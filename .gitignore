@@ -1,7 +1,2 @@
-__pycache__/sst.cpython-39.pyc
-__pycache__/torch_ddp_neural_classifier.cpython-39.pyc
-__pycache__/torch_model_base.cpython-39.pyc
-__pycache__/torch_rnn_classifier.cpython-39.pyc
-__pycache__/torch_shallow_neural_classifier.cpython-39.pyc
-__pycache__/utils.cpython-39.pyc
+__pycache__/
 .vscode/settings.json

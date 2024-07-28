@@ -10,15 +10,88 @@ from sklearn.metrics import f1_score
 from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 import sys
 import os
-
-__author__ = "Christopher Potts"
-__version__ = "CS224u, Stanford, Spring 2023"
-
+import torch
+import torch.distributed as dist
+import torch.nn as nn
 
 START_SYMBOL = "<s>"
 END_SYMBOL = "</s>"
 UNK_SYMBOL = "$UNK"
 
+
+def format_time(seconds):
+    if seconds >= 1:
+        hrs, secs = divmod(seconds, 3600)
+        mins, secs = divmod(secs, 60)
+        formatted_time = []
+        if hrs > 0:
+            formatted_time.append(f"{int(hrs):,}h")
+        if mins > 0:
+            formatted_time.append(f"{int(mins):,}m")
+        if secs >= 1:
+            formatted_time.append(f"{int(secs):,}s")
+        else:
+            millisecs = int((secs - int(secs)) * 1e3)
+            formatted_time.append(f"{millisecs:,}ms")
+        return ' '.join(formatted_time)
+    else:
+        millisecs = int(seconds * 1e3)
+        return f"{millisecs:,}ms"
+
+def setup_environment(rank, world_size, backend, device, debug):
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "12355"
+    dist.init_process_group(backend=backend, rank=rank, world_size=world_size)
+    print(f"Rank {rank} - Device: {device}")
+    dist.barrier()
+    if rank == 0:
+        print(f"{world_size} process groups initialized with '{backend}' backend on {os.environ['MASTER_ADDR']}:{os.environ['MASTER_PORT']}")
+
+def cleanup_environment(rank, debug):
+    if dist.is_initialized():
+        dist.destroy_process_group()
+        if debug:
+            print(f"Rank {rank} - Process group destroyed")
+
+def prepare_device(rank, device_type):
+    if device_type == "cuda":
+        device = torch.device('cuda', rank)
+        torch.cuda.set_device(device)
+    else:
+        device = torch.device('cpu')
+    return device
+
+def gather_tensors(tensor, world_size):
+    gather_list = [torch.zeros_like(tensor) for _ in range(world_size)]
+    dist.all_gather(gather_list, tensor)
+    return torch.cat(gather_list)
+
+def convert_numeric_to_labels(numeric_preds, label_dict):
+    if label_dict is None:
+        label_dict = {0: 'negative', 1: 'neutral', 2: 'positive'}
+    return [label_dict[pred] for pred in numeric_preds]
+
+def convert_sst_label(s):
+    return s.split(" ")[-1]
+
+def get_activation(activation):
+    if activation == "relu":
+        return nn.ReLU()
+    elif activation == "tanh":
+        return nn.Tanh()
+    elif activation == "sigmoid":
+        return nn.Sigmoid()
+    elif activation == "identity":
+        return nn.Identity()
+    else:
+        raise ValueError(f"Unknown activation function: {activation}")
+    
+def set_threads(num_threads):
+    os.environ['OMP_NUM_THREADS'] = str(num_threads)
+    os.environ['MKL_NUM_THREADS'] = str(num_threads)
+    os.environ['NUMEXPR_NUM_THREADS'] = str(num_threads)
+    os.environ['VECLIB_MAXIMUM_THREADS'] = str(num_threads)
+    os.environ['OPENBLAS_NUM_THREADS'] = str(num_threads)
 
 def glove2dict(src_filename):
     """
