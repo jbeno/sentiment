@@ -280,7 +280,7 @@ def bert_phi(texts, tokenizer, model, pooling, device, batch_size, sample_texts,
     return final_embeddings.to(device) 
 
 def initialize_classifier(num_layers, hidden_dim, batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol,
-                          rank, debug):
+                          rank, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint):
     class_init_start = time.time()
     hidden_activation = get_activation(hidden_activation)
     print(f"\nInitializing DDP Neural Classifier...") if rank == 0 else None
@@ -296,7 +296,10 @@ def initialize_classifier(num_layers, hidden_dim, batch_size, epochs, lr, early_
         tol=tol,
         eta=lr,
         rank=rank,
-        debug=debug)
+        debug=debug,
+        checkpoint_dir=checkpoint_dir,
+        checkpoint_interval=checkpoint_interval,
+        resume_from_checkpoint=resume_from_checkpoint)
     dist.barrier()
     if rank == 0:
         print(classifier) if debug else None
@@ -329,7 +332,7 @@ def evaluate_model(model, X_dev, y_dev, label_dict, numeric_dict, world_size, de
 
 def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_name, hidden_activation, label_dict, numeric_dict,
          num_layers, hidden_dim, batch_size=32, epochs=10, lr=0.001, sample_percent=None, random_seed=42, early_stop=True, 
-         n_iter_no_change=10, tol=1e-5, pooling='cls', debug=False):
+         n_iter_no_change=10, tol=1e-5, pooling='cls', debug=False, checkpoint_dir='checkpoints', checkpoint_interval=10, resume_from_checkpoint=False):
     try:
         start_time = time.time()
         # Initialize the distributed environment
@@ -344,7 +347,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
 
         # Initialize and train the neural classifier
         classifier = initialize_classifier(num_layers, hidden_dim, batch_size, epochs, lr, early_stop, hidden_activation,
-                                        n_iter_no_change, tol, rank, debug)
+                                        n_iter_no_change, tol, rank, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint)
         classifier.fit(X_train, y_train, rank, world_size, device, debug)
 
         # Evaluate the model
@@ -377,6 +380,9 @@ if __name__ == '__main__':
     parser.add_argument('--pooling', type=str, default='cls', help='Pooling method for BERT embeddings')
     parser.add_argument('--num_threads', type=int, default=None, help='Number of threads for CPU training')
     parser.add_argument('--debug', type=bool, default=False, help='Debug mode (default: False)')
+    parser.add_argument('--checkpoint_dir', type=str, default='checkpoints', help='Directory to save checkpoints (default: checkpoints)')
+    parser.add_argument('--checkpoint_interval', type=int, default=10, help='Checkpoint interval in epochs (default: 10)')
+    parser.add_argument('--resume_from_checkpoint', action='store_true', default=False)
     args = parser.parse_args()
 
     print("\nStarting DDP PyTorch Training...")
@@ -433,7 +439,10 @@ if __name__ == '__main__':
                       args.n_iter_no_change,
                       args.tol,
                       args.pooling,
-                      args.debug),
+                      args.debug,
+                      args.checkpoint_dir,
+                      args.checkpoint_interval,
+                      args.resume_from_checkpoint),
                 nprocs=world_size,
                 join=True)
     except Exception as e:

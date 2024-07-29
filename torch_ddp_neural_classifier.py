@@ -5,9 +5,10 @@ import torch.utils.data
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch_model_base import TorchModelBase
+import os
 import time
 import utils
-from utils import format_time, convert_numeric_to_labels, convert_labels_to_tensor
+from utils import format_time
 
 class TorchDDPNeuralClassifier(TorchModelBase):
     def __init__(self,
@@ -19,6 +20,9 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                  tol=1e-5,
                  rank=None,
                  debug=False,
+                 checkpoint_dir=None,
+                 checkpoint_interval=None,
+                 resume_from_checkpoint=False,
                  **base_kwargs):
         """
         A flexible neural network classifier with Distributed Data Parallel (DDP) support.
@@ -114,6 +118,9 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.tol = tol
         self.rank = rank
         self.debug = debug
+        self.checkpoint_dir = checkpoint_dir
+        self.checkpoint_interval = checkpoint_interval
+        self.resume_from_checkpoint = resume_from_checkpoint
         super().__init__(**base_kwargs)
         self.loss = nn.CrossEntropyLoss(reduction="mean")
         self.params += ['hidden_dim', 'hidden_activation', 'num_layers', 
@@ -151,6 +158,46 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             dataset = torch.utils.data.TensorDataset(X, y)
         return dataset
 
+    def _update_no_improvement_count_early_stopping(self, X, y, epoch, debug):
+        current_score = self.score(X, y)
+        if self.best_score is None or current_score > self.best_score + self.tol:
+            self.best_score = current_score
+            self.no_improvement_count = 0
+        else:
+            self.no_improvement_count += 1
+        if debug and self.rank == 0:
+            print(f"Epoch: {epoch+1}, Current Score: {current_score}, Best Score: {self.best_score}, No Improvement Count: {self.no_improvement_count}")
+
+    def _update_no_improvement_count_errors(self, epoch_loss, epoch, debug):
+        if self.best_score is None or epoch_loss < self.best_score - self.tol:
+            self.best_score = epoch_loss
+            self.no_improvement_count = 0
+        else:
+            self.no_improvement_count += 1
+        if debug and self.rank == 0:
+            print(f"Epoch: {epoch+1}, Current Loss: {epoch_loss}, Best Loss: {self.best_score}, No Improvement Count: {self.no_improvement_count}")
+
+    def save_checkpoint(self, epoch, optimizer):
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict()
+        }
+        if not os.path.exists(self.checkpoint_dir):
+            print(f"Creating checkpoint directory: {self.checkpoint_dir}")
+            os.makedirs(self.checkpoint_dir)
+        # Create a filename timestamp
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        torch.save(checkpoint, os.path.join(self.checkpoint_dir, f'checkpoint_epoch_{epoch+1}_{timestamp}.pth'))
+        print(f"Saved checkpoint: {self.checkpoint_dir}/checkpoint_epoch_{epoch+1}_{timestamp}.pth")
+
+    def load_checkpoint(self, optimizer):
+        latest_checkpoint = max([os.path.join(self.checkpoint_dir, d) for d in os.listdir(self.checkpoint_dir)], key=os.path.getctime)
+        checkpoint = torch.load(latest_checkpoint)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        return checkpoint['epoch']
+
     def fit(self, X, y, rank, world_size, device, debug=False):
         training_start = time.time()
         if rank == 0:
@@ -174,6 +221,10 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             self.model = DDP(self.model, device_ids=None)
         optimizer = self.build_optimizer()
 
+        start_epoch = 0
+        if self.resume_from_checkpoint and self.checkpoint_dir and os.listdir(self.checkpoint_dir):
+            start_epoch = self.load_checkpoint(optimizer)
+
         if rank == 0:
             print(f"Model architecture:\n{self.model}") if debug else None
             print(f"Starting training loop...")
@@ -181,7 +232,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.model.train()
 
         stop_training = torch.tensor(0, device=device)
-        for epoch in range(self.max_iter):
+        for epoch in range(start_epoch, self.max_iter):
             epoch_start = time.time()
             if device.type == 'cuda':
                 sampler.set_epoch(epoch)
@@ -200,15 +251,19 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             print(f"Epoch {epoch+1}, Loss: {loss.item():.6f}, Time: {format_time(time.time() - epoch_start)}") if rank == 0 else None
 
             if rank == 0:
+                if self.checkpoint_interval and (epoch+1) % self.checkpoint_interval == 0:
+                    print(f"Saving checkpoint at epoch {epoch+1}...")
+                    self.save_checkpoint(epoch, optimizer)
+
                 # Early stopping logic
                 if self.early_stopping:
-                    self._update_no_improvement_count_early_stopping(X, y)
+                    self._update_no_improvement_count_early_stopping(X, y, epoch, debug)
                     if self.no_improvement_count > self.n_iter_no_change:
                         if self.display_progress:
                             print(f"Stopping early after {epoch+1} epochs due to no improvement.")
                         stop_training = torch.tensor(1, device=device)
                 else:
-                    self._update_no_improvement_count_errors(epoch_loss)
+                    self._update_no_improvement_count_errors(epoch_loss, epoch, debug)
                     if self.no_improvement_count > self.n_iter_no_change:
                         if self.display_progress:
                             print(f"Stopping early after {epoch+1} epochs due to no improvement.")
@@ -256,9 +311,13 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             device = self.device
         self.model.to(device)
         self.model.eval()
+        if isinstance(X, np.ndarray):
+            X = torch.FloatTensor(X)
+        X = X.to(device)
         with torch.no_grad():
             preds = self.model(X)
         return preds
+
 
     def to(self, device):
         if self.model:
