@@ -7,7 +7,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch_model_base import TorchModelBase
 import time
 import utils
-from utils import format_time
+from utils import format_time, convert_numeric_to_labels, convert_labels_to_tensor
 
 class TorchDDPNeuralClassifier(TorchModelBase):
     def __init__(self,
@@ -230,26 +230,33 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
         return self
 
-    def score(self, X, y, device=None):
-        preds = self.predict(X, device=device)
+    def score(self, X, y, device=None, debug=False):
+        if debug:
+            print(f"Scoring on {len(X)} samples...")
+            print(f"X shape: {X.shape}")
+            print(f"X type: {X.dtype}")
+            print(f"X device: {X.device}")
+            print(f"X[:5]: {X[:5]}")
+            print(f"y[:5]: {y[:5]}")
+            print(f"y type: {y.dtype}")
+        preds = self.predict(X, device=device, debug=debug)
         return utils.safe_macro_f1(y, preds)
 
-    def predict_proba(self, X, device=None):
-        preds = self._predict(X, device=device)
+    def predict_proba(self, X, device=None, debug=False):
+        preds = self._predict(X, device=device, debug=debug)
         probs = torch.softmax(preds, dim=1).cpu().numpy()
         return probs
 
-    def predict(self, X, device=None):
-        probs = self.predict_proba(X, device=device)
+    def predict(self, X, device=None, debug=False):
+        probs = self.predict_proba(X, device=device, debug=debug)
         return [self.classes_[i] for i in probs.argmax(axis=1)]
 
-    def _predict(self, X, device=None):
+    def _predict(self, X, device=None, debug=False):
         if device is None:
             device = self.device
         self.model.to(device)
         self.model.eval()
         with torch.no_grad():
-            X = torch.FloatTensor(X).to(device)
             preds = self.model(X)
         return preds
 

@@ -13,6 +13,7 @@ import os
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+from contextlib import contextmanager
 
 START_SYMBOL = "<s>"
 END_SYMBOL = "</s>"
@@ -66,10 +67,16 @@ def gather_tensors(tensor, world_size):
     dist.all_gather(gather_list, tensor)
     return torch.cat(gather_list)
 
-def convert_numeric_to_labels(numeric_preds, label_dict):
+def convert_labels_to_tensor(labels, label_dict, device):
     if label_dict is None:
-        label_dict = {0: 'negative', 1: 'neutral', 2: 'positive'}
-    return [label_dict[pred] for pred in numeric_preds]
+        label_dict = {'negative': 0, 'neutral': 1, 'positive': 2}
+    numeric_labels = [label_dict[label] for label in labels]
+    return torch.tensor(numeric_labels, dtype=torch.long).to(device)
+
+def convert_numeric_to_labels(numeric_preds, numeric_dict):
+    if numeric_dict is None:
+        numeric_dict = {0: 'negative', 1: 'neutral', 2: 'positive'}
+    return [numeric_dict[pred] for pred in numeric_preds]
 
 def convert_sst_label(s):
     return s.split(" ")[-1]

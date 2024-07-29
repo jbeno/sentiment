@@ -7,6 +7,7 @@ warnings.filterwarnings("ignore", message="promote has been superseded by promot
 # Standard library imports
 import argparse
 import os
+import sys
 import time
 from collections import Counter
 
@@ -31,6 +32,7 @@ from utils import (
     prepare_device, 
     fix_random_seeds,
     convert_numeric_to_labels, 
+    convert_labels_to_tensor,
     format_time, 
     convert_sst_label, 
     get_activation,
@@ -38,6 +40,11 @@ from utils import (
 )
 from torch_ddp_neural_classifier import TorchDDPNeuralClassifier
 
+# Suppress Hugging Face library warnings
+import logging
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("datasets").setLevel(logging.ERROR)
+logging.getLogger("huggingface_hub.repocard").setLevel(logging.ERROR)
 
 def initialize_bert_model(weights_name, device, rank, device_type, debug):
     model_init_start = time.time()
@@ -58,10 +65,10 @@ def load_data(dataset, eval_dataset, sample_percent, rank, debug):
     data_load_start = time.time()
     print(f"\nLoading data...") if rank == 0 else None
     if eval_dataset is not None:
-        print("Using different datasets for training and evaluation")
+        print("Using different datasets for training and evaluation") if rank == 0 else None
     else:
         eval_dataset = dataset
-        print("Using the same dataset for training and evaluation")
+        print("Using the same dataset for training and evaluation") if rank == 0 else None
     
     # Function to get a subset of data based on split name
     def get_split(data, split):
@@ -277,7 +284,7 @@ def initialize_classifier(num_layers, hidden_dim, batch_size, epochs, lr, early_
     class_init_start = time.time()
     hidden_activation = get_activation(hidden_activation)
     print(f"\nInitializing DDP Neural Classifier...") if rank == 0 else None
-    print(f"Number of Layers: {num_layers}, Hidden dimension: {hidden_dim}, Hidden activation: {hidden_activation}, Batch size: {batch_size}, Max epochs: {epochs}, Early stop: {early_stop}")
+    print(f"Number of Layers: {num_layers}, Hidden dimension: {hidden_dim}, Hidden activation: {hidden_activation}, Batch size: {batch_size}, Max epochs: {epochs}, Early stop: {early_stop}") if rank == 0 else None
     classifier = TorchDDPNeuralClassifier(
         num_layers=num_layers,
         early_stopping=early_stop,
@@ -296,7 +303,7 @@ def initialize_classifier(num_layers, hidden_dim, batch_size, epochs, lr, early_
         print(f"Classifier initialized ({format_time(time.time() - class_init_start)})")
     return classifier
 
-def evaluate_model(model, X_dev, y_dev, label_dict, world_size, device, rank, debug):
+def evaluate_model(model, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug):
     eval_start = time.time()
     print("\nEvaluating model...") if rank == 0 else None
     model.model.eval()
@@ -309,15 +316,18 @@ def evaluate_model(model, X_dev, y_dev, label_dict, world_size, device, rank, de
         dist.all_gather(all_preds, preds)
         if rank == 0:
             all_preds = torch.cat(all_preds, dim=0)[:len(y_dev)]
-            preds_labels = convert_numeric_to_labels(all_preds.argmax(dim=1).cpu().numpy(), label_dict)
+            preds_labels = convert_numeric_to_labels(all_preds.argmax(dim=1).cpu().numpy(), numeric_dict)
             print(f"Predictions: {len(preds_labels)}, True labels: {len(y_dev)}") if debug else None
             print("\nClassification report:")
             print(classification_report(y_dev, preds_labels, digits=3, zero_division=0))
-            macro_f1_score = model.score(X_dev, y_dev)
+            # check if y_dev is not a tensor
+            # if not torch.is_tensor(y_dev):
+            #     y_dev = convert_labels_to_tensor(y_dev, label_dict, device)
+            macro_f1_score = model.score(X_dev, y_dev, device, debug)
             print(f"Macro F1 Score: {macro_f1_score:.2f}")
             print(f"\nEvaluation completed ({format_time(time.time() - eval_start)})")
 
-def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_name, hidden_activation, label_dict,
+def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_name, hidden_activation, label_dict, numeric_dict,
          num_layers, hidden_dim, batch_size=32, epochs=10, lr=0.001, sample_percent=None, random_seed=42, early_stop=True, 
          n_iter_no_change=10, tol=1e-5, pooling='cls', debug=False):
     try:
@@ -334,11 +344,11 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
 
         # Initialize and train the neural classifier
         classifier = initialize_classifier(num_layers, hidden_dim, batch_size, epochs, lr, early_stop, hidden_activation,
-                                           n_iter_no_change, tol, rank, debug)
+                                        n_iter_no_change, tol, rank, debug)
         classifier.fit(X_train, y_train, rank, world_size, device, debug)
 
         # Evaluate the model
-        evaluate_model(classifier, X_dev, y_dev, label_dict, world_size, device, rank, debug)
+        evaluate_model(classifier, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug)
         print(f"TOTAL Time: {format_time(time.time() - start_time)}") if rank == 0 else None
         dist.barrier()
     finally:
@@ -350,7 +360,8 @@ if __name__ == '__main__':
     parser.add_argument('--eval_dataset', type=str, default=None, help='Evaluation dataset to use: sst or dynasent')
     parser.add_argument('--weights_name', type=str, default='bert-base-uncased', help='Pre-trained model name')
     parser.add_argument('--hidden_activation', type=str, default='tanh', help='Hidden activation function')
-    parser.add_argument('--label_dict', type=dict, default={0: 'negative', 1: 'neutral', 2: 'positive'}, help='Label dictionary')
+    parser.add_argument('--label_dict', type=dict, default={'negative': 0, 'neutral': 1, 'positive': 2}, help='Text label dictionary, string to numeric')
+    parser.add_argument('--numeric_dict', type=dict, default={0: 'negative', 1: 'neutral', 2: 'positive'}, help='Numeric label dictionary, numeric to string')
     parser.add_argument('--num_layers', type=int, default=1, help='Number of hidden layers for neural classifier')
     parser.add_argument('--hidden_dim', type=int, default=300, help='Hidden dimension for neural classifier')
     parser.add_argument('--device', type=str, default=None, help="Device: auto-detected, or specify 'cuda' or 'cpu'")
@@ -369,6 +380,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     print("\nStarting DDP PyTorch Training...")
+
+    if args.debug:
+        print("Arguments:")
+        for arg in vars(args):
+            print(f"{arg}: {getattr(args, arg)}")
+
     device_type = args.device if args.device is not None else ("cuda" if torch.cuda.is_available() else "cpu")
 
     if device_type == "cuda":
@@ -404,6 +421,7 @@ if __name__ == '__main__':
                       args.weights_name,
                       args.hidden_activation,
                       args.label_dict,
+                      args.numeric_dict,
                       args.num_layers,
                       args.hidden_dim,
                       args.batch_size,
