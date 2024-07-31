@@ -10,10 +10,12 @@ from sklearn.metrics import f1_score
 from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 import sys
 import os
+import signal
 import torch
 import torch.distributed as dist
 import torch.nn as nn
 from contextlib import contextmanager
+import multiprocessing as mp
 
 START_SYMBOL = "<s>"
 END_SYMBOL = "</s>"
@@ -48,11 +50,30 @@ def setup_environment(rank, world_size, backend, device, debug):
     if rank == 0:
         print(f"{world_size} process groups initialized with '{backend}' backend on {os.environ['MASTER_ADDR']}:{os.environ['MASTER_PORT']}")
 
-def cleanup_environment(rank, debug):
+def signal_handler(signum, frame):
+    print("\nCtrl+C received. Terminating all processes...")
+    cleanup_and_exit(0, True) 
+
+def cleanup_and_exit(rank, debug):
+    # Terminate all child processes
+    current_process = mp.current_process()
+    if current_process.name == 'MainProcess':
+        # For the main process, terminate all children
+        for child in mp.active_children():
+            child.terminate()
+    
+    # Destroy the process group
     if dist.is_initialized():
         dist.destroy_process_group()
         if debug:
             print(f"Rank {rank} - Process group destroyed")
+
+    # Clean up CUDA resources
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
+    # Exit the program
+    sys.exit(0)
 
 def prepare_device(rank, device_type):
     if device_type == "cuda":
@@ -70,13 +91,13 @@ def gather_tensors(tensor, world_size):
 def convert_labels_to_tensor(labels, label_dict, device):
     if label_dict is None:
         label_dict = {'negative': 0, 'neutral': 1, 'positive': 2}
-    numeric_labels = [label_dict[label] for label in labels]
+    numeric_labels = [label_dict.get(str(label), 'unknown') for label in labels]
     return torch.tensor(numeric_labels, dtype=torch.long).to(device)
 
 def convert_numeric_to_labels(numeric_preds, numeric_dict):
     if numeric_dict is None:
         numeric_dict = {0: 'negative', 1: 'neutral', 2: 'positive'}
-    return [numeric_dict[pred] for pred in numeric_preds]
+    return [numeric_dict.get(int(pred), 'unknown') for pred in numeric_preds]
 
 def convert_sst_label(s):
     return s.split(" ")[-1]
@@ -99,6 +120,40 @@ def set_threads(num_threads):
     os.environ['NUMEXPR_NUM_THREADS'] = str(num_threads)
     os.environ['VECLIB_MAXIMUM_THREADS'] = str(num_threads)
     os.environ['OPENBLAS_NUM_THREADS'] = str(num_threads)
+
+def print_state_summary(state_dict, indent=0):
+    indent_str = ' ' * indent
+    if isinstance(state_dict, dict):
+        for key, value in state_dict.items():
+            if isinstance(value, torch.Tensor):
+                if value.size():
+                    print(f"{indent_str}- {key}: Tensor of shape {list(value.size())}")
+                else:
+                    print(f"{indent_str}- {key}: {value.item()}")
+            elif isinstance(value, dict):
+                print(f"{indent_str}- {key}: Dictionary with keys {list(value.keys())}")
+                print_state_summary(value, indent + 2)
+            elif isinstance(value, list):
+                print(f"{indent_str}- {key}: List with {len(value)} elements")
+                print_state_summary(value, indent + 2)
+            else:
+                print(f"{indent_str}- {key}: {value}")
+    elif isinstance(state_dict, list):
+        for i, value in enumerate(state_dict):
+            if isinstance(value, torch.Tensor):
+                if value.size():
+                    print(f"{indent_str}- Element {i}: Tensor of shape {list(value.size())}")
+                else:
+                    print(f"{indent_str}- Element {i}: {value.item()}")
+            elif isinstance(value, dict):
+                print(f"{indent_str}- Element {i}: Dictionary with keys {list(value.keys())}")
+                print_state_summary(value, indent + 2)
+            elif isinstance(value, list):
+                print(f"{indent_str}- Element {i}: List with {len(value)} elements")
+                print_state_summary(value, indent + 2)
+            else:
+                print(f"{indent_str}- Element {i}: {value}")
+
 
 def glove2dict(src_filename):
     """

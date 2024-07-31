@@ -8,8 +8,10 @@ warnings.filterwarnings("ignore", message="promote has been superseded by promot
 import argparse
 import os
 import sys
+import signal
 import time
 from collections import Counter
+import traceback
 
 # PyTorch imports
 import torch
@@ -20,6 +22,7 @@ import torch.multiprocessing as mp
 
 # Third-party library imports
 import numpy as np
+import pandas as pd
 from transformers import BertTokenizer, BertModel
 from sklearn.metrics import classification_report
 import sst
@@ -28,7 +31,6 @@ from datasets import load_dataset
 # Custom utility imports
 from utils import (
     setup_environment, 
-    cleanup_environment, 
     prepare_device, 
     fix_random_seeds,
     convert_numeric_to_labels, 
@@ -36,7 +38,9 @@ from utils import (
     format_time, 
     convert_sst_label, 
     get_activation,
-    set_threads
+    set_threads,
+    signal_handler,
+    cleanup_and_exit
 )
 from torch_ddp_neural_classifier import TorchDDPNeuralClassifier
 
@@ -201,7 +205,7 @@ def process_data(bert_tokenizer, bert_model, pooling, train, dev, device, batch_
     if rank == 0:
         print(f"Train shape: {list(np.shape(X_train))}, Dev shape: {list(np.shape(X_dev))}")
         print(f"Data processed ({format_time(time.time() - data_process_start)})")
-    return X_train, X_dev, y_train, y_dev
+    return X_train, X_dev, y_train, y_dev, X_dev_sent
 
 def bert_phi(texts, tokenizer, model, pooling, device, batch_size, sample_texts, rank, debug):
     encoding_start = time.time()
@@ -279,12 +283,14 @@ def bert_phi(texts, tokenizer, model, pooling, device, batch_size, sample_texts,
 
     return final_embeddings.to(device) 
 
-def initialize_classifier(num_layers, hidden_dim, batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol,
-                          rank, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint):
+def initialize_classifier(num_layers, hidden_dim, batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change,
+                          tol, rank, device, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint,
+                          load_model=False, filename=None, use_saved_params=True):
     class_init_start = time.time()
     hidden_activation = get_activation(hidden_activation)
     print(f"\nInitializing DDP Neural Classifier...") if rank == 0 else None
     print(f"Number of Layers: {num_layers}, Hidden dimension: {hidden_dim}, Hidden activation: {hidden_activation}, Batch size: {batch_size}, Max epochs: {epochs}, Early stop: {early_stop}") if rank == 0 else None
+    
     classifier = TorchDDPNeuralClassifier(
         num_layers=num_layers,
         early_stopping=early_stop,
@@ -299,14 +305,32 @@ def initialize_classifier(num_layers, hidden_dim, batch_size, epochs, lr, early_
         debug=debug,
         checkpoint_dir=checkpoint_dir,
         checkpoint_interval=checkpoint_interval,
-        resume_from_checkpoint=resume_from_checkpoint)
+        resume_from_checkpoint=resume_from_checkpoint,
+        device=device
+    )
+
+    if load_model and filename is not None:
+        print(f"Loading model from: {checkpoint_dir}/{filename}...") if rank == 0 else None
+        start_epoch, optimizer_state_dict = classifier.load_model(directory=checkpoint_dir, filename=filename, pattern=None, use_saved_params=use_saved_params, rank=rank, debug=debug)
+    elif load_model and filename is None:
+        print("Loading the latest final model...") if rank == 0 else None
+        start_epoch, model_state_dict, optimizer_state_dict = classifier.load_model(directory=checkpoint_dir, filename=None, pattern='final_model', use_saved_params=use_saved_params, rank=rank, debug=debug)
+    elif resume_from_checkpoint:
+        print("Resuming training from the latest checkpoint...") if rank == 0 else None
+        start_epoch, model_state_dict, optimizer_state_dict = classifier.load_model(directory=checkpoint_dir, filename=None, pattern='checkpoint_epoch', use_saved_params=use_saved_params, rank=rank, debug=debug)
+    else:
+        start_epoch = 1
+        model_state_dict = None
+        optimizer_state_dict = None
+
     dist.barrier()
     if rank == 0:
         print(classifier) if debug else None
         print(f"Classifier initialized ({format_time(time.time() - class_init_start)})")
-    return classifier
+    return classifier, start_epoch, model_state_dict, optimizer_state_dict
 
-def evaluate_model(model, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug):
+def evaluate_model(model, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
+                   save_dir, X_dev_sent):
     eval_start = time.time()
     print("\nEvaluating model...") if rank == 0 else None
     model.model.eval()
@@ -321,18 +345,32 @@ def evaluate_model(model, X_dev, y_dev, label_dict, numeric_dict, world_size, de
             all_preds = torch.cat(all_preds, dim=0)[:len(y_dev)]
             preds_labels = convert_numeric_to_labels(all_preds.argmax(dim=1).cpu().numpy(), numeric_dict)
             print(f"Predictions: {len(preds_labels)}, True labels: {len(y_dev)}") if debug else None
+            # Save predictions if requested
+            if save_preds:
+                df = pd.DataFrame({
+                    'X_dev_sent': X_dev_sent,
+                    'y_dev': y_dev,
+                    'preds_labels': preds_labels
+                })
+                # Create a save directory if it doesn't exist
+                if not os.path.exists(save_dir):
+                    print(f"Creating save directory: {save_dir}")
+                    os.makedirs(save_dir)
+                # Create a filename timestamp
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                save_path = os.path.join(save_dir, f'predictions_{timestamp}.csv')
+                df.to_csv(save_path, index=False)
+                print(f"Saved predictions: {save_dir}/predictions_{timestamp}.csv")
             print("\nClassification report:")
             print(classification_report(y_dev, preds_labels, digits=3, zero_division=0))
-            # check if y_dev is not a tensor
-            # if not torch.is_tensor(y_dev):
-            #     y_dev = convert_labels_to_tensor(y_dev, label_dict, device)
             macro_f1_score = model.score(X_dev, y_dev, device, debug)
             print(f"Macro F1 Score: {macro_f1_score:.2f}")
             print(f"\nEvaluation completed ({format_time(time.time() - eval_start)})")
 
 def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_name, hidden_activation, label_dict, numeric_dict,
-         num_layers, hidden_dim, batch_size=32, epochs=10, lr=0.001, sample_percent=None, random_seed=42, early_stop=True, 
-         n_iter_no_change=10, tol=1e-5, pooling='cls', debug=False, checkpoint_dir='checkpoints', checkpoint_interval=10, resume_from_checkpoint=False):
+         num_layers, hidden_dim, batch_size=32, epochs=10, lr=0.001, sample_percent=None, random_seed=42, early_stop=None, 
+         n_iter_no_change=10, tol=1e-5, pooling='cls', debug=False, checkpoint_dir='checkpoints', checkpoint_interval=10, resume_from_checkpoint=False,
+         save_preds=False, save_dir='saves', load_model=False, filename=None, use_saved_params=True):
     try:
         start_time = time.time()
         # Initialize the distributed environment
@@ -343,21 +381,39 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         # Initialize BERT model and tokenizer. Load, tokenize and encode data
         bert_tokenizer, bert_model = initialize_bert_model(weights_name, device, rank, device_type, debug)
         train, dev = load_data(dataset, eval_dataset, sample_percent, rank, debug)
-        X_train, X_dev, y_train, y_dev = process_data(bert_tokenizer, bert_model, pooling, train, dev, device, batch_size, rank, debug)
+        X_train, X_dev, y_train, y_dev, X_dev_sent = process_data(bert_tokenizer, bert_model, pooling, train, dev, device, batch_size, rank, debug)
 
         # Initialize and train the neural classifier
-        classifier = initialize_classifier(num_layers, hidden_dim, batch_size, epochs, lr, early_stop, hidden_activation,
-                                        n_iter_no_change, tol, rank, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint)
-        classifier.fit(X_train, y_train, rank, world_size, device, debug)
+        classifier, start_epoch, model_state_dict, optimizer_state_dict = initialize_classifier(
+            num_layers, hidden_dim, batch_size, epochs, lr, early_stop, hidden_activation,
+            n_iter_no_change, tol, rank, device, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint,
+            load_model, filename, use_saved_params
+        )
+        classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict)
 
         # Evaluate the model
-        evaluate_model(classifier, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug)
+        evaluate_model(classifier, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
+                       save_dir, X_dev_sent)
         print(f"TOTAL Time: {format_time(time.time() - start_time)}") if rank == 0 else None
         dist.barrier()
+    except KeyboardInterrupt:
+        print("\nKeyboardInterrupt received. Terminating all processes...")
+        cleanup_and_exit(rank, debug)
+    except Exception as e:
+        print(f"An error occurred during training: {str(e)}")
+        traceback.print_exc()
+        cleanup_and_exit(rank, debug)
     finally:
-        cleanup_environment(rank, debug)
+        cleanup_and_exit(rank, debug)
+    
+    return
+
 
 if __name__ == '__main__':
+    # Register the signal handler
+    signal.signal(signal.SIGINT, signal_handler)
+    
+    # Parse command-line arguments
     parser = argparse.ArgumentParser(description="DDP PyTorch Training")
     parser.add_argument('--dataset', type=str, default='sst_local', help='Training dataset to use: sst or dynasent')
     parser.add_argument('--eval_dataset', type=str, default=None, help='Evaluation dataset to use: sst or dynasent')
@@ -374,15 +430,20 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate (default: 0.001)')
     parser.add_argument('--sample_percent', type=float, default=None, help='Percentage of data to use for training')
     parser.add_argument('--random_seed', type=int, default=42, help='Random seed (default: 42)')
-    parser.add_argument('--early_stop', type=bool, default=True, help='Use early stopping (default: True)')
+    parser.add_argument('--early_stop', type=str, default=None, help="Early stopping method, 'score' or 'loss' (default: None)")
     parser.add_argument('--n_iter_no_change', type=int, default=10, help='Number of iterations with no improvement to stop training')
     parser.add_argument('--tol', type=float, default=1e-5, help='Tolerance for early stopping')
     parser.add_argument('--pooling', type=str, default='cls', help='Pooling method for BERT embeddings')
     parser.add_argument('--num_threads', type=int, default=None, help='Number of threads for CPU training')
-    parser.add_argument('--debug', type=bool, default=False, help='Debug mode (default: False)')
-    parser.add_argument('--checkpoint_dir', type=str, default='checkpoints', help='Directory to save checkpoints (default: checkpoints)')
+    parser.add_argument('--debug', action='store_true', default=False, help='Debug mode (default: False)')
+    parser.add_argument('--checkpoint_dir', type=str, default='checkpoints', help='Directory to save and load checkpoints (default: checkpoints)')
     parser.add_argument('--checkpoint_interval', type=int, default=10, help='Checkpoint interval in epochs (default: 10)')
-    parser.add_argument('--resume_from_checkpoint', action='store_true', default=False)
+    parser.add_argument('--resume_from_checkpoint', action='store_true', default=False, help='Resume training from latest checkpoint (default: False)')
+    parser.add_argument("--save_preds", action='store_true', default=False, help="Save predictions to CSV (default: False)")
+    parser.add_argument("--save_dir", type=str, default='saves', help="Directory to save predictions (default: saves)")
+    parser.add_argument("--load_model", action='store_true', default=False, help="Load a pre-trained model or checkpoint (default: False)")
+    parser.add_argument("--filename", type=str, default=None, help="Filename of the model or checkpoint to load")
+    parser.add_argument("--use_saved_params", action='store_true', default=False, help="Use saved parameters for training, if loading a model (default: False)")
     args = parser.parse_args()
 
     print("\nStarting DDP PyTorch Training...")
@@ -442,10 +503,20 @@ if __name__ == '__main__':
                       args.debug,
                       args.checkpoint_dir,
                       args.checkpoint_interval,
-                      args.resume_from_checkpoint),
+                      args.resume_from_checkpoint,
+                      args.save_preds,
+                      args.save_dir,
+                      args.load_model,
+                      args.filename,
+                      args.use_saved_params),
                 nprocs=world_size,
                 join=True)
+    except KeyboardInterrupt:
+        print("\nKeyboardInterrupt received. Terminating all processes...")
     except Exception as e:
         print(f"An error occurred during training: {str(e)}")
+        traceback.print_exc()
     finally:
-        pass
+        cleanup_and_exit(0, args.debug)
+
+    print("All processes finished.")
