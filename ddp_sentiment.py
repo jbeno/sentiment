@@ -12,6 +12,7 @@ import signal
 import time
 from collections import Counter
 import traceback
+import zipfile
 
 # PyTorch imports
 import torch
@@ -19,6 +20,7 @@ import torch.distributed as dist
 import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.multiprocessing as mp
+from torch.utils.data import DataLoader, DistributedSampler, TensorDataset
 
 # Third-party library imports
 import numpy as np
@@ -50,7 +52,61 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 logging.getLogger("datasets").setLevel(logging.ERROR)
 logging.getLogger("huggingface_hub.repocard").setLevel(logging.ERROR)
 
+from torch.utils.data import Dataset
+
+class SentencesDataset(Dataset):
+    def __init__(self, sentences):
+        self.sentences = sentences
+
+    def __len__(self):
+        return len(self.sentences)
+
+    def __getitem__(self, idx):
+        return self.sentences[idx]
+
+def save_data_archive(X_train, X_dev, y_train, y_dev, X_dev_sent, world_size, device_type, data_dir):
+    # Create directory if it doesn't exist
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    
+    # Create filename with appropriate suffix and timestamp
+    suffix = f'_{world_size}_gpu' if device_type == 'cuda' else '_1_cpu'
+    timestamp = time.strftime('%Y%m%d-%H%M%S')
+    filename = f'data{suffix}_{timestamp}.npz'
+    filepath = os.path.join(data_dir, filename)
+
+    # Save data to archive file
+    np.savez_compressed(filepath, X_train=X_train, X_dev=X_dev, y_train=y_train, y_dev=y_dev, X_dev_sent=X_dev_sent)
+    print(f"Data saved to: {filepath}")
+
+def load_data_archive(archive_file, device, rank):
+    load_archive_start = time.time()
+    
+    # Check if the archive file path is provided
+    if archive_file is None:
+        raise ValueError("No archive file provided to load data from")
+    
+    # Check if the archive file exists
+    if not os.path.exists(archive_file):
+        raise FileNotFoundError(f"Archive file not found: {archive_file}")
+    
+    # Attempt to load the data from the archive file
+    try:
+        print(f"\nLoading archived data from: {archive_file}...") if rank == 0 else None
+        with np.load(archive_file, allow_pickle=True) as data:
+            X_train = data['X_train']
+            X_dev = data['X_dev']
+            y_train = data['y_train']
+            y_dev = data['y_dev']
+            X_dev_sent = data['X_dev_sent']
+        print(f"Archived data loaded ({format_time(time.time() - load_archive_start)})") if rank == 0 else None
+    except Exception as e:
+        raise RuntimeError(f"Failed to load data from archive file {archive_file}: {str(e)}")
+    
+    return X_train, X_dev, y_train, y_dev, X_dev_sent
+
 def initialize_bert_model(weights_name, device, rank, device_type, debug):
+    torch.manual_seed(42)  # Set a fixed seed for model initialization
     model_init_start = time.time()
     print(f"\nInitializing '{weights_name}' tokenizer and model...") if rank == 0 else None
     bert_tokenizer = BertTokenizer.from_pretrained(weights_name)
@@ -173,20 +229,24 @@ def load_data(dataset, eval_dataset, sample_percent, rank, debug):
 
     return train, dev
 
-def process_data(bert_tokenizer, bert_model, pooling, train, dev, device, batch_size, rank, debug):
+def process_data(bert_tokenizer, bert_model, pooling, world_size, train, dev, device, batch_size, rank, debug, save_archive, save_dir):
     data_process_start = time.time()
     if rank == 0:
         print(f"\nProcessing data (Batch size: {batch_size}, Pooling: {pooling.upper() if pooling == 'cls' else pooling.capitalize()})...")
         print(f"Extracting sentences and labels...")
+        
     # Extract y labels
     y_train = train.label.values
     y_dev = dev.label.values
+    
     # Extract X sentences
     X_train_sent = train.sentence.values
     X_dev_sent = dev.sentence.values
+    
     # Generate random indices
     train_indices = np.random.choice(len(X_train_sent), 3, replace=False)
     dev_indices = np.random.choice(len(X_dev_sent), 3, replace=False)
+    
     # Print samples and collect sample sentences
     train_samples = []
     dev_samples = []
@@ -194,40 +254,57 @@ def process_data(bert_tokenizer, bert_model, pooling, train, dev, device, batch_
         for i in train_indices:
             train_samples.append((f'Train[{i}]: ', X_train_sent[i], f' - {y_train[i].upper()}'))
         for i in dev_indices:
-            train_samples.append((f'Dev[{i}]: ', X_dev_sent[i], f' - {y_dev[i].upper()}'))
+            dev_samples.append((f'Dev[{i}]: ', X_dev_sent[i], f' - {y_dev[i].upper()}'))
+
     # Process X sentences (tokenize and encode with BERT)
-    X_train_tensor = bert_phi(X_train_sent, bert_tokenizer, bert_model, pooling, device, batch_size, train_samples, rank, debug).to(device)
-    X_dev_tensor = bert_phi(X_dev_sent, bert_tokenizer, bert_model, pooling, device, batch_size, dev_samples, rank, debug).to(device)
+    X_train_tensor = bert_phi(X_train_sent, bert_tokenizer, bert_model, pooling, world_size, device, batch_size, train_samples, rank, debug, split='train').to(device)
+    X_dev_tensor = bert_phi(X_dev_sent, bert_tokenizer, bert_model, pooling, world_size, device, batch_size, dev_samples, rank, debug, split='dev').to(device)
+    
     # Convert tensors to numpy arrays on CPU
     X_train = X_train_tensor.cpu().numpy()
     X_dev = X_dev_tensor.cpu().numpy()
+    
+    if save_archive and rank == 0:
+        save_data_archive(X_train, X_dev, y_train, y_dev, X_dev_sent, world_size, device.type, save_dir)
+    
     dist.barrier()
     if rank == 0:
         print(f"Train shape: {list(np.shape(X_train))}, Dev shape: {list(np.shape(X_dev))}")
         print(f"Data processed ({format_time(time.time() - data_process_start)})")
+    
     return X_train, X_dev, y_train, y_dev, X_dev_sent
 
-def bert_phi(texts, tokenizer, model, pooling, device, batch_size, sample_texts, rank, debug):
+
+def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, sample_texts, rank, debug, split):
     encoding_start = time.time()
-    total_batches = len(texts) // batch_size + 1
-    print(f"Encoding {len(texts)} sentences with BERT...") if rank == 0 else None
+    total_texts = len(texts)
+    
+    # Divide texts among GPUs
+    texts_per_gpu = (total_texts + world_size - 1) // world_size  # Round up
+    start_idx = rank * texts_per_gpu
+    end_idx = min(start_idx + texts_per_gpu, total_texts)
+    local_texts = texts[start_idx:end_idx]
+    
+    total_batches_per_rank = (len(local_texts) + batch_size - 1) // batch_size
+    total_batches = total_batches_per_rank * world_size
+
+    if rank == 0:
+        print(f"\nEncoding {split.capitalize()} data of {total_texts} texts...")
+        print(f"Texts per GPU: {texts_per_gpu}")
+        print(f"Total batches per rank: {total_batches_per_rank}")
+        print(f"Total batches across all ranks: {total_batches}")
 
     embeddings = []
 
-    # Process and display sample texts first
-    if debug and rank == 0:
-        print(f"\nPooling strategy: {pooling.upper() if pooling == 'cls' else pooling.capitalize()}")
-        for text in sample_texts:
-            # Tokenize the text and get the tokens
-            tokens = tokenizer.tokenize(text[1])
-            print(f"{text[0]}{text[1]}{text[2]}")
-            print(f"Tokens: {tokens}")
-            
-            # Encode the text (including special tokens) and get embeddings
-            encoded = tokenizer.encode_plus(
-                text,
+    model.eval()
+    with torch.no_grad():
+        for i in range(0, len(local_texts), batch_size):
+            batch_start = time.time()
+            batch_texts = local_texts[i:i + batch_size]
+            encoded = tokenizer.batch_encode_plus(
+                batch_texts,
                 add_special_tokens=True,
-                padding='max_length',
+                padding='longest',
                 truncation=True,
                 max_length=512,
                 return_tensors="pt"
@@ -235,53 +312,43 @@ def bert_phi(texts, tokenizer, model, pooling, device, batch_size, sample_texts,
             input_ids = encoded['input_ids'].to(device)
             attention_mask = encoded['attention_mask'].to(device)
             
-            with torch.no_grad():
-                outputs = model(input_ids, attention_mask=attention_mask)
-            
-            if pooling == 'cls':
-                embedding = outputs.last_hidden_state[:, 0, :]
-            elif pooling == 'mean':
-                embedding = (outputs.last_hidden_state * attention_mask.unsqueeze(-1)).sum(1) / attention_mask.sum(-1).unsqueeze(-1)
-            elif pooling == 'max':
-                embedding = torch.max(outputs.last_hidden_state * attention_mask.unsqueeze(-1), dim=1)[0]
-            
-            print(f"Embedding: {embedding[0, :6].cpu().numpy()} ...")
-            print()
-
-    for i in range(0, len(texts), batch_size):
-        batch_start = time.time()
-        batch_texts = texts[i:i + batch_size]
-        encoded = tokenizer.batch_encode_plus(
-            batch_texts,
-            add_special_tokens=True,
-            padding=True,
-            truncation=True,
-            max_length=512,
-            return_tensors="pt"
-        )
-        input_ids = encoded['input_ids'].to(device)
-        attention_mask = encoded['attention_mask'].to(device)
-        with torch.no_grad():
             outputs = model(input_ids, attention_mask=attention_mask)
 
-        # Perform only the selected pooling strategy for all batches
-        if pooling == 'cls':
-            batch_embeddings = outputs.last_hidden_state[:, 0, :]
-        elif pooling == 'mean':
-            batch_embeddings = (outputs.last_hidden_state * attention_mask.unsqueeze(-1)).sum(1) / attention_mask.sum(-1).unsqueeze(-1)
-        elif pooling == 'max':
-            batch_embeddings = torch.max(outputs.last_hidden_state * attention_mask.unsqueeze(-1), dim=1)[0]
-        else:
-            raise ValueError(f"Unknown pooling strategy: {pooling}")
-        
-        embeddings.append(batch_embeddings)
-        final_embeddings = torch.cat(embeddings, dim=0)
-        print(f"Batch {(i // batch_size) + 1} of {total_batches}, Shape: {list(batch_embeddings.shape)}, Time: {format_time(time.time() - batch_start)}") if rank == 0 else None
+            if pooling == 'cls':
+                batch_embeddings = outputs.last_hidden_state[:, 0, :]
+            elif pooling == 'mean':
+                batch_embeddings = (outputs.last_hidden_state * attention_mask.unsqueeze(-1)).sum(1) / attention_mask.sum(-1).unsqueeze(-1)
+            elif pooling == 'max':
+                batch_embeddings = torch.max(outputs.last_hidden_state * attention_mask.unsqueeze(-1), dim=1)[0]
+            
+            embeddings.append(batch_embeddings)
+            
+            batch_num = i // batch_size + 1
+            print(f"Rank {rank}: Batch {batch_num:2d} / {total_batches_per_rank}, Shape: {list(batch_embeddings.shape)}, Time: {format_time(time.time() - batch_start)}")
+
+    local_embeddings = torch.cat(embeddings, dim=0)
+    
+    # Pad local embeddings to ensure all have the same size
+    padding_size = texts_per_gpu - local_embeddings.shape[0]
+    if padding_size > 0:
+        padding = torch.zeros((padding_size, local_embeddings.shape[1]), device=device)
+        local_embeddings = torch.cat([local_embeddings, padding], dim=0)
+    
+    # Gather embeddings from all processes
+    gathered_embeddings = [torch.zeros_like(local_embeddings, device=device) for _ in range(world_size)]
+    dist.all_gather(gathered_embeddings, local_embeddings)
+    
+    # Remove padding and concatenate
+    final_embeddings = torch.cat([emb[:texts_per_gpu] for emb in gathered_embeddings], dim=0)
+    final_embeddings = final_embeddings[:total_texts]  # Trim to the correct size
 
     dist.barrier()
-    print(f"Encoding completed ({format_time(time.time() - encoding_start)})") if rank == 0 else None
 
-    return final_embeddings.to(device) 
+    if rank == 0 and debug:
+        print(f"\nEncoding completed ({format_time(time.time() - encoding_start)})")
+        print(f"Final embeddings shape: {final_embeddings.shape}")
+
+    return final_embeddings
 
 def initialize_classifier(num_layers, hidden_dim, batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change,
                           tol, rank, device, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint,
@@ -370,7 +437,7 @@ def evaluate_model(model, X_dev, y_dev, label_dict, numeric_dict, world_size, de
 def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_name, hidden_activation, label_dict, numeric_dict,
          num_layers, hidden_dim, batch_size=32, epochs=10, lr=0.001, sample_percent=None, random_seed=42, early_stop=None, 
          n_iter_no_change=10, tol=1e-5, pooling='cls', debug=False, checkpoint_dir='checkpoints', checkpoint_interval=10, resume_from_checkpoint=False,
-         save_preds=False, save_dir='saves', load_model=False, filename=None, use_saved_params=True):
+         save_preds=False, save_dir='saves', load_model=False, filename=None, use_saved_params=True, save_archive=False, archive_file=None):
     try:
         start_time = time.time()
         # Initialize the distributed environment
@@ -378,10 +445,14 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         setup_environment(rank, world_size, backend, device, debug)
         fix_random_seeds(random_seed)
 
-        # Initialize BERT model and tokenizer. Load, tokenize and encode data
-        bert_tokenizer, bert_model = initialize_bert_model(weights_name, device, rank, device_type, debug)
-        train, dev = load_data(dataset, eval_dataset, sample_percent, rank, debug)
-        X_train, X_dev, y_train, y_dev, X_dev_sent = process_data(bert_tokenizer, bert_model, pooling, train, dev, device, batch_size, rank, debug)
+        if archive_file is not None:
+            # Load previously processed data from an archive file
+            X_train, X_dev, y_train, y_dev, X_dev_sent = load_data_archive(archive_file, device, rank)
+        else:
+            # Initialize BERT model and tokenizer. Load, tokenize and encode data
+            bert_tokenizer, bert_model = initialize_bert_model(weights_name, device, rank, device_type, debug)
+            train, dev = load_data(dataset, eval_dataset, sample_percent, rank, debug)
+            X_train, X_dev, y_train, y_dev, X_dev_sent = process_data(bert_tokenizer, bert_model, pooling, world_size, train, dev, device, batch_size, rank, debug, save_archive, save_dir)
 
         # Initialize and train the neural classifier
         classifier, start_epoch, model_state_dict, optimizer_state_dict = initialize_classifier(
@@ -407,6 +478,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         cleanup_and_exit(rank, debug)
     
     return
+
 
 
 if __name__ == '__main__':
@@ -440,10 +512,12 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint_interval', type=int, default=10, help='Checkpoint interval in epochs (default: 10)')
     parser.add_argument('--resume_from_checkpoint', action='store_true', default=False, help='Resume training from latest checkpoint (default: False)')
     parser.add_argument("--save_preds", action='store_true', default=False, help="Save predictions to CSV (default: False)")
-    parser.add_argument("--save_dir", type=str, default='saves', help="Directory to save predictions (default: saves)")
+    parser.add_argument("--save_dir", type=str, default='saves', help="Directory to save data, predictions (default: saves)")
     parser.add_argument("--load_model", action='store_true', default=False, help="Load a pre-trained model or checkpoint (default: False)")
     parser.add_argument("--filename", type=str, default=None, help="Filename of the model or checkpoint to load")
     parser.add_argument("--use_saved_params", action='store_true', default=False, help="Use saved parameters for training, if loading a model (default: False)")
+    parser.add_argument("--save_archive", action='store_true', default=False, help="Save processed data to disk as a .zip archive (X_train, X_dev, y_train, y_dev, y_dev_sent) (default: False)")
+    parser.add_argument("--archive_file", type=str, default=None, help="Filename of the processed data to load as a .zip archive (default: None)")
     args = parser.parse_args()
 
     print("\nStarting DDP PyTorch Training...")
@@ -508,7 +582,9 @@ if __name__ == '__main__':
                       args.save_dir,
                       args.load_model,
                       args.filename,
-                      args.use_saved_params),
+                      args.use_saved_params,
+                      args.save_archive,
+                      args.archive_file),
                 nprocs=world_size,
                 join=True)
     except KeyboardInterrupt:
