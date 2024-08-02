@@ -176,15 +176,21 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         X = np.array(X)
         self.input_dim = X.shape[1]
         X = torch.FloatTensor(X)
+
         if y is None:
             dataset = torch.utils.data.TensorDataset(X)
         else:
             self.classes_ = sorted(set(y))
             self.n_classes_ = len(self.classes_)
             class2index = dict(zip(self.classes_, range(self.n_classes_)))
-            y = [class2index[label] for label in y]
-            y = torch.tensor(y)
+            
+            y = torch.tensor([class2index[label] for label in y], dtype=torch.long)
+            
+            if self.debug:
+                print(f"Rank {self.rank}: X shape: {X.shape}, y shape: {y.shape}")
+            
             dataset = torch.utils.data.TensorDataset(X, y)
+
         return dataset
 
     def _update_no_improvement_count_early_stopping(self, X, y, epoch, debug):
@@ -309,7 +315,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         if rank == 0:
             print(f"Building dataset and dataloader...")
         dataset = self.build_dataset(X_train, y_train)
-        if self.device.type == 'cuda':
+        if self.device.type == 'cuda' and world_size > 1:
             sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
             dataloader = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler)
         else:
@@ -335,6 +341,8 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             print(f"Optimizer:\n{optimizer}") if debug else None
             print(f"Starting training loop...")
 
+        num_digits = len(str(self.max_iter))
+
         self.model.train()
 
         stop_training = torch.tensor(0, device=self.device)
@@ -345,48 +353,66 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         print(f"Start epoch: {start_epoch}, Max Iterations: {self.max_iter}") if rank == 0 else None
         for epoch in range(start_epoch, last_epoch+1):
             epoch_start = time.time()
-            if self.device.type == 'cuda':
+            if self.device.type == 'cuda' and world_size > 1:
                 sampler.set_epoch(epoch)
             epoch_loss = 0.0
-            for X_batch, y_batch in dataloader:
+            batch_count = 0
+            for batch_idx, (X_batch, y_batch) in enumerate(dataloader):
                 X_batch = X_batch.to(self.device)
                 y_batch = y_batch.to(self.device)
                 optimizer.zero_grad()
                 outputs = self.model(X_batch)
                 loss = self.loss(outputs, y_batch)
-                dist.all_reduce(loss, op=dist.ReduceOp.SUM)
-                loss = loss / world_size
+                
+                # if debug:
+                #     print(f"Rank {rank}: Epoch: {epoch}, Batch: {batch_idx}, Size: {X_batch.size(0)}, Loss: {loss.item():.6f}, Epoch Loss: {epoch_loss:.6f}")
+                
+                # Average loss across all ranks
+                if world_size > 1:
+                    dist.all_reduce(loss, op=dist.ReduceOp.AVG)
+                
                 loss.backward()
                 optimizer.step()
+                
                 epoch_loss += loss.item()
-            print(f"Epoch {epoch}, Loss: {loss.item():.6f}, Time: {format_time(time.time() - epoch_start)}") if rank == 0 else None
+                batch_count += 1
+
+            # Calculate average epoch loss
+            avg_epoch_loss = epoch_loss / batch_count
+
+            # Print epoch summary
+            if debug:
+                print(f"Epoch {epoch:{num_digits}d}, Average Loss: {avg_epoch_loss:.6f}, Total Loss: {epoch_loss:.6f}, Time: {format_time(time.time() - epoch_start)}") if rank == 0 else None
+            else:
+                print(f"Epoch {epoch:{num_digits}d}, Average Loss: {avg_epoch_loss:.6f}, Time: {format_time(time.time() - epoch_start)}") if rank == 0 else None            
 
             if rank == 0:
                 if self.checkpoint_interval and (epoch) % self.checkpoint_interval == 0:
-                    print(f"Saving checkpoint at epoch {epoch}...")
+                    print(f"Saving checkpoint at epoch {epoch}...") if debug else None
                     self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=optimizer, is_final=False)
 
                 # Early stopping logic
                 if self.early_stopping == 'score':
                     current_score = self._update_no_improvement_count_early_stopping(X_val, y_val, epoch, debug)
                     if self.no_improvement_count >= self.n_iter_no_change:
-                        print(f"Stopping early after {epoch} epochs due to no improvement in validation score in last {self.n_iter_no_change} iterations.")
                         print(f"Best score: {self.best_score:.6f}, Current score: {current_score:.6f}, No improvement count: {self.no_improvement_count}")
+                        print(f"Stopping early after {epoch} epochs due to no improvement in validation score in last {self.n_iter_no_change} iterations.")
                         stop_training = torch.tensor(1, device=self.device)
-                elif self.early_stopping == 'loss':
-                    current_loss = self._update_no_improvement_count_errors(epoch_loss, epoch, debug)
+                if self.early_stopping == 'loss':
+                    current_loss = self._update_no_improvement_count_errors(avg_epoch_loss, epoch, debug)
                     if self.no_improvement_count >= self.n_iter_no_change:
-                        print(f"Stopping early after {epoch} epochs due to no improvement in training loss in last {self.n_iter_no_change} iterations.")
                         print(f"Best loss: {self.best_error:.6f}, Current loss: {current_loss:.6f}, No improvement count: {self.no_improvement_count}")
+                        print(f"Stopping early after {epoch} epochs due to no improvement in training loss in last {self.n_iter_no_change} iterations.")
                         stop_training = torch.tensor(1, device=self.device)
 
             # Broadcast stop_training to all processes
-            dist.broadcast(stop_training, 0)
+            if world_size > 1:
+                dist.broadcast(stop_training, 0)
 
             if stop_training.item() == 1:
                 break
 
-        if self.early_stopping:
+        if self.early_stopping and self.device.type == 'cuda' and world_size > 1:
             # Broadcast best parameters to all processes
             for param in self.model.parameters():
                 dist.broadcast(param.data, 0)

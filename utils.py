@@ -111,6 +111,8 @@ def get_activation(activation):
         return nn.Sigmoid()
     elif activation == "identity":
         return nn.Identity()
+    elif activation == "leaky_relu":
+        return nn.LeakyReLU()
     else:
         raise ValueError(f"Unknown activation function: {activation}")
     
