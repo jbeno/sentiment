@@ -318,7 +318,15 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             if rank == 0:
                 print(f"Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: {self.validation_fraction}")
                 print(f"Training will stop early if the score does not improve by at least {self.tol} for {self.n_iter_no_change} iterations.")
-            (X_train, y_train), (X_val, y_val) = self._build_validation_split(X, y, validation_fraction=self.validation_fraction)
+                (X_train, y_train), (X_val, y_val) = self._build_validation_split(X, y, validation_fraction=self.validation_fraction)
+                data_list = [X_train, y_train, X_val, y_val]
+            else:
+                data_list = [None, None, None, None]
+            # Broadcast the data
+            if world_size > 1:
+                dist.broadcast_object_list(data_list, src=0)
+                # Unpack the broadcasted data
+                X_train, y_train, X_val, y_val = data_list
             if rank == 0:
                 print(f"Split data into {len(X_train)} training samples and {len(X_val)} validation samples.")
                 print(f"Split data into {len(y_train)} training labels and {len(y_val)} validation labels.")
@@ -379,9 +387,8 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             if self.device.type == 'cuda' and world_size > 1:
                 sampler.set_epoch(epoch)
             epoch_loss = 0.0
-            #batch_count = 0
-            #for X_batch, y_batch in dataloader:
-            for batch_idx, (X_batch, y_batch) in enumerate(dataloader):
+            batch_count = 0
+            for X_batch, y_batch in dataloader:
                 X_batch = X_batch.to(self.device)
                 y_batch = y_batch.to(self.device)
                 optimizer.zero_grad()
@@ -399,7 +406,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 optimizer.step()
                 
                 epoch_loss += loss.item()
-                #batch_count += 1
+                batch_count += 1
                 
                 if empty_cache:
                     # Delete the unused objects
@@ -408,8 +415,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                     torch.cuda.empty_cache()
 
             # Calculate average epoch loss
-            #avg_epoch_loss = epoch_loss / batch_count
-            avg_epoch_loss = epoch_loss / batch_idx
+            avg_epoch_loss = epoch_loss / batch_count
 
             # Print epoch summary
             if debug:
@@ -418,7 +424,8 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 print(f"Epoch {epoch:{num_digits}d}, Average Loss: {avg_epoch_loss:.6f}, Time: {format_time(time.time() - epoch_start)}") if rank == 0 else None            
 
             # Consolidate optimizer state before saving
-            optimizer.consolidate_state_dict()
+            if self.optimizer_class == ZeroRedundancyOptimizer:
+                optimizer.consolidate_state_dict()
 
             if rank == 0:
                 # Save a checkpoint
