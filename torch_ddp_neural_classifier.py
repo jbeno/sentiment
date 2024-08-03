@@ -7,6 +7,8 @@ import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch_model_base import TorchModelBase
+import torch.optim as optim
+from torch.distributed.optim import ZeroRedundancyOptimizer
 import os
 import time
 import utils
@@ -172,6 +174,25 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         
         return nn.Sequential(*layers)
 
+    def build_optimizer(self):
+        if self.optimizer_class == ZeroRedundancyOptimizer:
+            optimizer = ZeroRedundancyOptimizer(
+                self.model.parameters(),
+                optimizer_class=torch.optim.Adam,
+                lr=self.eta,
+                weight_decay=self.l2_strength,
+                **self.optimizer_kwargs
+            )
+        else:
+            optimizer = self.optimizer_class(
+                self.model.parameters(),
+                lr=self.eta,
+                weight_decay=self.l2_strength,
+                **self.optimizer_kwargs
+            )
+            
+        return optimizer
+
     def build_dataset(self, X, y=None):
         X = np.array(X)
         self.input_dim = X.shape[1]
@@ -287,10 +308,11 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
         return start_epoch, model_state_dict, optimizer_state_dict
 
-    def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None):
+    def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None, num_workers=0, prefetch=None, empty_cache=False):
         training_start = time.time()
         if rank == 0:
             print(f"\nFitting DDP Neural Classifier on training data...")
+            print(f"Num Workers: {num_workers}, Prefetch: {prefetch}, Empty Cache: {empty_cache}")
         # Determine the early stopping strategy and split the data if necessary
         if self.early_stopping == 'score':
             if rank == 0:
@@ -317,9 +339,9 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         dataset = self.build_dataset(X_train, y_train)
         if self.device.type == 'cuda' and world_size > 1:
             sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
-            dataloader = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler)
+            dataloader = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler, num_workers=num_workers, prefetch_factor=prefetch)
         else:
-            dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+            dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=num_workers, prefetch_factor=prefetch)
 
         # Initialize the model, optimizer, and other training parameters
         print("Initializing model, graph, optimizer...") if rank == 0 else None
@@ -329,6 +351,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             self.model.load_state_dict(model_state_dict)
         self.model.to(self.device)
         if self.device.type == 'cuda':
+            #self.model = DDP(self.model, device_ids=[rank], output_device=rank)
             self.model = DDP(self.model, device_ids=[rank])
         else:
             self.model = DDP(self.model, device_ids=None)
@@ -356,7 +379,8 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             if self.device.type == 'cuda' and world_size > 1:
                 sampler.set_epoch(epoch)
             epoch_loss = 0.0
-            batch_count = 0
+            #batch_count = 0
+            #for X_batch, y_batch in dataloader:
             for batch_idx, (X_batch, y_batch) in enumerate(dataloader):
                 X_batch = X_batch.to(self.device)
                 y_batch = y_batch.to(self.device)
@@ -375,10 +399,17 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 optimizer.step()
                 
                 epoch_loss += loss.item()
-                batch_count += 1
+                #batch_count += 1
+                
+                if empty_cache:
+                    # Delete the unused objects
+                    del outputs, X_batch, y_batch
+                    # Empty CUDA cache
+                    torch.cuda.empty_cache()
 
             # Calculate average epoch loss
-            avg_epoch_loss = epoch_loss / batch_count
+            #avg_epoch_loss = epoch_loss / batch_count
+            avg_epoch_loss = epoch_loss / batch_idx
 
             # Print epoch summary
             if debug:
@@ -386,7 +417,11 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             else:
                 print(f"Epoch {epoch:{num_digits}d}, Average Loss: {avg_epoch_loss:.6f}, Time: {format_time(time.time() - epoch_start)}") if rank == 0 else None            
 
+            # Consolidate optimizer state before saving
+            optimizer.consolidate_state_dict()
+
             if rank == 0:
+                # Save a checkpoint
                 if self.checkpoint_interval and (epoch) % self.checkpoint_interval == 0:
                     print(f"Saving checkpoint at epoch {epoch}...") if debug else None
                     self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=optimizer, is_final=False)
@@ -416,9 +451,9 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             # Broadcast best parameters to all processes
             for param in self.model.parameters():
                 dist.broadcast(param.data, 0)
-
+        
+        # Save the final model
         if rank == 0:
-            # Save the final model
             self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=optimizer, is_final=True)
             print(f"Training completed ({format_time(time.time() - training_start)})")
 

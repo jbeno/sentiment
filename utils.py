@@ -16,6 +16,8 @@ import torch.distributed as dist
 import torch.nn as nn
 from contextlib import contextmanager
 import multiprocessing as mp
+import torch.optim as optim
+from torch.distributed.optim import ZeroRedundancyOptimizer
 
 START_SYMBOL = "<s>"
 END_SYMBOL = "</s>"
@@ -115,7 +117,30 @@ def get_activation(activation):
         return nn.LeakyReLU()
     else:
         raise ValueError(f"Unknown activation function: {activation}")
-    
+
+def get_optimizer(optimizer_name, device, rank, world_size):
+    # Options are 'zero', 'adam', 'sgd', 'adagrad', 'rmsprop'
+    # If None and device CUDA and world_size > 1, use ZeroRedundancyOptimizer, else Adam
+    if optimizer_name is None:
+        if device.type == 'cuda' and world_size > 1:
+            print(f"Optimizer not specified. Using ZeroRedundancyOptimizer for CUDA and World Size > 1") if rank == 0 else None
+            return ZeroRedundancyOptimizer
+        else:
+            print(f"Optimizer not specified. Using Adam") if rank == 0 else None
+            return torch.optim.Adam
+    if optimizer_name == "adam":
+        return torch.optim.Adam
+    elif optimizer_name == "sgd":
+        return torch.optim.SGD
+    elif optimizer_name == "adagrad":
+        return torch.optim.Adagrad
+    elif optimizer_name == "rmsprop":
+        return torch.optim.RMSprop
+    elif optimizer_name == "zero":
+        return ZeroRedundancyOptimizer
+    else:
+        raise ValueError(f"Unknown optimizer: {optimizer_name}")
+
 def set_threads(num_threads):
     os.environ['OMP_NUM_THREADS'] = str(num_threads)
     os.environ['MKL_NUM_THREADS'] = str(num_threads)
