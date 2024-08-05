@@ -11,6 +11,7 @@ from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 import sys
 import os
 import signal
+import decimal
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -18,6 +19,7 @@ from contextlib import contextmanager
 import multiprocessing as mp
 import torch.optim as optim
 from torch.distributed.optim import ZeroRedundancyOptimizer
+from colors import *
 
 START_SYMBOL = "<s>"
 END_SYMBOL = "</s>"
@@ -42,6 +44,18 @@ def format_time(seconds):
     else:
         millisecs = int(seconds * 1e3)
         return f"{millisecs:,}ms"
+
+def format_tolerance(tolerance):
+    # Convert the tolerance to a float
+    tolerance_float = float(tolerance)
+    
+    # Use decimal module for precise representation
+    d = decimal.Decimal(str(tolerance_float))
+    
+    # Normalize the decimal to remove any extra zeros
+    normalized = d.normalize()
+
+    return str(normalized)
 
 def setup_environment(rank, world_size, backend, device, debug):
     os.environ["MASTER_ADDR"] = "localhost"
@@ -141,6 +155,31 @@ def get_optimizer(optimizer_name, device, rank, world_size):
     else:
         raise ValueError(f"Unknown optimizer: {optimizer_name}")
 
+def get_scheduler(scheduler_name, device, rank, world_size):
+    # Options are 'none', 'step', 'multi_step', 'exponential', 'cosine', 'reduce_on_plateau'
+    # If None and device CUDA and world_size > 1, use None, else StepLR
+    if scheduler_name is None:
+        if device.type == 'cuda' and world_size > 1:
+            print(f"Scheduler not specified. Using None for CUDA and World Size > 1") if rank == 0 else None
+            return None
+        else:
+            print(f"Scheduler not specified. Using StepLR") if rank == 0 else None
+            return optim.lr_scheduler.StepLR
+    if scheduler_name == "none":
+        return None
+    elif scheduler_name == "step":
+        return optim.lr_scheduler.StepLR
+    elif scheduler_name == "multi_step":
+        return optim.lr_scheduler.MultiStepLR
+    elif scheduler_name == "exponential":
+        return optim.lr_scheduler.ExponentialLR
+    elif scheduler_name == "cosine":
+        return optim.lr_scheduler.CosineAnnealingLR
+    elif scheduler_name == "reduce_on_plateau":
+        return optim.lr_scheduler.ReduceLROnPlateau
+    else:
+        raise ValueError(f"Unknown scheduler: {scheduler_name}")
+
 def set_threads(num_threads):
     os.environ['OMP_NUM_THREADS'] = str(num_threads)
     os.environ['MKL_NUM_THREADS'] = str(num_threads)
@@ -181,7 +220,80 @@ def print_state_summary(state_dict, indent=0):
             else:
                 print(f"{indent_str}- Element {i}: {value}")
 
+def print_rank_memory_summary(world_size, rank, all_local=True, max_memory=None):
+    """
+    Print a summary of memory usage for the current rank or all ranks.
+    
+    Args:
+    world_size (int): Total number of ranks in the current world.
+    rank (int): Current rank.
+    all_local (bool): If True, print info for all ranks from local process. If False, print only current rank.
+    max_memory (float): Maximum memory threshold for color coding. If None, use the current max allocated.
+    """
+    if all_local:
+        summary_parts = []
+        for i in range(world_size):
+            mem_allocated = torch.cuda.memory_allocated(i) / 1e9  # Convert to GB
+            mem_max_allocated = torch.cuda.max_memory_allocated(i) / 1e9  # Convert to GB
+            
+            if max_memory is None:
+                max_memory = mem_max_allocated
+            
+            color = get_mem_color(mem_allocated, max_memory)
+            summary_parts.append(f"Rank {bright_white}{bold}{i}{reset}: {color}{bold}{mem_allocated:.2f}/{mem_max_allocated:.2f} GB{reset}")
+        
+        summary = " | ".join(summary_parts)
+        print(f"Memory usage: {summary}")
+    else:
+        device = torch.cuda.current_device()
+        mem_allocated = torch.cuda.memory_allocated(device) / 1e9  # Convert to GB
+        mem_max_allocated = torch.cuda.max_memory_allocated(device) / 1e9  # Convert to GB
+        
+        if max_memory is None:
+            max_memory = mem_max_allocated
+        
+        color = get_mem_color(mem_allocated, max_memory)
+        print(f"Rank {bright_white}{bold}{i}{reset}: {color}{bold}{mem_allocated:.2f}/{mem_max_allocated:.2f} GB{reset}")
 
+def print_rank_memory_summary(world_size, rank, all_local=True, verbose=False):
+    """
+    Print a summary of memory usage for the current rank or all ranks.
+    
+    Args:
+    world_size (int): Total number of ranks in the current world.
+    rank (int): Current rank.
+    all_local (bool): If True, print info for all ranks from local process. If False, print only current rank.
+    """
+    if all_local:
+        summary_parts = []
+        for i in range(world_size):
+            free_mem, total_mem = torch.cuda.mem_get_info(i)
+            free_mem, total_mem = free_mem / 1e9, total_mem / 1e9  # Convert to GB
+            used_mem = total_mem - free_mem
+            mem_allocated = torch.cuda.memory_allocated(i) / 1e9  # Convert to GB
+            mem_reserved = torch.cuda.memory_reserved(i) / 1e9  # Convert to GB
+            
+            color = get_mem_color(used_mem, total_mem)
+            if verbose:
+                summary_parts.append(f"Rank {bright_white}{bold}{i}{reset}: {color}{bold}{used_mem:.2f}{reset} / {total_mem:.2f} GB (A: {mem_allocated:.2f}, R: {mem_reserved:.2f})")
+            else:
+                summary_parts.append(f"Rank {bright_white}{bold}{i}{reset}: {color}{bold}{used_mem:.2f}{reset} / {total_mem:.2f} GB")
+        
+        summary = " | ".join(summary_parts)
+        print(f"{bright_white}█{reset} Memory: {summary}")
+    else:
+        device = torch.cuda.current_device()
+        free_mem, total_mem = torch.cuda.mem_get_info(device)
+        free_mem, total_mem = free_mem / 1e9, total_mem / 1e9  # Convert to GB
+        used_mem = total_mem - free_mem
+        mem_allocated = torch.cuda.memory_allocated(device) / 1e9  # Convert to GB
+        mem_reserved = torch.cuda.memory_reserved(device) / 1e9  # Convert to GB
+        
+        color = get_mem_color(used_mem, total_mem)
+        print(f"Memory used/total for Rank {bright_white}{bold}{i}{reset}: {color}{bold}{used_mem:.2f} GB{reset} / {total_mem:.2f} GB (A: {mem_allocated:.2f}, R: {mem_reserved:.2f})")
+
+
+    
 def glove2dict(src_filename):
     """
     GloVe vectors file reader.

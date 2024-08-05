@@ -45,9 +45,13 @@ from utils import (
     set_threads,
     signal_handler,
     cleanup_and_exit,
-    get_optimizer
+    get_optimizer,
+    get_shape_color,
+    print_rank_memory_summary,
+    #get_scheduler
 )
 from torch_ddp_neural_classifier import TorchDDPNeuralClassifier
+from colors import *
 
 # Suppress Hugging Face library warnings
 import logging
@@ -82,21 +86,21 @@ def save_data_archive(X_train, X_dev, y_train, y_dev, X_dev_sent, world_size, de
     np.savez_compressed(filepath, X_train=X_train, X_dev=X_dev, y_train=y_train, y_dev=y_dev, X_dev_sent=X_dev_sent)
     print(f"\nData saved to: {filepath}")
 
-def load_data_archive(archive_file, device, rank):
+def load_data_archive(data_file, device, rank):
     load_archive_start = time.time()
     
     # Check if the archive file path is provided
-    if archive_file is None:
+    if data_file is None:
         raise ValueError("No archive file provided to load data from")
     
     # Check if the archive file exists
-    if not os.path.exists(archive_file):
-        raise FileNotFoundError(f"Archive file not found: {archive_file}")
+    if not os.path.exists(data_file):
+        raise FileNotFoundError(f"Archive file not found: {data_file}")
     
     # Attempt to load the data from the archive file
     try:
-        print(f"\nLoading archived data from: {archive_file}...") if rank == 0 else None
-        with np.load(archive_file, allow_pickle=True) as data:
+        print(f"\nLoading archived data from: {data_file}...") if rank == 0 else None
+        with np.load(data_file, allow_pickle=True) as data:
             X_train = data['X_train']
             X_dev = data['X_dev']
             y_train = data['y_train']
@@ -104,7 +108,7 @@ def load_data_archive(archive_file, device, rank):
             X_dev_sent = data['X_dev_sent']
         print(f"Archived data loaded ({format_time(time.time() - load_archive_start)})") if rank == 0 else None
     except Exception as e:
-        raise RuntimeError(f"Failed to load data from archive file {archive_file}: {str(e)}")
+        raise RuntimeError(f"Failed to load data from archive file {data_file}: {str(e)}")
     
     return X_train, X_dev, y_train, y_dev, X_dev_sent
 
@@ -113,10 +117,10 @@ def initialize_bert_model(weights_name, device, rank, debug):
     print(f"\nInitializing '{weights_name}' tokenizer and model...") if rank == 0 else None
     bert_tokenizer = BertTokenizer.from_pretrained(weights_name)
     bert_model = BertModel.from_pretrained(weights_name).to(device)
-    if device.type == 'cuda':
-        bert_model = DDP(bert_model, device_ids=[rank], output_device=rank, static_graph=True)
-    else:
-        bert_model = DDP(bert_model, device_ids=None, output_device=None, static_graph=True)
+    # if device.type == 'cuda':
+    #     bert_model = DDP(bert_model, device_ids=[rank], output_device=rank, static_graph=True)
+    # else:
+    #     bert_model = DDP(bert_model, device_ids=None, output_device=None, static_graph=True)
     dist.barrier()
     if rank == 0:
         if debug:
@@ -269,14 +273,13 @@ def process_data(bert_tokenizer, bert_model, pooling, world_size, train, dev, de
         train_indices = np.random.choice(len(X_train_sent), 3, replace=False)
         dev_indices = np.random.choice(len(X_dev_sent), 3, replace=False)
         
-        # Print samples and collect sample sentences
+        # Collect sample sentences
         train_samples = []
         dev_samples = []
-        if debug and rank == 0:
-            for i in train_indices:
-                train_samples.append((f'Train[{i}]: ', X_train_sent[i], f' - {y_train[i].upper()}'))
-            for i in dev_indices:
-                dev_samples.append((f'Dev[{i}]: ', X_dev_sent[i], f' - {y_dev[i].upper()}'))
+        for i in train_indices:
+            train_samples.append((f'Train[{i}]: ', X_train_sent[i], f' - {y_train[i].upper()}'))
+        for i in dev_indices:
+            dev_samples.append((f'Dev[{i}]: ', X_dev_sent[i], f' - {y_dev[i].upper()}'))
     else:
         train_samples = None
         dev_samples = None
@@ -299,19 +302,20 @@ def process_data(bert_tokenizer, bert_model, pooling, world_size, train, dev, de
             train_sizes = [size.cpu().item() for size in train_sizes]
             dev_sizes = [size.cpu().item() for size in dev_sizes]
 
-            print("\nDataset size summary:")
-            print(f"Train sizes across ranks: {train_sizes}")
-            print(f"Dev sizes across ranks: {dev_sizes}")
-            
-            if len(set(train_sizes)) > 1 or len(set(dev_sizes)) > 1:
-                print("WARNING: Mismatch in dataset sizes across ranks!")
-                print(f"Train size mismatch: {max(train_sizes) - min(train_sizes)}")
-                print(f"Dev size mismatch: {max(dev_sizes) - min(dev_sizes)}")
-            else:
-                print("All ranks have consistent dataset sizes.")
-            
-            print(f"Total train samples: {sum(train_sizes)}")
-            print(f"Total dev samples: {sum(dev_sizes)}")
+            if debug:
+                print("\nDataset size summary:")
+                print(f"Train sizes across ranks: {train_sizes}")
+                print(f"Dev sizes across ranks: {dev_sizes}")
+                
+                if len(set(train_sizes)) > 1 or len(set(dev_sizes)) > 1:
+                    print("WARNING: Mismatch in dataset sizes across ranks!")
+                    print(f"Train size mismatch: {max(train_sizes) - min(train_sizes)}")
+                    print(f"Dev size mismatch: {max(dev_sizes) - min(dev_sizes)}")
+                else:
+                    print("All ranks have consistent dataset sizes.")
+                
+                print(f"Total train samples: {sum(train_sizes)}")
+                print(f"Total dev samples: {sum(dev_sizes)}")
 
             # Check for significant mismatch and raise error if necessary
             max_mismatch = max(max(train_sizes) - min(train_sizes), max(dev_sizes) - min(dev_sizes))
@@ -335,8 +339,7 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
     embeddings = []
 
     # Process and display sample texts first
-    if debug and rank == 0:
-        print(f"\nPooling strategy: {pooling.upper() if pooling == 'cls' else pooling.capitalize()}")
+    def display_sample_texts(sample_texts):
         for text in sample_texts:
             # Tokenize the text and get the tokens
             tokens = tokenizer.tokenize(text[1])
@@ -373,12 +376,17 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
                 torch.cuda.empty_cache()
 
     # Use DDP to distribute the encoding process across multiple GPUs
-    if device.type == 'cuda' and world_size > 1:
-        dist.barrier()   
+    if device.type == 'cuda' and world_size > 1: 
         if rank == 0:
-            print(f"\nEncoding {split.capitalize()} data of {total_texts} texts distributed across {world_size} GPUs...")
-            print(f"Batch Size: {batch_size}, Pooling: {pooling.upper() if pooling == 'cls' else pooling.capitalize()}, Num Workers: {num_workers}, Prefetch: {prefetch}, Empty Cache: {empty_cache}")
 
+            # Display sample texts
+            print(f"\nDisplaying samples from {split.capitalize()} data:")
+            display_sample_texts(sample_texts)
+
+            print(f"\nEncoding {split.capitalize()} data of {total_texts} texts distributed across {world_size} GPUs...")
+            print(f"Batch Size: {batch_size}, Pooling: {pooling.upper() if pooling == 'cls' else pooling.capitalize()}, Empty Cache: {empty_cache}")
+
+        dist.barrier()
         # Calculate the number of texts that make the dataset evenly divisible by world_size
         texts_per_rank = math.ceil(total_texts / world_size)
         padded_total = texts_per_rank * world_size
@@ -397,60 +405,59 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
         start_idx = rank * texts_per_rank
         end_idx = start_idx + texts_per_rank
         local_texts = texts_with_padding[start_idx:end_idx]
+        local_batch_count = len(local_texts) // batch_size + 1
 
-        print(f"Rank {rank}: Processing {len(local_texts)} texts (indices {start_idx} to {end_idx-1})")
+        batch_count = len(texts) // batch_size + 1
+        total_batches = batch_count
 
-        # Tokenize and encode local texts
-        encoded = tokenizer.batch_encode_plus(
-            local_texts,
-            add_special_tokens=True,
-            padding='max_length',
-            truncation=True,
-            max_length=512,
-            return_tensors="pt"
-        )
-        dataset = TensorDataset(encoded['input_ids'], encoded['attention_mask'])
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, prefetch_factor=prefetch)
-        batch_count = len(dataloader)
-        total_batches = batch_count * world_size
         if rank == 0:
             print(f"Texts per rank: {texts_per_rank}, Total batches: {total_batches}")
-
-        dist.barrier()
         
+        dist.barrier()
+        print(f"Rank {rank}: Processing {len(local_texts)} texts (indices {start_idx} to {end_idx-1}) in {local_batch_count} batches...")
+        
+        dist.barrier()
         model.eval()
 
-        with torch.no_grad():
-            for batch_num, (input_ids, attention_mask) in enumerate(dataloader, 1):
-                batch_start = time.time()
-                
-                input_ids = input_ids.to(device)
-                attention_mask = attention_mask.to(device)
-                
+        for i in range(0, len(local_texts), batch_size):
+            batch_start = time.time()
+            batch_texts = local_texts[i:i + batch_size]
+            encoded = tokenizer.batch_encode_plus(
+                batch_texts,
+                add_special_tokens=True,
+                padding=True,
+                truncation=True,
+                max_length=512,
+                return_tensors="pt"
+            )
+            input_ids = encoded['input_ids'].to(device)
+            attention_mask = encoded['attention_mask'].to(device)
+            with torch.no_grad():
                 outputs = model(input_ids, attention_mask=attention_mask)
 
-                if pooling == 'cls':
-                    batch_embeddings = outputs.last_hidden_state[:, 0, :]
-                elif pooling == 'mean':
-                    batch_embeddings = (outputs.last_hidden_state * attention_mask.unsqueeze(-1)).sum(1) / attention_mask.sum(-1).unsqueeze(-1)
-                elif pooling == 'max':
-                    batch_embeddings = torch.max(outputs.last_hidden_state * attention_mask.unsqueeze(-1), dim=1)[0]
-                
-                embeddings.append(batch_embeddings)
-                
-                # # Force CUDA stream synchronization
-                # if device.type == 'cuda':
-                #     torch.cuda.synchronize()
+            if pooling == 'cls':
+                batch_embeddings = outputs.last_hidden_state[:, 0, :]
+            elif pooling == 'mean':
+                batch_embeddings = (outputs.last_hidden_state * attention_mask.unsqueeze(-1)).sum(1) / attention_mask.sum(-1).unsqueeze(-1)
+            elif pooling == 'max':
+                batch_embeddings = torch.max(outputs.last_hidden_state * attention_mask.unsqueeze(-1), dim=1)[0]
+            
+            embeddings.append(batch_embeddings)
 
-                batch_shape = list(batch_embeddings.shape)
+            batch_shape = list(batch_embeddings.shape)
 
-                if empty_cache:
-                    # Delete the unused objects
-                    del outputs, input_ids, attention_mask, batch_embeddings
-                    # Empty CUDA cache
-                    torch.cuda.empty_cache()
+            if empty_cache:
+                # Delete the unused objects
+                del outputs, input_ids, attention_mask, batch_embeddings
+                # Empty CUDA cache
+                torch.cuda.empty_cache()
 
-                print(f"Rank {rank}: Batch {batch_num:2d} / {batch_count}, Shape: {batch_shape}, Time: {format_time(time.time() - batch_start)}")
+            shape_color = get_shape_color(batch_size, batch_shape)
+            print(f"Rank {bright_white}{bold}{rank}{reset}: Batch {bright_white}{bold}{(i // batch_size) + 1:2d}{reset} / {local_batch_count}, Shape: {shape_color}{bold}{batch_shape}{reset}, Time: {format_time(time.time() - batch_start)}")
+
+            if rank == 0:
+                if (i // batch_size) % 5 == 0:
+                    print_rank_memory_summary(world_size, rank, all_local=True, verbose=False)
 
         local_embeddings = torch.cat(embeddings, dim=0)
 
@@ -460,7 +467,37 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
         if world_size > 1:
             gathered_embeddings = [torch.zeros_like(local_embeddings) for _ in range(world_size)]
             dist.all_gather(gathered_embeddings, local_embeddings)
-            final_embeddings = torch.cat(gathered_embeddings, dim=0)[:total_texts]
+            all_embeddings = torch.cat(gathered_embeddings, dim=0)
+            
+            if rank == 0:  # Only one process needs to do this check
+                total_embeddings = all_embeddings.shape[0]
+                padding_embeddings = total_embeddings - total_texts
+                
+                print(f"Total embeddings: {total_embeddings}")
+                print(f"Original texts: {total_texts}")
+                print(f"Expected padding: {padding_texts}")
+                print(f"Actual padding: {padding_embeddings}")
+                
+                if padding_embeddings != padding_texts:
+                    print("WARNING: Mismatch in padding count!")
+                
+                if padding_embeddings > 0:
+                    # Get the embeddings of the padded texts
+                    padding_embeds = all_embeddings[-padding_embeddings:]
+                    
+                    # Calculate the maximum difference between any two padding embeddings
+                    max_diff = torch.max(torch.pdist(padding_embeds))
+                    
+                    print(f"Maximum difference between padding embeddings: {max_diff}")
+                    
+                    # You can adjust this threshold based on your observations
+                    if max_diff > 1e-6:
+                        print("WARNING: Padding embeddings are not similar.")
+                    else:
+                        print("Padding embeddings verified as very similar.")
+
+            # Now slice off the padding
+            final_embeddings = all_embeddings[:total_texts]
         else:
             final_embeddings = local_embeddings
 
@@ -474,7 +511,11 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
         if rank == 0:
             device_string = 'GPU' if device.type == 'cuda' else 'CPU'
             print(f"\nEncoding {split.capitalize()} data of {total_texts} texts on a single {device_string}...")
-            print(f"Batch Size: {batch_size}, Pooling: {pooling.upper() if pooling == 'cls' else pooling.capitalize()}, Num Workers: {num_workers}, Prefetch: {prefetch}, Empty Cache: {empty_cache}")
+            print(f"Batch Size: {batch_size}, Pooling: {pooling.upper() if pooling == 'cls' else pooling.capitalize()}, Empty Cache: {empty_cache}")
+
+            # Display sample texts
+            print(f"\nDisplaying samples from {split.capitalize()} data:")
+            display_sample_texts(sample_texts)
 
         total_batches = len(texts) // batch_size + 1
 
@@ -513,11 +554,12 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
 
 def initialize_classifier(num_layers, hidden_dim, batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change,
                           tol, rank, world_size, device, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint,
-                          load_model=False, filename=None, use_saved_params=True, optimizer_name=None):
+                          load_model=False, filename=None, use_saved_params=True, optimizer_name=None, scheduler_name=None):
     class_init_start = time.time()
     print(f"\nInitializing DDP Neural Classifier...") if rank == 0 else None
     hidden_activation = get_activation(hidden_activation)
     optimizer_class = get_optimizer(optimizer_name, device, rank, world_size)
+    #scheduler_class = get_scheduler(scheduler_name, device, rank, world_size)
     print(f"Layers: {num_layers}, Hidden Dim: {hidden_dim}, Hidden Act: {hidden_activation.__class__.__name__}, Optimizer: {optimizer_class.__name__},  Batch Size: {batch_size}, Max Epochs: {epochs}, LR: {lr}, Early Stop: {early_stop.capitalize()}") if rank == 0 else None
     
     classifier = TorchDDPNeuralClassifier(
@@ -602,7 +644,7 @@ def evaluate_model(model, X_dev, y_dev, label_dict, numeric_dict, world_size, de
 def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_name, hidden_activation, label_dict, numeric_dict,
          num_layers, hidden_dim, batch_size, epochs, lr, sample_percent, random_seed, early_stop, n_iter_no_change, tol,
          pooling, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint, save_preds, save_dir, model_file,
-         use_saved_params, save_data, archive_file, num_workers, prefetch, optimizer_name, empty_cache):
+         use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, empty_cache, decimal, scheduler_name):
     try:
         start_time = time.time()
         # Initialize the distributed environment
@@ -610,9 +652,9 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         setup_environment(rank, world_size, backend, device, debug)
         fix_random_seeds(random_seed)
 
-        if archive_file is not None:
+        if data_file is not None:
             # Load previously processed data from an archive file
-            X_train, X_dev, y_train, y_dev, X_dev_sent = load_data_archive(archive_file, device, rank)
+            X_train, X_dev, y_train, y_dev, X_dev_sent = load_data_archive(data_file, device, rank)
         else:
             # Initialize BERT model and tokenizer. Load, tokenize and encode data
             bert_tokenizer, bert_model = initialize_bert_model(weights_name, device, rank, debug)
@@ -623,9 +665,9 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         classifier, start_epoch, model_state_dict, optimizer_state_dict = initialize_classifier(
             num_layers, hidden_dim, batch_size, epochs, lr, early_stop, hidden_activation,
             n_iter_no_change, tol, rank, world_size, device, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint,
-            model_file, use_saved_params, optimizer_name
+            model_file, use_saved_params, optimizer_name, scheduler_name
         )
-        classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict, num_workers, prefetch, empty_cache)
+        classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict, num_workers, prefetch, empty_cache, decimal)
 
         # Evaluate the model
         evaluate_model(classifier, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
@@ -676,6 +718,7 @@ if __name__ == '__main__':
     training_group.add_argument('--epochs', type=int, default=100, help='Number of epochs to train (default: 100)')
     training_group.add_argument('--lr', type=float, default=0.001, help='Learning rate (default: 0.001)')
     training_group.add_argument('--optimizer', type=str, default=None, help="Optimizer to use, will auto-detect multiple GPUs and use 'zero', otherwise 'adam': 'zero', 'adam', 'sgd', 'adagrad', 'rmsprop' (default: None)")
+    training_group.add_argument('--scheduler', type=str, default=None, help="Learning rate scheduler to use: 'step', 'plateau', 'exponent', 'cosine' (default: None)")
     training_group.add_argument('--random_seed', type=int, default=42, help='Random seed (default: 42)')
 
     # Checkpoint configuration
@@ -699,7 +742,7 @@ if __name__ == '__main__':
 
     # Loading options
     loading_group = parser.add_argument_group('Loading options')
-    loading_group.add_argument('--archive_file', type=str, default=None, help="Filename of the processed data to load as an .npz archive (default: None)")
+    loading_group.add_argument('--data_file', type=str, default=None, help="Filename of the processed data to load as an .npz archive (default: None)")
     loading_group.add_argument('--model_file', type=str, default=None, help="Filename of the classifier model or checkpoint to load (default: None)")
     loading_group.add_argument('--use_saved_params', action='store_true', default=False, help="Use saved parameters for training, if loading a model")
 
@@ -715,6 +758,7 @@ if __name__ == '__main__':
     # Debugging and logging
     debug_group = parser.add_argument_group('Debugging and logging')
     debug_group.add_argument('--debug', action='store_true', default=False, help='Debug or verbose mode to print more details (default: False)')
+    debug_group.add_argument('--decimal', type=int, default=6, help='Decimal places for floating point numbers (default: 6)')
 
     args = parser.parse_args()
 
@@ -784,11 +828,13 @@ if __name__ == '__main__':
                       args.model_file,
                       args.use_saved_params,
                       args.save_data,
-                      args.archive_file,
+                      args.data_file,
                       args.num_workers,
                       args.prefetch,
                       args.optimizer,
-                      args.empty_cache),
+                      args.empty_cache,
+                      args.decimal,
+                      args.scheduler),
                 nprocs=world_size,
                 join=True)
     except KeyboardInterrupt:

@@ -12,7 +12,8 @@ from torch.distributed.optim import ZeroRedundancyOptimizer
 import os
 import time
 import utils
-from utils import format_time, print_state_summary
+from colors import *
+from utils import format_time, print_state_summary, format_tolerance, get_nic_color, get_score_colors, print_rank_memory_summary
 
 class TorchDDPNeuralClassifier(TorchModelBase):
     def __init__(self,
@@ -235,14 +236,23 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             print(f"Current Loss: {epoch_loss:.6f}, Best Loss: {self.best_error:.6f}, Tolerance {self.tol}, No Improvement Count: {self.no_improvement_count}")
         return epoch_loss
 
-    def save_model(self, directory='saves', epoch=None, optimizer=None, is_final=False):
+    def save_model(self, directory='saves', epoch=None, optimizer=None, is_final=False, save_ddp=True):
         if not os.path.exists(directory):
             print(f"Creating directory: {directory}")
             os.makedirs(directory)
         
+        # Save the core model state dictionary if save_ddp is False, else save the DDP wrapped model
+        if save_ddp:
+            if hasattr(self.model, 'module'):
+                model_state_dict = self.model.module.state_dict()
+            else:
+                model_state_dict = self.model.state_dict()
+        else:
+            model_state_dict = self.model.state_dict()
+        
         state = {
             'epoch': epoch,
-            'model_state_dict': self.model.state_dict(),
+            'model_state_dict': model_state_dict,
             'params': self.__dict__
         }
         if optimizer:
@@ -250,14 +260,19 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         
         timestamp = time.strftime("%Y%m%d-%H%M%S")
 
+        suffix = 'ddp_' if save_ddp else ''
+
         if is_final:
-            filename = f'final_model_{timestamp}.pth'
+            filename = f'final_model_{suffix}{timestamp}.pth'
         else:
-            filename = f'checkpoint_epoch_{epoch}_{timestamp}.pth'
+            filename = f'checkpoint_epoch_{epoch}_{suffix}{timestamp}.pth'
         
         torch.save(state, os.path.join(directory, filename))
-        print(f"Saved model: {os.path.join(directory, filename)}")
-    
+        if save_ddp:
+            print(f"Saved model with DDP wrapper: {os.path.join(directory, filename)}")
+        else:
+            print(f"Saved model: {os.path.join(directory, filename)}")
+
 
     def load_model(self, directory='checkpoints', filename=None, pattern='checkpoint_epoch', use_saved_params=True, rank=0, debug=False):
         if not os.path.exists(directory):
@@ -308,16 +323,20 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
         return start_epoch, model_state_dict, optimizer_state_dict
 
-    def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None, num_workers=0, prefetch=None, empty_cache=False):
+    def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None, num_workers=0, prefetch=None, empty_cache=False, decimal=6):
         training_start = time.time()
         if rank == 0:
             print(f"\nFitting DDP Neural Classifier on training data...")
-            print(f"Num Workers: {num_workers}, Prefetch: {prefetch}, Empty Cache: {empty_cache}")
+            print(f"Num Workers: {num_workers}, Prefetch: {prefetch}")
+
+        # Print tolerance as float with as many decimal places as in the tolerance
+        tol_str = format_tolerance(self.tol)        
+
         # Determine the early stopping strategy and split the data if necessary
         if self.early_stopping == 'score':
             if rank == 0:
                 print(f"Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: {self.validation_fraction}")
-                print(f"Training will stop early if the score does not improve by at least {self.tol} for {self.n_iter_no_change} iterations.")
+                print(f"Training will stop early if the score does not improve by at least {tol_str} for {self.n_iter_no_change} iterations.")
                 (X_train, y_train), (X_val, y_val) = self._build_validation_split(X, y, validation_fraction=self.validation_fraction)
                 data_list = [X_train, y_train, X_val, y_val]
             else:
@@ -328,12 +347,11 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 # Unpack the broadcasted data
                 X_train, y_train, X_val, y_val = data_list
             if rank == 0:
-                print(f"Split data into {len(X_train)} training samples and {len(X_val)} validation samples.")
-                print(f"Split data into {len(y_train)} training labels and {len(y_val)} validation labels.")
+                print(f"Split data into (X:{len(X_train)}, y:{len(y_train)}) Training samples, and (X:{len(X_val)}, y:{len(y_val)}) Validation samples.")
         elif self.early_stopping == 'loss':
             if rank == 0:
                 print(f"Loss-based early stopping enabled. No validation set required, all data used for training.")
-                print(f"Training will stop early if the loss does not improve by at least {self.tol} for {self.n_iter_no_change} iterations.")
+                print(f"Training will stop early if the loss does not improve by at least {tol_str} for {self.n_iter_no_change} iterations.")
             X_train, y_train = X, y
         else:
             if rank == 0:
@@ -377,11 +395,13 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.model.train()
 
         stop_training = torch.tensor(0, device=self.device)
+        
         if start_epoch > 1:
             last_epoch = start_epoch + self.max_iter
         else:
             last_epoch = self.max_iter
-        print(f"Start epoch: {start_epoch}, Max Iterations: {self.max_iter}") if rank == 0 else None
+        print(f"Start epoch: {start_epoch}, Max Iterations: {self.max_iter}, Early Stop: {self.early_stopping.capitalize()}, Tolerance: {tol_str}, Number Iterations No Change: {self.n_iter_no_change}") if rank == 0 else None
+        print_rank_memory_summary(world_size, rank, all_local=True, verbose=False) if rank == 0 else None
         for epoch in range(start_epoch, last_epoch+1):
             epoch_start = time.time()
             if self.device.type == 'cuda' and world_size > 1:
@@ -408,44 +428,59 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 epoch_loss += loss.item()
                 batch_count += 1
                 
-                if empty_cache:
-                    # Delete the unused objects
-                    del outputs, X_batch, y_batch
-                    # Empty CUDA cache
-                    torch.cuda.empty_cache()
+                # if empty_cache:
+                #     # Delete the unused objects
+                #     del outputs, X_batch, y_batch
+                #     # Empty CUDA cache
+                #     torch.cuda.empty_cache()
 
             # Calculate average epoch loss
             avg_epoch_loss = epoch_loss / batch_count
-
-            # Print epoch summary
-            if debug:
-                print(f"Epoch {epoch:{num_digits}d}, Average Loss: {avg_epoch_loss:.6f}, Total Loss: {epoch_loss:.6f}, Time: {format_time(time.time() - epoch_start)}") if rank == 0 else None
-            else:
-                print(f"Epoch {epoch:{num_digits}d}, Average Loss: {avg_epoch_loss:.6f}, Time: {format_time(time.time() - epoch_start)}") if rank == 0 else None            
 
             # Consolidate optimizer state before saving
             if self.optimizer_class == ZeroRedundancyOptimizer:
                 optimizer.consolidate_state_dict()
 
             if rank == 0:
-                # Save a checkpoint
-                if self.checkpoint_interval and (epoch) % self.checkpoint_interval == 0:
-                    print(f"Saving checkpoint at epoch {epoch}...") if debug else None
-                    self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=optimizer, is_final=False)
-
                 # Early stopping logic
                 if self.early_stopping == 'score':
                     current_score = self._update_no_improvement_count_early_stopping(X_val, y_val, epoch, debug)
                     if self.no_improvement_count >= self.n_iter_no_change:
-                        print(f"Best score: {self.best_score:.6f}, Current score: {current_score:.6f}, No improvement count: {self.no_improvement_count}")
-                        print(f"Stopping early after {epoch} epochs due to no improvement in validation score in last {self.n_iter_no_change} iterations.")
                         stop_training = torch.tensor(1, device=self.device)
+                    current_score_color, best_score_color = get_score_colors(current_score, self.best_score)
                 if self.early_stopping == 'loss':
                     current_loss = self._update_no_improvement_count_errors(avg_epoch_loss, epoch, debug)
                     if self.no_improvement_count >= self.n_iter_no_change:
-                        print(f"Best loss: {self.best_error:.6f}, Current loss: {current_loss:.6f}, No improvement count: {self.no_improvement_count}")
-                        print(f"Stopping early after {epoch} epochs due to no improvement in training loss in last {self.n_iter_no_change} iterations.")
                         stop_training = torch.tensor(1, device=self.device)
+                    current_loss_color, best_error_color = get_loss_colors(current_loss, self.best_error, self.no_improvement_count, self.n_iter_no_change)
+
+                # Get the no improvement count color based on value relative to n_iter_no_change
+                nic_color = get_nic_color(self.no_improvement_count, self.n_iter_no_change)
+
+
+                # Print epoch summary
+                if self.early_stopping == 'score':
+                    print(f"{nic_color}█{reset} Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset}: Avg Loss: {bright_white}{bold}{avg_epoch_loss:.{decimal}f}{reset} | Val Score: {current_score_color}{bold}{current_score:.{decimal}f}{reset}, Best Score: {best_score_color}{bold}{self.best_score:.{decimal}f}{reset}, Stop Count: {nic_color}{bold}{self.no_improvement_count}{reset} / {self.n_iter_no_change} | Time: {format_time(time.time() - epoch_start)}")
+                elif self.early_stopping == 'loss':
+                    print(f"{nic_color}█{reset} Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset}: Avg Loss: {current_loss_color}{bold}{avg_epoch_loss:.{decimal}f}{reset} | Best Loss: {best_error_color}{bold}{self.best_error:.{decimal}f}{reset}, Stop Count: {nic_color}{bold}{self.no_improvement_count}{reset} / {self.n_iter_no_change} | Time: {format_time(time.time() - epoch_start)}")
+                else:
+                    print(f"Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset} / {self.max_iter}: Avg Loss: {bright_white}{bold}{avg_epoch_loss:.{decimal}f}{reset} | Total Loss: {epoch_loss:.{decimal}f}, Batch Count: {batch_count} | Time: {format_time(time.time() - epoch_start)}")
+
+                if epoch % 10 == 0:
+                    print_rank_memory_summary(world_size, rank, all_local=True, verbose=False) 
+
+                # Print early stopping message
+                if stop_training.item() == 1:
+                    if self.early_stopping == 'score':
+                        print(f"Stopping early after {epoch} epochs due to no improvement in validation score in last {self.n_iter_no_change} iterations.")
+                    elif self.early_stopping == 'loss':
+                        print(f"Stopping early after {epoch} epochs due to no improvement in training loss in last {self.n_iter_no_change} iterations.")
+                    else:
+                        print(f"Stopping early after {epoch} epochs.")
+
+                # Save a checkpoint
+                if self.checkpoint_interval and (epoch) % self.checkpoint_interval == 0:
+                    self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=optimizer, is_final=False, save_ddp=True)
 
             # Broadcast stop_training to all processes
             if world_size > 1:
@@ -461,7 +496,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         
         # Save the final model
         if rank == 0:
-            self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=optimizer, is_final=True)
+            self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=optimizer, is_final=True, save_ddp=False)
             print(f"Training completed ({format_time(time.time() - training_start)})")
 
         return self
@@ -503,4 +538,4 @@ class TorchDDPNeuralClassifier(TorchModelBase):
     def to(self, device):
         if self.model:
             self.model = self.model.to(device)
-        return self
+        return self#
