@@ -19,12 +19,31 @@ from contextlib import contextmanager
 import multiprocessing as mp
 import torch.optim as optim
 from torch.distributed.optim import ZeroRedundancyOptimizer
+from typing import Any, Dict
 from colors import *
 
 START_SYMBOL = "<s>"
 END_SYMBOL = "</s>"
 UNK_SYMBOL = "$UNK"
 
+
+class Config:
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
+
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+
+    def update(self, dict_obj: Dict[str, Any]):
+        for key, value in dict_obj.items():
+            setattr(self, key, value)
 
 def format_time(seconds):
     if seconds >= 1:
@@ -107,13 +126,63 @@ def gather_tensors(tensor, world_size):
 def convert_labels_to_tensor(labels, label_dict, device):
     if label_dict is None:
         label_dict = {'negative': 0, 'neutral': 1, 'positive': 2}
-    numeric_labels = [label_dict.get(str(label), 'unknown') for label in labels]
-    return torch.tensor(numeric_labels, dtype=torch.long).to(device)
+    
+    if isinstance(labels, torch.Tensor):
+        return labels.to(device)
+    
+    if isinstance(labels, np.ndarray):
+        if labels.dtype == np.int64 or labels.dtype == np.int32:
+            return torch.tensor(labels, dtype=torch.long).to(device)
+    
+    numeric_labels = []
+    for label in labels:
+        if isinstance(label, (int, np.integer)):
+            numeric_labels.append(label)
+        elif isinstance(label, str):
+            if label not in label_dict:
+                raise ValueError(f"Label '{label}' not found in label_dict")
+            numeric_labels.append(label_dict[label])
+        else:
+            raise ValueError(f"Unexpected label type: {type(label)}, value: {label}")
+    
+    try:
+        return torch.tensor(numeric_labels, dtype=torch.long).to(device)
+    except Exception as e:
+        print(f"Error in convert_labels_to_tensor: {str(e)}")
+        print(f"Labels: {labels}")
+        print(f"Numeric labels: {numeric_labels}")
+        print(f"Label dict: {label_dict}")
+        raise ValueError(f"Failed to convert labels to tensor: {str(e)}")
 
 def convert_numeric_to_labels(numeric_preds, numeric_dict):
     if numeric_dict is None:
         numeric_dict = {0: 'negative', 1: 'neutral', 2: 'positive'}
-    return [numeric_dict.get(int(pred), 'unknown') for pred in numeric_preds]
+    
+    if isinstance(numeric_preds, torch.Tensor):
+        numeric_preds = numeric_preds.cpu().numpy()
+    
+    if isinstance(numeric_preds, np.ndarray):
+        numeric_preds = numeric_preds.flatten()
+    
+    try:
+        labels = []
+        for pred in numeric_preds:
+            if isinstance(pred, (np.floating, float)):
+                pred = int(round(pred))
+            elif not isinstance(pred, (int, np.integer)):
+                raise ValueError(f"Unexpected prediction type: {type(pred)}, value: {pred}")
+            
+            label = numeric_dict.get(pred, 'unknown')
+            if label == 'unknown':
+                print(f"Warning: Encountered unknown prediction value: {pred}")
+            labels.append(label)
+        
+        return labels
+    except Exception as e:
+        print(f"Error in convert_numeric_to_labels: {str(e)}")
+        print(f"Numeric predictions: {numeric_preds[:10]}...")  # Print first 10 predictions
+        print(f"Numeric dict: {numeric_dict}")
+        raise ValueError(f"Failed to convert numeric predictions to labels: {str(e)}")
 
 def convert_sst_label(s):
     return s.split(" ")[-1]
@@ -220,41 +289,6 @@ def print_state_summary(state_dict, indent=0):
             else:
                 print(f"{indent_str}- Element {i}: {value}")
 
-def print_rank_memory_summary(world_size, rank, all_local=True, max_memory=None):
-    """
-    Print a summary of memory usage for the current rank or all ranks.
-    
-    Args:
-    world_size (int): Total number of ranks in the current world.
-    rank (int): Current rank.
-    all_local (bool): If True, print info for all ranks from local process. If False, print only current rank.
-    max_memory (float): Maximum memory threshold for color coding. If None, use the current max allocated.
-    """
-    if all_local:
-        summary_parts = []
-        for i in range(world_size):
-            mem_allocated = torch.cuda.memory_allocated(i) / 1e9  # Convert to GB
-            mem_max_allocated = torch.cuda.max_memory_allocated(i) / 1e9  # Convert to GB
-            
-            if max_memory is None:
-                max_memory = mem_max_allocated
-            
-            color = get_mem_color(mem_allocated, max_memory)
-            summary_parts.append(f"Rank {bright_white}{bold}{i}{reset}: {color}{bold}{mem_allocated:.2f}/{mem_max_allocated:.2f} GB{reset}")
-        
-        summary = " | ".join(summary_parts)
-        print(f"Memory usage: {summary}")
-    else:
-        device = torch.cuda.current_device()
-        mem_allocated = torch.cuda.memory_allocated(device) / 1e9  # Convert to GB
-        mem_max_allocated = torch.cuda.max_memory_allocated(device) / 1e9  # Convert to GB
-        
-        if max_memory is None:
-            max_memory = mem_max_allocated
-        
-        color = get_mem_color(mem_allocated, max_memory)
-        print(f"Rank {bright_white}{bold}{i}{reset}: {color}{bold}{mem_allocated:.2f}/{mem_max_allocated:.2f} GB{reset}")
-
 def print_rank_memory_summary(world_size, rank, all_local=True, verbose=False):
     """
     Print a summary of memory usage for the current rank or all ranks.
@@ -266,21 +300,39 @@ def print_rank_memory_summary(world_size, rank, all_local=True, verbose=False):
     """
     if all_local:
         summary_parts = []
+        first_total_mem = None
+        same_total_mem = True
+        total_mem_sum = 0  # Initialize sum of total memory
+
         for i in range(world_size):
             free_mem, total_mem = torch.cuda.mem_get_info(i)
             free_mem, total_mem = free_mem / 1e9, total_mem / 1e9  # Convert to GB
             used_mem = total_mem - free_mem
             mem_allocated = torch.cuda.memory_allocated(i) / 1e9  # Convert to GB
             mem_reserved = torch.cuda.memory_reserved(i) / 1e9  # Convert to GB
-            
+
+            total_mem_sum += total_mem  # Add to total memory sum
+
+            if first_total_mem is None:
+                first_total_mem = total_mem
+            elif total_mem != first_total_mem:
+                same_total_mem = False
+
             color = get_mem_color(used_mem, total_mem)
             if verbose:
-                summary_parts.append(f"Rank {bright_white}{bold}{i}{reset}: {color}{bold}{used_mem:.2f}{reset} / {total_mem:.2f} GB (A: {mem_allocated:.2f}, R: {mem_reserved:.2f})")
+                summary_parts.append(f"Rank {bright_white}{bold}{i}{reset}: {color}{bold}{used_mem:.2f}{reset} GB (A: {mem_allocated:.2f}, R: {mem_reserved:.2f})")
             else:
-                summary_parts.append(f"Rank {bright_white}{bold}{i}{reset}: {color}{bold}{used_mem:.2f}{reset} / {total_mem:.2f} GB")
-        
-        summary = " | ".join(summary_parts)
-        print(f"{bright_white}█{reset} Memory: {summary}")
+                summary_parts.append(f"Rank {bright_white}{bold}{i}{reset}: {color}{bold}{used_mem:.2f}{reset} GB")
+
+        if same_total_mem:
+            summary = " | ".join(summary_parts)
+            summary += f" (Max: {first_total_mem:.2f} GB"
+        else:
+            summary = " | ".join([f"{part} / {total_mem:.2f} GB" for part, total_mem in zip(summary_parts, [torch.cuda.mem_get_info(i)[1] / 1e9 for i in range(world_size)])])
+
+        summary += f", Total: {total_mem_sum:.2f} GB)" 
+
+        print(f"Memory: {summary}")
     else:
         device = torch.cuda.current_device()
         free_mem, total_mem = torch.cuda.mem_get_info(device)
