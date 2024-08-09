@@ -532,6 +532,12 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
             final_embeddings = torch.cat(embeddings, dim=0)
             print(f"Batch {(i // batch_size) + 1:2d} / {total_batches}, Shape: {list(batch_embeddings.shape)}, Time: {format_time(time.time() - batch_start)}")
     
+            if empty_cache and device.type == 'cuda':
+                # Delete the unused objects
+                del outputs, input_ids, attention_mask, batch_embeddings
+                # Empty CUDA cache
+                torch.cuda.empty_cache()
+
     return final_embeddings
 
 
