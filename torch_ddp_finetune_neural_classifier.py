@@ -703,6 +703,8 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 # Synchronize all processes after each epoch
                 dist.barrier()
 
+                command_value = torch.tensor([0.0, 0.0], device=self.device)  # Tensor to store the command and an optional value
+
                 if rank == 0:
                     print(f"Epoch {epoch} completed. Waiting for input...")
                     sys.stdout.flush()
@@ -710,10 +712,41 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                     user_input = response_pipe.recv()
                     print(f"Rank {rank} received input: {user_input}")
                     
+                    # Parse the input
+                    user_input_split = user_input.split()
+                    if user_input_split:
+                        # Set command based on the first input
+                        if user_input_split[0] in ['c', 'continue']:
+                            command_value[0] = 0  # Continue
+                        elif user_input_split[0] in ['s', 'save']:
+                            command_value[0] = 1  # Save
+                        elif user_input_split[0] in ['q', 'quit']:
+                            command_value[0] = 2  # Quit
+                        elif user_input_split[0] in ['h', 'help']:
+                            command_value[0] = 3  # Help
+                        elif user_input_split[0] == 'e' and len(user_input_split) > 1:
+                            try:
+                                command_value[0] = 4  # Set max epochs
+                                command_value[1] = float(user_input_split[1])  # Associated value for max epochs
+                            except ValueError:
+                                print("Invalid value for max epochs")
+                        elif user_input_split[0] == 't' and len(user_input_split) > 1:
+                            try:
+                                command_value[0] = 5  # Set tolerance
+                                command_value[1] = float(user_input_split[1])  # Associated value for tolerance
+                            except ValueError:
+                                print("Invalid value for tolerance")
+                        elif user_input_split[0] == 'n' and len(user_input_split) > 1:
+                            try:
+                                command_value[0] = 6  # Set n_iter_no_change
+                                command_value[1] = float(user_input_split[1])  # Associated value for n_iter_no_change
+                            except ValueError:
+                                print("Invalid value for n_iter_no_change")
+
                     # Set the global tensor
                     global_tensor[0] = 1  # Signal that input is ready
-                    global_tensor[1] = ord(user_input[0])  # Store the first character of input
-                
+                    global_tensor[1] = command_value[0]  # Store the command
+
                 # Broadcast the global tensor to all processes
                 dist.broadcast(global_tensor, src=0)
                 
@@ -721,16 +754,37 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 while global_tensor[0].item() == 0:
                     dist.broadcast(global_tensor, src=0)
                     time.sleep(0.1)
-                
+
                 # Process the input
-                user_input = chr(global_tensor[1].item())
-                print(f"Rank {rank} processed input: {user_input}")
+                command = int(global_tensor[1].item())
+                value = command_value[1].item()
 
-
-                if user_input == 'q':
-                    print(f"Rank {rank} received quit command. Exiting.")
+                # Handle the command
+                if command == 1:  # Save
+                    if rank == 0:
+                        self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False)
+                        print("Model saved.")
+                elif command == 2:  # Quit
+                    if rank == 0:
+                        print("Quitting training...")
                     break
-
+                elif command == 3:  # Help
+                    if rank == 0:
+                        print("Commands: c/continue, s/save (save model), q/quit, "
+                            "e <value> (set max epochs), t <value> (set tolerance), "
+                            "n <value> (set n_iter_no_change)")
+                elif command == 4:  # Set max epochs
+                    self.max_iter = int(value)
+                    if rank == 0:
+                        print(f"Updated max epochs to {self.max_iter}")
+                elif command == 5:  # Set tolerance
+                    self.tol = value
+                    if rank == 0:
+                        print(f"Updated tolerance to {self.tol}")
+                elif command == 6:  # Set n_iter_no_change
+                    self.n_iter_no_change = int(value)
+                    if rank == 0:
+                        print(f"Updated n_iter_no_change to {self.n_iter_no_change}")
 
                 # Reset the global tensor for the next iteration
                 if rank == 0:
@@ -739,81 +793,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
                 # Ensure all ranks have processed the input before continuing
                 dist.barrier()
-
-                # command_value = torch.tensor([0.0, 0.0], device=self.device)
-                # # command_value[0]: 0: continue, 1: save, 2: quit, 3: help, 4: set max epochs, 5: set tolerance, 6: set n_iter_no_change
-                # # command_value[1]: value associated with the command (if any)
-
-                # if rank == 0:
-                #     try:
-                #         user_input = input("Enter command ('c' continue, 's' save, 'q' quit, 'h' help): ").strip().lower().split()
-                #         if user_input:
-                #             if user_input[0] in ['c', 'continue']:
-                #                 command_value[0] = 0
-                #             elif user_input[0] in ['s', 'save']:
-                #                 command_value[0] = 1
-                #             elif user_input[0] in ['q', 'quit']:
-                #                 command_value[0] = 2
-                #             elif user_input[0] in ['h', 'help']:
-                #                 command_value[0] = 3
-                #             elif user_input[0] == 'e' and len(user_input) > 1:
-                #                 try:
-                #                     command_value[0] = 4
-                #                     command_value[1] = float(user_input[1])
-                #                 except ValueError:
-                #                     print("Invalid value for max epochs")
-                #             elif user_input[0] == 't' and len(user_input) > 1:
-                #                 try:
-                #                     command_value[0] = 5
-                #                     command_value[1] = float(user_input[1])
-                #                 except ValueError:
-                #                     print("Invalid value for tolerance")
-                #             elif user_input[0] == 'n' and len(user_input) > 1:
-                #                 try:
-                #                     command_value[0] = 6
-                #                     command_value[1] = float(user_input[1])
-                #                 except ValueError:
-                #                     print("Invalid value for n_iter_no_change")
-                #     except EOFError:
-                #         print("No input detected, continuing with default action.")
-
-                # dist.barrier()
-                # # Broadcast the command and value to all processes
-                # dist.broadcast(command_value, 0)
-
-                # command = int(command_value[0].item())
-                # value = command_value[1].item()
-
-                # if command == 1:  # Save
-                #     if rank == 0:
-                #         self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False)
-                #         print("Model saved.")
-                # elif command == 2:  # Quit
-                #     if rank == 0:
-                #         print("Quitting training...")
-                #     break
-                # elif command == 3:  # Help
-                #     if rank == 0:
-                #         print("Commands: c/continue, s/save (save model), q/quit, "
-                #             "e <value> (set max epochs), t <value> (set tolerance), "
-                #             "n <value> (set n_iter_no_change)")
-                # elif command == 4:  # Set max epochs
-                #     self.max_iter = int(value)
-                #     if rank == 0:
-                #         print(f"Updated max epochs to {self.max_iter}")
-                # elif command == 5:  # Set tolerance
-                #     self.tol = value
-                #     if rank == 0:
-                #         print(f"Updated tolerance to {self.tol}")
-                # elif command == 6:  # Set n_iter_no_change
-                #     self.n_iter_no_change = int(value)
-                #     if rank == 0:
-                #         print(f"Updated n_iter_no_change to {self.n_iter_no_change}")
-
-                # # Synchronize all processes here
-                # dist.barrier()
-
-
 
 
             # Print early stopping message
