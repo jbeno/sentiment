@@ -12,6 +12,8 @@ from torch.distributed.optim import ZeroRedundancyOptimizer
 import os
 import time
 import utils
+import sys
+import select
 from colors import *
 from utils import (format_time, print_state_summary, format_tolerance, get_nic_color, get_score_colors,
                    print_rank_memory_summary, convert_labels_to_tensor, convert_numeric_to_labels)
@@ -160,6 +162,8 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 checkpoint_dir=None,
                 checkpoint_interval=None,
                 resume_from_checkpoint=False,
+                target_score=None,
+                interactive=False,
                 **optimizer_kwargs):
         """
         A flexible neural network classifier with Distributed Data Parallel (DDP) support.
@@ -280,12 +284,15 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_interval = checkpoint_interval
         self.resume_from_checkpoint = resume_from_checkpoint
+        self.target_score = target_score
+        self.interactive = interactive
         
         self.loss = nn.CrossEntropyLoss(reduction="mean")
 
         # Update self.params to include the new parameters
         self.params += ['bert_model', 'bert_tokenizer', 'finetune_bert', 'pooling', 'hidden_dim', 'hidden_activation',
-                        'num_layers', 'rank', 'debug', 'checkpoint_dir', 'checkpoint_interval', 'resume_from_checkpoint']
+                        'num_layers', 'rank', 'debug', 'checkpoint_dir', 'checkpoint_interval', 'resume_from_checkpoint',
+                        'target_score', 'interactive']
 
     def build_graph(self):
         if not hasattr(self, 'n_classes_') or self.n_classes_ is None:
@@ -479,11 +486,17 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
 
 
-    def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None, num_workers=0, prefetch=None, empty_cache=False, decimal=6):
+    def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None,
+            num_workers=0, prefetch=None, empty_cache=False, decimal=6, input_queue=None, response_pipe=None):
         training_start = time.time()
         if rank == 0:
             print(f"\nFitting DDP Neural Classifier on training data...")
             print(f"Num Workers: {num_workers}, Prefetch: {prefetch}")
+
+        user_input = 'c'
+
+        # Create a global tensor for synchronization
+        global_tensor = torch.zeros(2, dtype=torch.long, device=self.device)
 
         # Set classes_ and n_classes_
         self.classes_ = sorted(set(y))
@@ -523,6 +536,18 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 print(f"Training without early stopping. No validation set required, all data used for training.")
                 print(f"Training will stop after {self.max_iter} iterations.")
             X_train, y_train = X, y
+
+        # Check target_score compatibility
+        if self.target_score is not None:
+            if self.early_stopping != 'score':
+                if rank == 0:
+                    print(f"Warning: target_score is set to {self.target_score}, but early_stopping is '{self.early_stopping}'. "
+                        f"target_score will be ignored.")
+                self.target_score = None
+            else:
+                if rank == 0:
+                    print(f"Target score set to {self.target_score}. Training will stop if this validation score is reached.")
+
 
         # Build the dataset and dataloader
         if rank == 0:
@@ -646,7 +671,14 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 if self.no_improvement_count >= self.n_iter_no_change:
                     stop_training = torch.tensor(1, device=self.device)
                 current_score_color, best_score_color = get_score_colors(current_score, self.best_score)
-            if self.early_stopping == 'loss':
+
+                # Check if target score is reached
+                if self.target_score is not None and current_score >= self.target_score:
+                    if rank == 0:
+                        print(f"Reached target validation score of {self.target_score}. Stopping training.")
+                    stop_training = torch.tensor(1, device=self.device)
+
+            elif self.early_stopping == 'loss':
                 current_loss = self._update_no_improvement_count_errors(avg_epoch_loss, epoch, debug)
                 if self.no_improvement_count >= self.n_iter_no_change:
                     stop_training = torch.tensor(1, device=self.device)
@@ -665,6 +697,124 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
             if epoch % 10 == 0:
                 print_rank_memory_summary(world_size, rank, all_local=True, verbose=False) if rank == 0 else None
+
+            # Interactive mode check
+            if self.interactive:
+                # Synchronize all processes after each epoch
+                dist.barrier()
+
+                if rank == 0:
+                    print(f"Epoch {epoch} completed. Waiting for input...")
+                    sys.stdout.flush()
+                    input_queue.put(rank)
+                    user_input = response_pipe.recv()
+                    print(f"Rank {rank} received input: {user_input}")
+                    
+                    # Set the global tensor
+                    global_tensor[0] = 1  # Signal that input is ready
+                    global_tensor[1] = ord(user_input[0])  # Store the first character of input
+                
+                # Broadcast the global tensor to all processes
+                dist.broadcast(global_tensor, src=0)
+                
+                # All processes wait until the input is ready
+                while global_tensor[0].item() == 0:
+                    dist.broadcast(global_tensor, src=0)
+                    time.sleep(0.1)
+                
+                # Process the input
+                user_input = chr(global_tensor[1].item())
+                print(f"Rank {rank} processed input: {user_input}")
+
+
+                if user_input == 'q':
+                    print(f"Rank {rank} received quit command. Exiting.")
+                    break
+
+
+                # Reset the global tensor for the next iteration
+                if rank == 0:
+                    global_tensor[0] = 0
+                dist.broadcast(global_tensor, src=0)
+
+                # Ensure all ranks have processed the input before continuing
+                dist.barrier()
+
+                # command_value = torch.tensor([0.0, 0.0], device=self.device)
+                # # command_value[0]: 0: continue, 1: save, 2: quit, 3: help, 4: set max epochs, 5: set tolerance, 6: set n_iter_no_change
+                # # command_value[1]: value associated with the command (if any)
+
+                # if rank == 0:
+                #     try:
+                #         user_input = input("Enter command ('c' continue, 's' save, 'q' quit, 'h' help): ").strip().lower().split()
+                #         if user_input:
+                #             if user_input[0] in ['c', 'continue']:
+                #                 command_value[0] = 0
+                #             elif user_input[0] in ['s', 'save']:
+                #                 command_value[0] = 1
+                #             elif user_input[0] in ['q', 'quit']:
+                #                 command_value[0] = 2
+                #             elif user_input[0] in ['h', 'help']:
+                #                 command_value[0] = 3
+                #             elif user_input[0] == 'e' and len(user_input) > 1:
+                #                 try:
+                #                     command_value[0] = 4
+                #                     command_value[1] = float(user_input[1])
+                #                 except ValueError:
+                #                     print("Invalid value for max epochs")
+                #             elif user_input[0] == 't' and len(user_input) > 1:
+                #                 try:
+                #                     command_value[0] = 5
+                #                     command_value[1] = float(user_input[1])
+                #                 except ValueError:
+                #                     print("Invalid value for tolerance")
+                #             elif user_input[0] == 'n' and len(user_input) > 1:
+                #                 try:
+                #                     command_value[0] = 6
+                #                     command_value[1] = float(user_input[1])
+                #                 except ValueError:
+                #                     print("Invalid value for n_iter_no_change")
+                #     except EOFError:
+                #         print("No input detected, continuing with default action.")
+
+                # dist.barrier()
+                # # Broadcast the command and value to all processes
+                # dist.broadcast(command_value, 0)
+
+                # command = int(command_value[0].item())
+                # value = command_value[1].item()
+
+                # if command == 1:  # Save
+                #     if rank == 0:
+                #         self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False)
+                #         print("Model saved.")
+                # elif command == 2:  # Quit
+                #     if rank == 0:
+                #         print("Quitting training...")
+                #     break
+                # elif command == 3:  # Help
+                #     if rank == 0:
+                #         print("Commands: c/continue, s/save (save model), q/quit, "
+                #             "e <value> (set max epochs), t <value> (set tolerance), "
+                #             "n <value> (set n_iter_no_change)")
+                # elif command == 4:  # Set max epochs
+                #     self.max_iter = int(value)
+                #     if rank == 0:
+                #         print(f"Updated max epochs to {self.max_iter}")
+                # elif command == 5:  # Set tolerance
+                #     self.tol = value
+                #     if rank == 0:
+                #         print(f"Updated tolerance to {self.tol}")
+                # elif command == 6:  # Set n_iter_no_change
+                #     self.n_iter_no_change = int(value)
+                #     if rank == 0:
+                #         print(f"Updated n_iter_no_change to {self.n_iter_no_change}")
+
+                # # Synchronize all processes here
+                # dist.barrier()
+
+
+
 
             # Print early stopping message
             if stop_training.item() == 1:

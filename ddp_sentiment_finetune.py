@@ -61,6 +61,7 @@ logging.getLogger("huggingface_hub.repocard").setLevel(logging.ERROR)
 
 from torch.utils.data import Dataset
 
+from multiprocessing import Queue, Pipe, set_start_method
 
 def save_data_archive(X_train, X_dev, y_train, y_dev, X_dev_sent, world_size, device_type, data_dir):
     # Create directory if it doesn't exist
@@ -544,13 +545,14 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
 def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_layers, num_layers, hidden_dim, batch_size,
                           epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
                           checkpoint_dir, checkpoint_interval, resume_from_checkpoint, filename=None, use_saved_params=True,
-                          optimizer_name=None, scheduler_name=None, pooling='cls'):
+                          optimizer_name=None, scheduler_name=None, pooling='cls', target_score=None, interactive=False):
     class_init_start = time.time()
     print(f"\nInitializing DDP Neural Classifier...") if rank == 0 else None
     hidden_activation = get_activation(hidden_activation)
     optimizer_class = get_optimizer(optimizer_name, device, rank, world_size)
     #scheduler_class = get_scheduler(scheduler_name, device, rank, world_size)
-    print(f"Layers: {num_layers}, Hidden Dim: {hidden_dim}, Hidden Act: {hidden_activation.__class__.__name__}, Optimizer: {optimizer_class.__name__}, Pooling: {pooling.upper()}, Batch Size: {batch_size}, Max Epochs: {epochs}, LR: {lr}, Early Stop: {early_stop}, Fine-tune BERT: {finetune_bert}, Fine-tune Layers: {finetune_layers}") if rank == 0 else None
+    print(f"Layers: {num_layers}, Hidden Dim: {hidden_dim}, Hidden Act: {hidden_activation.__class__.__name__}, Optimizer: {optimizer_class.__name__}, Pooling: {pooling.upper()}, Batch Size: {batch_size}, Max Epochs: {epochs}, LR: {lr}, Early Stop: {early_stop}") if rank == 0 else None
+    print(f"Fine-tune BERT: {finetune_bert}, Fine-tune Layers: {finetune_layers}, Target Score: {target_score}, Interactive: {interactive}") if rank == 0 else None
     
     classifier = TorchDDPNeuralClassifier(
         bert_model=bert_model,
@@ -573,7 +575,9 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
         checkpoint_interval=checkpoint_interval,
         resume_from_checkpoint=resume_from_checkpoint,
         device=device,
-        optimizer_class=optimizer_class
+        optimizer_class=optimizer_class,
+        target_score=target_score,
+        interactive=interactive
     )
 
     if filename is not None:
@@ -648,8 +652,10 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
          num_layers, hidden_dim, batch_size, epochs, lr, sample_percent, random_seed, early_stop, n_iter_no_change, tol,
          pooling, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint, save_preds, save_dir, model_file,
          use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, empty_cache, decimal, scheduler_name,
-         finetune_bert, finetune_layers):
+         finetune_bert, finetune_layers, target_score, interactive, input_queue, pipes):
+
     try:
+        response_pipe = pipes[rank][1]  # Get the specific pipe for this rank
         start_time = time.time()
         # Initialize the distributed environment
         device = prepare_device(rank, device_type)
@@ -674,9 +680,9 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             finetune_bert, finetune_layers, num_layers, hidden_dim,
             batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
             checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name,
-            scheduler_name, pooling)
+            scheduler_name, pooling, target_score, interactive)
         classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
-                       num_workers, prefetch, empty_cache, decimal)
+                       num_workers, prefetch, empty_cache, decimal, input_queue, response_pipe)
 
         # Evaluate the model
         evaluate_model(classifier, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
@@ -696,6 +702,8 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
     return
 
 if __name__ == '__main__':
+    set_start_method('spawn', force=True)
+
     # Register the signal handler
     signal.signal(signal.SIGINT, signal_handler)
     
@@ -731,6 +739,7 @@ if __name__ == '__main__':
     training_group.add_argument('--optimizer', type=str, default=None, help="Optimizer to use, will auto-detect multiple GPUs and use 'zero', otherwise 'adam': 'zero', 'adam', 'sgd', 'adagrad', 'rmsprop' (default: None)")
     training_group.add_argument('--scheduler', type=str, default=None, help="Learning rate scheduler to use: 'step', 'plateau', 'exponent', 'cosine' (default: None)")
     training_group.add_argument('--random_seed', type=int, default=42, help='Random seed (default: 42)')
+    training_group.add_argument('--interactive', action='store_true', default=False, help='Interactive mode for training (default: False)')
 
     # Checkpoint configuration
     checkpoint_group = parser.add_argument_group('Checkpoint configuration')
@@ -741,8 +750,9 @@ if __name__ == '__main__':
     # Early stopping
     early_stopping_group = parser.add_argument_group('Early stopping')
     early_stopping_group.add_argument('--early_stop', type=str, default=None, help="Early stopping method, 'score' or 'loss' (default: None)")
-    early_stopping_group.add_argument('--n_iter_no_change', type=int, default=10, help='Number of iterations with no improvement to stop training (default: 10)')
+    early_stopping_group.add_argument('--n_iter_no_change', type=int, default=5, help='Number of iterations with no improvement to stop training (default: 5)')
     early_stopping_group.add_argument('--tol', type=float, default=1e-5, help='Tolerance for early stopping (default: 1e-5)')
+    early_stopping_group.add_argument('--target_score', type=float, default=None, help='Target score for early stopping (default: None)')
 
     # Saving options
     saving_group = parser.add_argument_group('Saving options')
@@ -807,9 +817,13 @@ if __name__ == '__main__':
         print(f"Using {args.num_threads} threads for PyTorch")
 
     suffix = '' if world_size == 1 else 'es'
+
+    input_queue = Queue()
+    pipes = [Pipe() for _ in range(world_size)]
+
     print(f"Spawning {world_size} process{suffix}...")
     try:
-        mp.spawn(main,
+        processes = mp.spawn(main,
                 args=(world_size,
                       device_type,
                       backend,
@@ -847,9 +861,23 @@ if __name__ == '__main__':
                       args.decimal,
                       args.scheduler,
                       args.finetune_bert,
-                      args.finetune_layers),
+                      args.finetune_layers,
+                      args.target_score,
+                      args.interactive,
+                      input_queue,
+                      pipes),
                 nprocs=world_size,
-                join=True)
+                join=False)
+        while True:
+            if not input_queue.empty():
+                rank = input_queue.get()
+                user_input = input("Enter a command ('c' to continue, 'q' to quit): ").strip().lower()
+                pipes[rank][0].send(user_input)
+                if user_input == 'q':
+                    break
+            time.sleep(0.1)  # Small sleep to prevent busy waiting
+
+        processes.join()
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt received. Terminating all processes...")
     except Exception as e:
