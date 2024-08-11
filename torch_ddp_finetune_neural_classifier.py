@@ -14,6 +14,7 @@ import time
 import utils
 import sys
 import select
+from multiprocessing import Value
 from colors import *
 from utils import (format_time, print_state_summary, format_tolerance, get_nic_color, get_score_colors,
                    print_rank_memory_summary, convert_labels_to_tensor, convert_numeric_to_labels)
@@ -164,6 +165,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 resume_from_checkpoint=False,
                 target_score=None,
                 interactive=False,
+                response_pipe=None,
                 **optimizer_kwargs):
         """
         A flexible neural network classifier with Distributed Data Parallel (DDP) support.
@@ -286,6 +288,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.resume_from_checkpoint = resume_from_checkpoint
         self.target_score = target_score
         self.interactive = interactive
+        self.response_pipe = response_pipe
         
         self.loss = nn.CrossEntropyLoss(reduction="mean")
 
@@ -483,11 +486,19 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         return start_epoch, model_state_dict, optimizer_state_dict
 
 
-
+    def send_stop_signal(self):
+        if self.response_pipe:
+            try:
+                self.response_pipe.send('stop')
+                print(f"Rank {self.rank} sent stop signal") if self.debug else None
+            except Exception as e:
+                print(f"Rank {self.rank} failed to send stop signal: {e}") if self.debug else None
+        else:
+            print(f"Rank {self.rank} has no response_pipe to send stop signal") if self.debug else None
 
 
     def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None,
-            num_workers=0, prefetch=None, empty_cache=False, decimal=6, input_queue=None, response_pipe=None):
+            num_workers=0, prefetch=None, empty_cache=False, decimal=6, input_queue=None):
         training_start = time.time()
         if rank == 0:
             print(f"\nFitting DDP Neural Classifier on training data...")
@@ -607,6 +618,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.model.train()
 
         stop_training = torch.tensor(0, device=self.device)
+        skip_epochs = 0  # Counter to skip epochs without prompting
         
         if start_epoch > 1:
             last_epoch = start_epoch + self.max_iter
@@ -615,6 +627,9 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         print(f"Start epoch: {start_epoch}, Max Iterations: {self.max_iter}, Early Stop: {self.early_stopping}, Tolerance: {tol_str}, Number Iterations No Change: {self.n_iter_no_change}") if rank == 0 else None
         print_rank_memory_summary(world_size, rank, all_local=True, verbose=False) if rank == 0 else None
         for epoch in range(start_epoch, last_epoch+1):
+            if stop_training.item() == 1:
+                break  # Exit the training loop if the quit command was received or early stopping triggered
+
             epoch_start = time.time()
             if self.device.type == 'cuda' and world_size > 1:
                 sampler.set_epoch(epoch)
@@ -636,8 +651,8 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                     outputs = self.model(X_batch)
                     loss = self.loss(outputs, y_batch)
                 
-                # if debug:
-                #     print(f"Rank {rank}: Epoch: {epoch}, Batch: {batch_idx}, Size: {X_batch.size(0)}, Loss: {loss.item():.6f}, Epoch Loss: {epoch_loss:.6f}")
+                if debug:
+                    print(f"Rank {rank}: Epoch: {epoch}, Batch: {batch_count}, Size: {X_batch.size(0)}, Loss: {loss.item():.6f}, Epoch Loss: {epoch_loss:.6f}")
                 
                 # Average loss across all ranks
                 if world_size > 1:
@@ -699,104 +714,140 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 print_rank_memory_summary(world_size, rank, all_local=True, verbose=False) if rank == 0 else None
 
             # Interactive mode check
-            if self.interactive:
-                # Synchronize all processes after each epoch
-                dist.barrier()
+            if self.interactive and skip_epochs == 0:
+                while True:  # Start a loop to handle the input
 
-                command_value = torch.tensor([0.0, 0.0], device=self.device)  # Tensor to store the command and an optional value
+                    # Synchronize all processes after each epoch
+                    dist.barrier()
 
-                if rank == 0:
-                    print(f"Epoch {epoch} completed. Waiting for input...")
-                    sys.stdout.flush()
-                    input_queue.put(rank)
-                    user_input = response_pipe.recv()
-                    print(f"Rank {rank} received input: {user_input}")
-                    
-                    # Parse the input
-                    user_input_split = user_input.split()
-                    if user_input_split:
-                        # Set command based on the first input
-                        if user_input_split[0] in ['c', 'continue']:
-                            command_value[0] = 0  # Continue
-                        elif user_input_split[0] in ['s', 'save']:
-                            command_value[0] = 1  # Save
-                        elif user_input_split[0] in ['q', 'quit']:
-                            command_value[0] = 2  # Quit
-                        elif user_input_split[0] in ['h', 'help']:
-                            command_value[0] = 3  # Help
-                        elif user_input_split[0] == 'e' and len(user_input_split) > 1:
-                            try:
-                                command_value[0] = 4  # Set max epochs
-                                command_value[1] = float(user_input_split[1])  # Associated value for max epochs
-                            except ValueError:
-                                print("Invalid value for max epochs")
-                        elif user_input_split[0] == 't' and len(user_input_split) > 1:
-                            try:
-                                command_value[0] = 5  # Set tolerance
-                                command_value[1] = float(user_input_split[1])  # Associated value for tolerance
-                            except ValueError:
-                                print("Invalid value for tolerance")
-                        elif user_input_split[0] == 'n' and len(user_input_split) > 1:
-                            try:
-                                command_value[0] = 6  # Set n_iter_no_change
-                                command_value[1] = float(user_input_split[1])  # Associated value for n_iter_no_change
-                            except ValueError:
-                                print("Invalid value for n_iter_no_change")
+                    command_value = torch.tensor([0.0, 0.0], device=self.device)  # Tensor to store the command and an optional value
 
-                    # Set the global tensor
-                    global_tensor[0] = 1  # Signal that input is ready
-                    global_tensor[1] = command_value[0]  # Store the command
+                    if rank == 0:
+                        print(f"Epoch {epoch} completed. Waiting for input...") if debug else None
+                        sys.stdout.flush()
+                        input_queue.put(rank)
+                        user_input = self.response_pipe.recv()
+                        print(f"Rank {rank} received input: {user_input}") if debug else None
+                        
+                        # Parse the input
+                        user_input_split = user_input.split()
+                        if user_input_split:
+                            # Set command based on the first input
+                            if user_input_split[0] in ['c', 'continue']:
+                                command_value[0] = 0  # Continue
+                                if len(user_input_split) > 1:
+                                    try:
+                                        command_value[1] = int(user_input_split[1])  # Number of epochs to skip
+                                    except ValueError:
+                                        print("Invalid number for continue. Continuing with single epoch.")
+                            elif user_input_split[0] in ['s', 'save']:
+                                command_value[0] = 1  # Save
+                            elif user_input_split[0] in ['q', 'quit']:
+                                command_value[0] = 2  # Quit
+                            elif user_input_split[0] in ['h', 'help']:
+                                command_value[0] = 3  # Help
+                            elif user_input_split[0] in ['e', 'epoch', 'epochs'] and len(user_input_split) > 1:
+                                try:
+                                    command_value[0] = 4  # Set max epochs
+                                    command_value[1] = float(user_input_split[1])  # Associated value for max epochs
+                                except ValueError:
+                                    print("Invalid value for max epochs")
+                            elif user_input_split[0] in ['t', 'tol', 'tolerance'] and len(user_input_split) > 1:
+                                try:
+                                    command_value[0] = 5  # Set tolerance
+                                    command_value[1] = float(user_input_split[1])  # Associated value for tolerance
+                                except ValueError:
+                                    print("Invalid value for tolerance")
+                            elif user_input_split[0] in ['n', 'num', 'number'] and len(user_input_split) > 1:
+                                try:
+                                    command_value[0] = 6  # Set n_iter_no_change
+                                    command_value[1] = float(user_input_split[1])  # Associated value for n_iter_no_change
+                                except ValueError:
+                                    print("Invalid value for n_iter_no_change")
+                            elif user_input_split[0] in ['x', 'exit']:
+                                command_value[0] = 7  # Exit interactive mode
+                            elif user_input_split[0] in ['d', 'debug']:
+                                command_value[0] = 8  # Toggle debug mode
 
-                # Broadcast the global tensor to all processes
-                dist.broadcast(global_tensor, src=0)
-                
-                # All processes wait until the input is ready
-                while global_tensor[0].item() == 0:
+                        # Set the global tensor
+                        global_tensor[0] = 1  # Signal that input is ready
+                        global_tensor[1] = command_value[0]  # Store the command
+
+                    # Broadcast the global tensor to all processes
                     dist.broadcast(global_tensor, src=0)
-                    time.sleep(0.1)
+                    dist.broadcast(command_value, src=0)  # Broadcast the command value
 
-                # Process the input
-                command = int(global_tensor[1].item())
-                value = command_value[1].item()
+                    # Process the input
+                    command = int(global_tensor[1].item())
+                    value = command_value[1].item()
 
-                # Handle the command
-                if command == 1:  # Save
-                    if rank == 0:
-                        self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False)
-                        print("Model saved.")
-                elif command == 2:  # Quit
-                    if rank == 0:
-                        print("Quitting training...")
-                    break
-                elif command == 3:  # Help
-                    if rank == 0:
-                        print("Commands: c/continue, s/save (save model), q/quit, "
-                            "e <value> (set max epochs), t <value> (set tolerance), "
-                            "n <value> (set n_iter_no_change)")
-                elif command == 4:  # Set max epochs
-                    self.max_iter = int(value)
-                    if rank == 0:
-                        print(f"Updated max epochs to {self.max_iter}")
-                elif command == 5:  # Set tolerance
-                    self.tol = value
-                    if rank == 0:
-                        print(f"Updated tolerance to {self.tol}")
-                elif command == 6:  # Set n_iter_no_change
-                    self.n_iter_no_change = int(value)
-                    if rank == 0:
-                        print(f"Updated n_iter_no_change to {self.n_iter_no_change}")
+                    # Handle the command
+                    if command == 0:  # Continue
+                        skip_epochs = int(value) if value > 0 else 0  # Set the skip_epochs based on the provided value
+                        if skip_epochs > 0 and rank == 0:
+                            print(f"Skipping {skip_epochs} epochs.")
+                        break  # Exit the loop and proceed to the next epoch
+                    if command == 1:  # Save
+                        if rank == 0:
+                            self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False)
+                            print("Model saved.") if debug else None
+                        break  # Exit the loop to continue to the next epoch
+                    elif command == 2:  # Quit
+                        print("Quitting training...") if rank == 0 else None
+                        stop_training = torch.tensor(1, device=self.device)  # Set the flag to stop training
+                        break  # Exit the loop to continue to the next epoch
+                    elif command == 3:  # Help
+                        if rank == 0:
+                            print(f"\nChoose from the following commands:")
+                            print(f"[C]ontinue  ____  Continue to the next epoch. Optionally skip a number of epochs. Example: 'c 10'")
+                            print(f"[D]ebug           Toggle debug mode. Current: {debug}")
+                            print(f"[E]pochs    ____  Set the maximum number of epochs. Current: {self.max_iter}. Example: 'e 1000'")
+                            print(f"[H]elp            Display this help message")
+                            print(f"[N]umber    ____  Set the number of iterations no change. Current: {self.n_iter_no_change}. Example: 'n 10'")
+                            print(f"[Q]uit            Quit the training loop")
+                            print(f"[S]ave            Save the model as a checkpoint with DDP wrapper")
+                            print(f"[T]olerance ____  Set the tolerance for early stopping. Current: {self.tol}. Example: 't 1e-03'")
+                            print(f"[X]it             Exit interactive mode. You won't be prompted for input again.")
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 4:  # Set max epochs
+                        self.max_iter = int(value)
+                        if start_epoch > 1:
+                            last_epoch = start_epoch + self.max_iter
+                        else:
+                            last_epoch = self.max_iter
+                        print(f"Updated max epochs to: {self.max_iter}") if rank == 0 else None
+                        break  # Exit the loop to continue to the next epoch
+                    elif command == 5:  # Set tolerance
+                        self.tol = value
+                        print(f"Updated tolerance to: {self.tol}") if rank == 0 else None
+                        break  # Exit the loop to continue to the next epoch
+                    elif command == 6:  # Set n_iter_no_change
+                        self.n_iter_no_change = int(value)
+                        print(f"Updated number of iterations no change to: {self.n_iter_no_change}") if rank == 0 else None
+                        break  # Exit the loop to continue to the next epoch
+                    elif command == 7:  # Exit interactive mode
+                        print("Exiting interactive mode...") if rank == 0 else None
+                        self.interactive = False
+                        self.send_stop_signal() # Send stop signal to master process to exit the interactive loop
+                        break  # Exit the loop to continue to the next epoch
+                    elif command == 8:  # Toggle debug mode
+                        debug = not debug
+                        print(f"Debug mode set to: {debug}") if rank == 0 else None
+                        break  # Exit the loop to continue to the next epoch
 
-                # Reset the global tensor for the next iteration
-                if rank == 0:
-                    global_tensor[0] = 0
-                dist.broadcast(global_tensor, src=0)
+                    # Reset the global tensor for the next iteration
+                    if rank == 0:
+                        global_tensor[0] = 0
+                    dist.broadcast(global_tensor, src=0)
 
-                # Ensure all ranks have processed the input before continuing
-                dist.barrier()
+                    # Ensure all ranks have processed the input before continuing
+                    dist.barrier()
 
 
             # Print early stopping message
             if stop_training.item() == 1:
+                dist.all_reduce(stop_training)
+                self.send_stop_signal() # Send stop signal to master process to exit the interactive loop
                 if self.early_stopping == 'score':
                     print(f"Stopping early after {epoch} epochs due to no improvement in validation score in last {self.n_iter_no_change} iterations.")  if rank == 0 else None
                 elif self.early_stopping == 'loss':
@@ -811,12 +862,17 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         
             #dist.barrier()
             
+            # Decrement the skip_epochs counter
+            if skip_epochs > 0:
+                skip_epochs -= 1
+
+            # Check if we've reached the last_epoch
+            if epoch == last_epoch:
+                stop_training = torch.tensor(1, device=self.device)
+
             # Broadcast stop_training to all processes
             if world_size > 1:
                 dist.broadcast(stop_training, 0)
-
-            if stop_training.item() == 1:
-                break
 
         if self.early_stopping and self.device.type == 'cuda' and world_size > 1:
             # Broadcast best parameters to all processes

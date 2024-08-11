@@ -89,26 +89,54 @@ def signal_handler(signum, frame):
     print("\nCtrl+C received. Terminating all processes...")
     cleanup_and_exit(0, True) 
 
-def cleanup_and_exit(rank, debug):
-    # Terminate all child processes
+def cleanup_and_exit(rank, debug, pipe=None, queue=None):
     current_process = mp.current_process()
-    if current_process.name == 'MainProcess':
-        # For the main process, terminate all children
-        for child in mp.active_children():
-            child.terminate()
     
-    # Destroy the process group
-    if dist.is_initialized():
-        dist.destroy_process_group()
-        if debug:
-            print(f"Rank {rank} - Process group destroyed")
+    if rank is not None:
+        print(f"Rank {rank} - Current process: {current_process.name}") if debug else None
+    else:
+        print(f"Current process: {current_process.name}") if debug else None
 
-    # Clean up CUDA resources
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    
+    if current_process.name == 'MainProcess':
+        # MainProcess-specific cleanup
+        if mp.active_children():
+            print(f"Terminating all child processes of MainProcess...") if debug else None
+            for child in mp.active_children():
+                child.terminate()
+                print(f"Terminated child process: {child.name}") if debug else None
+        else:
+            print(f"No active child processes to terminate") if debug else None
+    else:
+        # Child processes cleanup
+        if pipe is not None:
+            print(f"Rank {rank} - Closing response pipe...") if debug else None
+            pipe.close()  # Close the receive end
+            print(f"Rank {rank} - Closed response pipe") if debug else None
+
+        if queue is not None:
+            print(f"Rank {rank} - Closing input queue...") if debug else None
+            queue.close()
+            queue.join_thread()
+            print(f"Rank {rank} - Closed input queue") if debug else None
+
+        if dist.is_initialized():
+            dist.destroy_process_group()
+            print(f"Rank {rank} - Process group destroyed") if debug else None
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            print(f"Rank {rank} - Cleared CUDA cache") if debug else None
+
     # Exit the program
-    sys.exit(0)
+    if rank is not None:
+        print(f"Rank {rank} - Exiting program...") if debug else None
+    else:
+        print(f"Main process - Exiting program...") if debug else None
+
+    #sys.exit(0)
+    return
+
+
 
 def prepare_device(rank, device_type):
     if device_type == "cuda":

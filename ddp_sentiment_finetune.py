@@ -13,6 +13,8 @@ import time
 from collections import Counter
 import traceback
 import math
+from multiprocessing import Value
+from queue import Empty
 
 # PyTorch imports
 import torch
@@ -545,7 +547,8 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
 def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_layers, num_layers, hidden_dim, batch_size,
                           epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
                           checkpoint_dir, checkpoint_interval, resume_from_checkpoint, filename=None, use_saved_params=True,
-                          optimizer_name=None, scheduler_name=None, pooling='cls', target_score=None, interactive=False):
+                          optimizer_name=None, scheduler_name=None, pooling='cls', target_score=None, interactive=False,
+                          response_pipe=None):
     class_init_start = time.time()
     print(f"\nInitializing DDP Neural Classifier...") if rank == 0 else None
     hidden_activation = get_activation(hidden_activation)
@@ -577,7 +580,8 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
         device=device,
         optimizer_class=optimizer_class,
         target_score=target_score,
-        interactive=interactive
+        interactive=interactive,
+        response_pipe=response_pipe
     )
 
     if filename is not None:
@@ -652,10 +656,13 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
          num_layers, hidden_dim, batch_size, epochs, lr, sample_percent, random_seed, early_stop, n_iter_no_change, tol,
          pooling, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint, save_preds, save_dir, model_file,
          use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, empty_cache, decimal, scheduler_name,
-         finetune_bert, finetune_layers, target_score, interactive, input_queue, pipes):
+         finetune_bert, finetune_layers, target_score, interactive, input_queue, pipes, running):
 
     try:
-        response_pipe = pipes[rank][1]  # Get the specific pipe for this rank
+        if interactive:
+            response_pipe = pipes[rank][1]  # Get the specific pipe for this rank
+        else:
+            response_pipe = None
         start_time = time.time()
         # Initialize the distributed environment
         device = prepare_device(rank, device_type)
@@ -680,24 +687,33 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             finetune_bert, finetune_layers, num_layers, hidden_dim,
             batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
             checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name,
-            scheduler_name, pooling, target_score, interactive)
+            scheduler_name, pooling, target_score, interactive, response_pipe)
         classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
-                       num_workers, prefetch, empty_cache, decimal, input_queue, response_pipe)
+                       num_workers, prefetch, empty_cache, decimal, input_queue)
 
         # Evaluate the model
         evaluate_model(classifier, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
                        save_dir, X_dev_sent)
         print(f"TOTAL Time: {format_time(time.time() - start_time)}") if rank == 0 else None
         dist.barrier()
+        if rank == 0:
+            # Signal that all processes have finished
+            for _ in range(world_size):
+                input_queue.put(None)
+            with running.get_lock():
+                running.value = False
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt received. Terminating all processes...")
-        cleanup_and_exit(rank, debug)
+        cleanup_and_exit(rank, debug, response_pipe, input_queue)
     except Exception as e:
         print(f"An error occurred during training: {str(e)}")
         traceback.print_exc()
-        cleanup_and_exit(rank, debug)
+        cleanup_and_exit(rank, debug, response_pipe, input_queue)
     finally:
-        cleanup_and_exit(rank, debug)
+        if rank == 0:
+            with running.get_lock():
+                running.value = False
+        cleanup_and_exit(rank, debug, response_pipe, input_queue)
     
     return
 
@@ -818,10 +834,15 @@ if __name__ == '__main__':
 
     suffix = '' if world_size == 1 else 'es'
 
-    input_queue = Queue()
-    pipes = [Pipe() for _ in range(world_size)]
+    if args.interactive:
+        input_queue = Queue()
+        pipes = [Pipe() for _ in range(world_size)]
+    else:
+        input_queue = None
+        pipes = None
 
     print(f"Spawning {world_size} process{suffix}...")
+    running = Value('b', True)  # 'b' for boolean
     try:
         processes = mp.spawn(main,
                 args=(world_size,
@@ -865,26 +886,61 @@ if __name__ == '__main__':
                       args.target_score,
                       args.interactive,
                       input_queue,
-                      pipes),
+                      pipes,
+                      running),
                 nprocs=world_size,
                 join=False)
-        while True:
-            if not input_queue.empty():
-                rank = input_queue.get()
-                user_input = input("Enter a command ('c' to continue, 'q' to quit): ").strip().lower()
-                pipes[rank][0].send(user_input)
-                if user_input == 'q':
-                    break
-            time.sleep(0.1)  # Small sleep to prevent busy waiting
 
-        processes.join()
+
+        if args.interactive:
+            while running.value:
+                try:
+                    rank = input_queue.get(timeout=1)
+                    if rank is None:
+                        print("Received None rank, exiting interactive loop.")
+                        break
+                    print(f"Checking for messages from rank {rank}...") if args.debug else None
+                    if pipes[rank][0].poll():
+                        message = pipes[rank][0].recv()
+                        print(f"Rank {rank} has a message: {message}...") if args.debug else None
+                        if message == 'stop':
+                            print(f"Stopping signal received from rank {rank}...") if args.debug else None
+                            break
+                    else:
+                        user_input = input(f"\nRank {rank} - [C]ontinue, [Q]uit, [S]ave, [E]pochs, [H]elp: ").strip().lower()
+                        pipes[rank][0].send(user_input)
+                except Empty:
+                    continue  # Timeout occurred, just continue the loop
+
+        # if args.interactive:
+
+        #     while running.value:
+        #         if not input_queue.empty():
+        #             rank = input_queue.get()
+        #             print(f"Checking for messages from rank {rank}...") if args.debug else None
+        #             if pipes[rank][0].poll():
+        #                 print(f"Rank {rank} has a message...") if args.debug else None
+        #                 message = pipes[rank][0].recv()
+        #                 if message == 'stop':
+        #                     print(f"Stopping signal received from rank {rank}...") if args.debug else None
+        #                     with running.get_lock():
+        #                         print(f"Setting running to False...") if args.debug else None
+        #                         running.value = False
+        #                     break
+        #             else:
+        #                 user_input = input(f"\nRank {rank} - [C]ontinue, [Q]uit, [S]ave, [E]pochs, [H]elp: ").strip().lower()
+        #                 pipes[rank][0].send(user_input)
+        #         time.sleep(0.1)
+
+        processes.join()  # Ensure all processes are joined and finished
+        
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt received. Terminating all processes...")
     except Exception as e:
         print(f"An error occurred during training: {str(e)}")
         traceback.print_exc()
     finally:
-        cleanup_and_exit(0, args.debug)
+        cleanup_and_exit(None, args.debug, None, None)
 
     print("All processes finished.")
 
