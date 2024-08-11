@@ -656,7 +656,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
          num_layers, hidden_dim, batch_size, epochs, lr, sample_percent, random_seed, early_stop, n_iter_no_change, tol,
          pooling, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint, save_preds, save_dir, model_file,
          use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, empty_cache, decimal, scheduler_name,
-         finetune_bert, finetune_layers, target_score, interactive, input_queue, pipes, running):
+         finetune_bert, finetune_layers, target_score, interactive, mem_interval, input_queue, pipes, running):
 
     try:
         if interactive:
@@ -689,7 +689,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name,
             scheduler_name, pooling, target_score, interactive, response_pipe)
         classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
-                       num_workers, prefetch, empty_cache, decimal, input_queue)
+                       num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval)
 
         # Evaluate the model
         evaluate_model(classifier, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
@@ -795,6 +795,7 @@ if __name__ == '__main__':
     # Debugging and logging
     debug_group = parser.add_argument_group('Debugging and logging')
     debug_group.add_argument('--debug', action='store_true', default=False, help='Debug or verbose mode to print more details (default: False)')
+    debug_group.add_argument('--mem_interval', type=int, default=10, help='Memory check interval in epochs (default: 10)')
     debug_group.add_argument('--decimal', type=int, default=6, help='Decimal places for floating point numbers (default: 6)')
 
     args = parser.parse_args()
@@ -885,6 +886,7 @@ if __name__ == '__main__':
                       args.finetune_layers,
                       args.target_score,
                       args.interactive,
+                      args.mem_interval,
                       input_queue,
                       pipes,
                       running),
@@ -907,33 +909,13 @@ if __name__ == '__main__':
                             print(f"Stopping signal received from rank {rank}...") if args.debug else None
                             break
                     else:
-                        user_input = input(f"\nRank {rank} - [C]ontinue, [Q]uit, [S]ave, [E]pochs, [H]elp: ").strip().lower()
+                        user_input = input(f"\nEnter a command: [{bright_yellow}{bold}Enter{reset}], [{bright_yellow}{bold}#{reset}], [{bright_yellow}{bold}Q{reset}]uit, [{bright_yellow}{bold}S{reset}]ave, [{bright_yellow}{bold}E{reset}]pochs, [{bright_yellow}{bold}H{reset}]elp: ").strip().lower()
                         pipes[rank][0].send(user_input)
                 except Empty:
                     continue  # Timeout occurred, just continue the loop
 
-        # if args.interactive:
-
-        #     while running.value:
-        #         if not input_queue.empty():
-        #             rank = input_queue.get()
-        #             print(f"Checking for messages from rank {rank}...") if args.debug else None
-        #             if pipes[rank][0].poll():
-        #                 print(f"Rank {rank} has a message...") if args.debug else None
-        #                 message = pipes[rank][0].recv()
-        #                 if message == 'stop':
-        #                     print(f"Stopping signal received from rank {rank}...") if args.debug else None
-        #                     with running.get_lock():
-        #                         print(f"Setting running to False...") if args.debug else None
-        #                         running.value = False
-        #                     break
-        #             else:
-        #                 user_input = input(f"\nRank {rank} - [C]ontinue, [Q]uit, [S]ave, [E]pochs, [H]elp: ").strip().lower()
-        #                 pipes[rank][0].send(user_input)
-        #         time.sleep(0.1)
-
         processes.join()  # Ensure all processes are joined and finished
-        
+
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt received. Terminating all processes...")
     except Exception as e:
