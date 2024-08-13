@@ -17,7 +17,7 @@ import select
 from multiprocessing import Value
 from colors import *
 from utils import (format_time, print_state_summary, format_tolerance, get_nic_color, get_score_colors,
-                   print_rank_memory_summary, convert_labels_to_tensor, convert_numeric_to_labels)
+                   print_rank_memory_summary, convert_labels_to_tensor, convert_numeric_to_labels, tensor_to_numpy)
 
 
 class SentimentDataset(torch.utils.data.Dataset):
@@ -80,17 +80,31 @@ class BERTClassifier(nn.Module):
         total_bert_layers = len(self.bert.encoder.layer)
 
         # Freeze all layers except the specified number of final layers
-        if finetune_layers < total_bert_layers:
+        if finetune_layers == 0:
+            # Freeze all BERT parameters
+            for param in self.bert.parameters():
+                param.requires_grad = False
+        elif finetune_layers < total_bert_layers:
             modules_to_freeze = [self.bert.embeddings, *self.bert.encoder.layer[:-finetune_layers]]
             for module in modules_to_freeze:
                 for param in module.parameters():
                     param.requires_grad = False
 
+        # Count trainable and non-trainable parameters
         bert_trainable_params = sum(p.numel() for p in self.bert.parameters() if p.requires_grad)
+        bert_non_trainable_params = sum(p.numel() for p in self.bert.parameters() if not p.requires_grad)
+        
+        # Count layers requiring gradients
+        layers_requiring_grad = sum(any(p.requires_grad for p in layer.parameters()) for layer in self.bert.encoder.layer)
+        
         if rank == 0:
             print(f"BERT's original pooler removed. Using custom pooling type: {pooling}")
-            print(f"BERT has {bert_trainable_params} trainable parameters")
-            print(f"Fine-tuning the last {finetune_layers} out of {total_bert_layers} BERT layers")
+            print(f"BERT has {bert_trainable_params:,} trainable parameters and {bert_non_trainable_params:,} non-trainable parameters")
+            print(f"Number of BERT layers requiring gradients: {layers_requiring_grad} out of {total_bert_layers}")
+            if finetune_layers == 0:
+                print("All BERT layers are frozen")
+            else:
+                print(f"Fine-tuning the last {finetune_layers} out of {total_bert_layers} BERT layers")
 
     def forward(self, input_ids, attention_mask):
        # Get the last hidden states from BERT
@@ -302,7 +316,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             raise ValueError("n_classes_ is not set. Make sure fit() is called before building the graph.")
 
         if self.finetune_bert:
-            return BERTClassifier(
+            model = BERTClassifier(
                 self.bert_model,
                 self.pooling,
                 self.hidden_dim,
@@ -313,13 +327,41 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 rank=self.rank
             )
         else:
-            return Classifier(
+            model = Classifier(
                 self.input_dim,
                 self.hidden_dim,
                 self.hidden_activation,
                 self.num_layers,
                 self.n_classes_
             )
+
+        if self.rank == 0:
+            print("\nModel Architecture Summary:")
+            print(model)
+            total_params = 0
+            trainable_params = 0
+            total_layers = 0
+            trainable_layers = 0
+
+            for name, module in model.named_modules():
+                if isinstance(module, (nn.Linear, nn.Embedding, nn.LayerNorm)):
+                    total_layers += 1
+                    layer_params = sum(p.numel() for p in module.parameters())
+                    total_params += layer_params
+                    if any(p.requires_grad for p in module.parameters()):
+                        trainable_layers += 1
+                        trainable_params += layer_params
+                        print(f"  {name}: {layer_params:,} (trainable)")
+                    else:
+                        print(f"  {name}: {layer_params:,} (frozen)")
+
+            print(f"\nTotal layers: {total_layers}")
+            print(f"Trainable layers: {trainable_layers}")
+            print(f"Total parameters: {total_params:,}")
+            print(f"Trainable parameters: {trainable_params:,}")
+            print(f"Percentage of trainable parameters: {trainable_params/total_params*100:.2f}%")
+
+        return model
 
     def build_optimizer(self):
         if self.optimizer_class == ZeroRedundancyOptimizer:
@@ -341,7 +383,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         return optimizer
 
     def build_dataset(self, X, y=None):
-        X = np.array(X)
+        X = tensor_to_numpy(X)
         self.input_dim = X.shape[1]
         X = torch.FloatTensor(X)
 
@@ -382,45 +424,29 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             print(f"Current Loss: {epoch_loss:.6f}, Best Loss: {self.best_error:.6f}, Tolerance {self.tol}, No Improvement Count: {self.no_improvement_count}")
         return epoch_loss
 
-    def save_model(self, directory='saves', epoch=None, optimizer=None, is_final=False, save_ddp=True):
+    def save_model(self, directory='saves', epoch=None, optimizer=None, is_final=False):
         if not os.path.exists(directory):
             print(f"Creating directory: {directory}")
             os.makedirs(directory)
         
-        # Save the core model state dictionary if save_ddp is False, else save the DDP wrapped model
-        if save_ddp:
-            if hasattr(self.model, 'module'):
-                model_state_dict = self.model.module.state_dict()
-            else:
-                model_state_dict = self.model.state_dict()
-        else:
-            model_state_dict = self.model.state_dict()
-        
         state = {
             'epoch': epoch,
-            'model_state_dict': model_state_dict,
-            'params': self.__dict__,
-            'n_classes_': self.n_classes_
+            'model_state_dict': self.model.state_dict(),
+            'params': self.__dict__
         }
         if optimizer:
             state['optimizer_state_dict'] = optimizer.state_dict()
         
         timestamp = time.strftime("%Y%m%d-%H%M%S")
 
-        suffix = 'ddp_' if save_ddp else ''
-
         if is_final:
-            filename = f'final_model_{suffix}{timestamp}.pth'
+            filename = f'final_model_{timestamp}.pth'
         else:
-            filename = f'checkpoint_epoch_{epoch}_{suffix}{timestamp}.pth'
+            filename = f'checkpoint_epoch_{epoch}_{timestamp}.pth'
         
         torch.save(state, os.path.join(directory, filename))
-        if save_ddp:
-            print(f"Saved model with DDP wrapper: {os.path.join(directory, filename)}")
-        else:
-            print(f"Saved model: {os.path.join(directory, filename)}")
-
-
+        print(f"Saved model: {os.path.join(directory, filename)}")
+    
 
     def load_model(self, directory='checkpoints', filename=None, pattern='checkpoint_epoch', use_saved_params=True, rank=0, debug=False):
         if not os.path.exists(directory):
@@ -437,13 +463,13 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
         checkpoint = torch.load(latest_checkpoint, map_location=self.device)
         print(f"Loaded checkpoint: {latest_checkpoint}") if rank == 0 else None
-
         # Get the model state dict if it exists
         model_state_dict = checkpoint['model_state_dict'] if 'model_state_dict' in checkpoint else None
 
         # Remove 'module.' prefix if exists
         if model_state_dict is not None:
             model_state_dict = {key.replace("module.", ""): value for key, value in model_state_dict.items()}
+            # Loop through the dictionary and print each key and value (nicely formatted f strings)
             print(f"Retrieved model state dictionary.") if rank == 0 else None
             print_state_summary(model_state_dict) if debug else None
         else:
@@ -459,29 +485,15 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
         # Optionally update model parameters with the saved parameters
         if use_saved_params and 'params' in checkpoint:
-            if debug and rank == 0:
-                print(f"BEFORE updating model parameters:")
+            if debug:
+                print(f"BEFORE updating model parameters:") if rank == 0 else None
                 print_state_summary(self.__dict__)
             self.__dict__.update(checkpoint['params'])
-            if debug and rank == 0:
-                print(f"AFTER updating model parameters:")
+            if debug:
+                print(f"AFTER updating model parameters:") if rank == 0 else None
                 print_state_summary(self.__dict__)
 
-        # Ensure that n_classes_ attribute is set
-        if 'n_classes_' in checkpoint:
-            self.n_classes_ = checkpoint['n_classes_']
-        else:
-            raise ValueError("n_classes_ is not found in the checkpoint.")
-
-        # Initialize the model if not already done
-        if not hasattr(self, 'model') or self.model is None:
-            self.model = self.build_graph()
-
-        # Load the model state dict
-        if model_state_dict is not None:
-            self.model.load_state_dict(model_state_dict)
-
-        start_epoch = checkpoint['epoch'] + 1 if 'epoch' in checkpoint else 1
+        start_epoch = checkpoint.get('epoch', 0) + 1
 
         return start_epoch, model_state_dict, optimizer_state_dict
 
@@ -504,15 +516,25 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             print(f"\nFitting DDP Neural Classifier on training data...")
             print(f"Num Workers: {num_workers}, Prefetch: {prefetch}")
 
-        user_input = 'c'
+        # Build the dataset and dataloader
+        print(f"Building dataset and dataloader...") if rank == 0 else None
 
-        # Create a global tensor for synchronization
-        global_tensor = torch.zeros(2, dtype=torch.long, device=self.device)
+        if self.finetune_bert:
+            if self.bert_tokenizer is None:
+                raise ValueError("bert_tokenizer is required for fine-tuning BERT")
+            dataset = SentimentDataset(X, y, self.bert_tokenizer, self.label_dict, device=self.device)
+            self.classes_ = sorted(set(y))
+            self.n_classes_ = len(self.classes_)
+        else:
+            dataset = self.build_dataset(X, y)
 
-        # Set classes_ and n_classes_
-        self.classes_ = sorted(set(y))
-        self.n_classes_ = len(self.classes_)
-        
+        if self.device.type == 'cuda' and world_size > 1:
+            sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
+            dataloader = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler, num_workers=num_workers, prefetch_factor=prefetch)
+        else:
+            dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=num_workers, prefetch_factor=prefetch)
+
+        # Set the classes and label dictionaries
         if self.label_dict is None:
             self.label_dict = {label: idx for idx, label in enumerate(self.classes_)}
         if self.numeric_dict is None:
@@ -551,91 +573,61 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         # Check target_score compatibility
         if self.target_score is not None:
             if self.early_stopping != 'score':
-                if rank == 0:
-                    print(f"Warning: target_score is set to {self.target_score}, but early_stopping is '{self.early_stopping}'. "
-                        f"target_score will be ignored.")
+                print(f"Warning: target_score is set to {self.target_score}, but early_stopping is '{self.early_stopping}'. target_score will be ignored.") if rank == 0 else None
                 self.target_score = None
             else:
-                if rank == 0:
-                    print(f"Target score set to {self.target_score}. Training will stop if this validation score is reached.")
+                print(f"Target score set to {self.target_score}. Training will stop if this validation score is reached.") if rank == 0 else None
 
-
-        # Build the dataset and dataloader
-        if rank == 0:
-            print(f"Building dataset and dataloader...")
-
-        if self.finetune_bert:
-            if self.bert_tokenizer is None:
-                raise ValueError("bert_tokenizer is required for fine-tuning BERT")
-            dataset = SentimentDataset(X, y, self.bert_tokenizer, self.label_dict, device=self.device)
-        else:
-            dataset = self.build_dataset(X, y)
-
-        if self.device.type == 'cuda' and world_size > 1:
-            sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
-            dataloader = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler, num_workers=num_workers, prefetch_factor=prefetch)
-        else:
-            dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=num_workers, prefetch_factor=prefetch)
-
-        # Initialize the model, optimizer, and other training parameters
-        if rank == 0:
-            print("Initializing model, graph, optimizer...")
+        # Initialize the model, optimizer, and set it in training mode
+        print("Initializing model, graph, optimizer...") if rank == 0 else None
         
-        if not hasattr(self, 'model') or self.model is None:
-            self.model = self.build_graph()
-        
+        self.initialize()
+        dist.barrier()
+
         if model_state_dict is not None:
             self.model.load_state_dict(model_state_dict)
-        
-        self.model.to(self.device)
         
         if self.device.type == 'cuda':
             self.model = DDP(self.model, device_ids=[rank])
         else:
             self.model = DDP(self.model, device_ids=None)
         
-        if not hasattr(self, 'optimizer') or self.optimizer is None:
-            self.optimizer = self.build_optimizer()
-        
         if optimizer_state_dict is not None:
             self.optimizer.load_state_dict(optimizer_state_dict)
-
-        # Initialize training variables
-        self.errors = []
-        self.validation_scores = []
-        self.no_improvement_count = 0
-        self.best_error = float('inf')
-        self.best_score = float('-inf')
-        self.best_parameters = None
 
         if rank == 0:
             print(f"Model architecture:\n{self.model}") if debug else None
             print(f"Optimizer:\n{self.optimizer}") if debug else None
             print(f"Starting training loop...")
 
-        num_digits = len(str(self.max_iter))
-
         self.model.train()
 
-        stop_training = torch.tensor(0, device=self.device)
-        skip_epochs = 0  # Counter to skip epochs without prompting
+        num_digits = len(str(self.max_iter))  # Number of digits for formatting epoch output
+        stop_training = torch.tensor(0, device=self.device)  # Signal to stop training in DDP setup
+        skip_epochs = 0  # Counter to skip epochs without prompting in interactive mode
+        target_hit = False  # Flag to indicate if the target score was reached
         
+        # Set the last epoch based on the start epoch and max iterations
         if start_epoch > 1:
             last_epoch = start_epoch + self.max_iter
         else:
             last_epoch = self.max_iter
+
         print(f"Start epoch: {start_epoch}, Max Iterations: {self.max_iter}, Early Stop: {self.early_stopping}, Tolerance: {tol_str}, Number Iterations No Change: {self.n_iter_no_change}") if rank == 0 else None
         print_rank_memory_summary(world_size, rank, all_local=True, verbose=False) if rank == 0 else None
+
+        # Training loop
         for epoch in range(start_epoch, last_epoch+1):
             if stop_training.item() == 1:
-                break  # Exit the training loop if the quit command was received or early stopping triggered
+                break  # Exit the training loop if stop_training was triggered
 
             epoch_start = time.time()
             if self.device.type == 'cuda' and world_size > 1:
-                sampler.set_epoch(epoch)
+                sampler.set_epoch(epoch)  # Required for DistributedSampler to shuffle the data
             epoch_loss = 0.0
             batch_count = 0
             for batch in dataloader:
+                # Handle finetuning BERT or just training the classifier head, which have different X inputs
                 if self.finetune_bert:
                     input_ids = batch['input_ids'].to(self.device)
                     attention_mask = batch['attention_mask'].to(self.device)
@@ -651,8 +643,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                     outputs = self.model(X_batch)
                     loss = self.loss(outputs, y_batch)
                 
-                if debug:
-                    print(f"Rank {rank}: Epoch: {epoch}, Batch: {batch_count}, Size: {X_batch.size(0)}, Loss: {loss.item():.6f}, Epoch Loss: {epoch_loss:.6f}")
+                print(f"Rank {rank}: Epoch: {epoch}, Batch: {batch_count}, Size: {X_batch.size(0)}, Loss: {loss.item():.6f}, Epoch Loss: {epoch_loss:.6f}") if debug else None
                 
                 # Average loss across all ranks
                 if world_size > 1:
@@ -663,12 +654,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 
                 epoch_loss += loss.item()
                 batch_count += 1
-                
-                # if empty_cache:
-                #     # Delete the unused objects
-                #     del outputs, X_batch, y_batch
-                #     # Empty CUDA cache
-                #     torch.cuda.empty_cache()
 
             # Calculate average epoch loss
             avg_epoch_loss = epoch_loss / batch_count
@@ -679,7 +664,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
             dist.barrier()
 
-            #if rank == 0:
             # Early stopping logic
             if self.early_stopping == 'score':
                 current_score = self._update_no_improvement_count_early_stopping(X_val, y_val, epoch, debug)
@@ -689,6 +673,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
                 # Check if target score is reached
                 if self.target_score is not None and current_score >= self.target_score:
+                    target_hit = True
                     if rank == 0:
                         print(f"Reached target validation score of {self.target_score}. Stopping training.")
                     stop_training = torch.tensor(1, device=self.device)
@@ -710,11 +695,16 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             else:
                 print(f"Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset} / {self.max_iter}: Avg Loss: {bright_white}{bold}{avg_epoch_loss:.{decimal}f}{reset} | Total Loss: {epoch_loss:.{decimal}f}, Batch Count: {batch_count} | Time: {format_time(time.time() - epoch_start)}")  if rank == 0 else None
 
+            # Print memory summary
             if epoch % mem_interval == 0:
                 print_rank_memory_summary(world_size, rank, all_local=True, verbose=False) if rank == 0 else None
 
-            # Interactive mode check
+            # Interactive mode
             if self.interactive and skip_epochs == 0:
+
+                # Create a global tensor for synchronization
+                global_tensor = torch.zeros(2, dtype=torch.long, device=self.device)
+
                 while True:  # Start a loop to handle the input
 
                     # Synchronize all processes after each epoch
@@ -723,9 +713,9 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                     command_value = torch.tensor([0.0, 0.0], device=self.device)  # Tensor to store the command and an optional value
 
                     if rank == 0:
-                        print(f"Epoch {epoch} completed. Waiting for input...") if debug else None
                         sys.stdout.flush()
-                        input_queue.put(rank)
+                        if input_queue is not None:
+                            input_queue.put(rank)
                         user_input = self.response_pipe.recv()
                         print(f"Rank {rank} received input: {user_input}") if debug else None
                         
@@ -783,12 +773,23 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                                         command_value[1] = float(user_input_split[1])  # Associated value for target validation score
                                     except ValueError:
                                         print("Invalid value for target validation score")
-                                elif user_input_split[0] in ['m', 'mem', 'memory'] and len(user_input_split) > 1:
+                                elif user_input_split[0] in ['m', 'mem', 'memory']:
+                                    if len(user_input_split) > 1:
+                                        try:
+                                            command_value[0] = 11  # Set memory interval
+                                            command_value[1] = float(user_input_split[1])  # Associated value for memory interval
+                                        except ValueError:
+                                            print("Invalid value for memory interval")
+                                    else:
+                                        print("A number is required for the memory interval")
+                                elif user_input_split[0] in ['g', 'gpu', 'gpus']:
+                                    command_value[0] = 12  # Show GPU memory usage
+                                elif user_input_split[0] in ['l', 'lr', 'learning', 'rate'] and len(user_input_split) > 1:
                                     try:
-                                        command_value[0] = 11  # Set memory interval
-                                        command_value[1] = float(user_input_split[1])  # Associated value for memory interval
+                                        command_value[0] = 13  # Set learning rate
+                                        command_value[1] = float(user_input_split[1])  # Associated value for learning rate
                                     except ValueError:
-                                        print("Invalid value for memory interval")
+                                        print("Invalid value for learning rate")
 
                         # Set the global tensor
                         global_tensor[0] = 1  # Signal that input is ready
@@ -825,8 +826,10 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                             print(f"[{bold}{bright_yellow}C{reset}]heckpoint ____  Set the checkpoint interval. Current: {self.checkpoint_interval}. Example: 'c 5'")
                             print(f"[{bold}{bright_yellow}D{reset}]ebug            Toggle debug mode. Current: {debug}")
                             print(f"[{bold}{bright_yellow}E{reset}]pochs     ____  Set the maximum number of epochs. Current: {self.max_iter}. Example: 'e 1000'")
+                            print(f"[{bold}{bright_yellow}G{reset}]PUs       ____  Show current GPU memory usage.")
                             print(f"[{bold}{bright_yellow}H{reset}]elp             Display this help message")
-                            print(f"[{bold}{bright_yellow}M{reset}]emory     ____  Set the memory interval for memory usage summary. Example: 'm 5'")
+                            print(f"[{bold}{bright_yellow}L{reset}]earning   ____  Set the learning rate. Current: {self.eta:.{decimal}f}. Example: 'l 0.001'")
+                            print(f"[{bold}{bright_yellow}M{reset}]emory     ____  Set the interval to display GPU memory usage. Example: 'm 5'")
                             print(f"[{bold}{bright_yellow}N{reset}]umber     ____  Set the number of iterations no change. Current: {self.n_iter_no_change}. Example: 'n 10'")
                             print(f"[{bold}{bright_yellow}Q{reset}]uit             Quit the training loop")
                             print(f"[{bold}{bright_yellow}S{reset}]ave             Save the model as a checkpoint with DDP wrapper")
@@ -861,7 +864,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                         continue  # Stay in the loop to wait for another command
                     elif command == 9:  # Set target validation score
                         self.target_score = value
-                        print(f"Updated target validation score to: {self.target_score}") if rank == 0 else None
+                        print(f"Updated target validation score to: {self.target_score:.{decimal}f}") if rank == 0 else None
                         continue  # Stay in the loop to wait for another command
                     elif command == 10:  # Change checkpoint interval
                         if value > 0:
@@ -877,6 +880,17 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                         else:
                             print(f"Invalid value for memory interval. Please enter a positive integer.") if rank == 0 else None
                         continue  # Stay in the loop to wait for another command
+                    elif command == 12:  # Show GPU memory usage
+                        print_rank_memory_summary(world_size, rank, all_local=True, verbose=True) if rank == 0 else None
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 13:  # Set learning rate
+                        self.eta = value
+                        for param_group in self.optimizer.param_groups:
+                            if 'lr' in param_group:
+                                param_group['lr'] = self.eta
+                        if rank == 0:
+                            print(f"Updated learning rate to: {self.eta:.{decimal}f}")
+                        continue  # Stay in the loop to wait for another command
 
                     # Reset the global tensor for the next iteration
                     if rank == 0:
@@ -886,24 +900,22 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                     # Ensure all ranks have processed the input before continuing
                     dist.barrier()
 
-
             # Print early stopping message
             if stop_training.item() == 1:
-                #dist.all_reduce(stop_training)
                 self.send_stop_signal() # Send stop signal to master process to exit the interactive loop
-                if self.early_stopping == 'score':
+                if self.early_stopping == 'score' and target_hit:
+                    print(f"Stopping early after {epoch} epochs due to reaching target validation score of {self.target_score:.{decimal}f}.") if rank == 0 else None
+                elif self.early_stopping == 'score':
                     print(f"Stopping early after {epoch} epochs due to no improvement in validation score in last {self.n_iter_no_change} iterations.")  if rank == 0 else None
                 elif self.early_stopping == 'loss':
                     print(f"Stopping early after {epoch} epochs due to no improvement in training loss in last {self.n_iter_no_change} iterations.") if rank == 0 else None
                 else:
-                    print(f"Stopping early after {epoch} epochs.") if rank == 0 else None
+                    print(f"Stopping after {epoch} epochs. (Start: {start_epoch}, Last: {last_epoch}, Max: {self.max_iter})") if rank == 0 else None
 
             # Save a checkpoint
             if self.checkpoint_interval and (epoch) % self.checkpoint_interval == 0:
                 if rank == 0:
-                    self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False, save_ddp=True)
-        
-            #dist.barrier()
+                    self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False)
             
             # Decrement the skip_epochs counter
             if skip_epochs > 0:
@@ -917,6 +929,10 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             if world_size > 1:
                 dist.broadcast(stop_training, 0)
 
+            # Empty CUDA cache after each epoch
+            if empty_cache:
+                torch.cuda.empty_cache()
+
         if self.early_stopping and self.device.type == 'cuda' and world_size > 1:
             # Broadcast best parameters to all processes
             for param in self.model.parameters():
@@ -924,7 +940,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         
         # Save the final model
         if rank == 0:
-            self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=True, save_ddp=False)
+            self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=True)
             print(f"Training completed ({format_time(time.time() - training_start)})")
 
         return self

@@ -18,6 +18,16 @@ bright_green = "\033[38;5;82m"
 bright_yellow = "\033[93m"
 bright_red = "\033[91m"
 bright_white = "\033[97m"
+bright_magenta = "\033[95m"
+bright_cyan = "\033[96m"
+bright_blue = "\033[94m"
+bright_purple = "\033[38;5;129m"
+light_blue = "\033[38;5;123m"
+sky_blue = "\033[38;5;117m"
+deep_blue = "\033[38;5;21m"
+steel_blue = "\033[38;5;67m"
+electric_blue = "\033[38;5;81m"
+purple = "\033[38;5;93m"
 
 
 def get_nic_color(no_improvement_count, n_iter_no_change):

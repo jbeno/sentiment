@@ -45,6 +45,21 @@ class Config:
         for key, value in dict_obj.items():
             setattr(self, key, value)
 
+def tensor_to_numpy(tensor):
+    """
+    Convert a PyTorch tensor to a NumPy array, handling both CPU and CUDA tensors.
+    If the input is not a tensor, it is returned unchanged.
+
+    Args:
+    tensor: A PyTorch tensor or any other object
+
+    Returns:
+    A NumPy array if the input was a PyTorch tensor, otherwise the input is returned unchanged
+    """
+    if isinstance(tensor, torch.Tensor):
+        return tensor.cpu().numpy() if tensor.is_cuda else tensor.numpy()
+    return tensor
+
 def format_time(seconds):
     if seconds >= 1:
         hrs, secs = divmod(seconds, 3600)
@@ -76,14 +91,39 @@ def format_tolerance(tolerance):
 
     return str(normalized)
 
-def setup_environment(rank, world_size, backend, device, debug):
-    os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12355"
+def setup_environment(rank, world_size, backend, device, debug, port='12355', host='localhost', timeout='3600000', wait='1'):
+
+    # Set the DDP environment variables
+    os.environ["MASTER_ADDR"] = host
+    os.environ["MASTER_PORT"] = port
+    
+    # Initialize the process group
     dist.init_process_group(backend=backend, rank=rank, world_size=world_size)
     print(f"Rank {rank} - Device: {device}")
     dist.barrier()
-    if rank == 0:
-        print(f"{world_size} process groups initialized with '{backend}' backend on {os.environ['MASTER_ADDR']}:{os.environ['MASTER_PORT']}")
+    
+    print(f"{world_size} process groups initialized with '{backend}' backend on {os.environ['MASTER_ADDR']}:{os.environ['MASTER_PORT']}") if rank == 0 else None
+    
+    # Set NCCL blocking wait and timeout
+    if backend == 'nccl':
+        os.environ["NCCL_BLOCKING_WAIT"] = wait
+        os.environ["NCCL_TIMEOUT_MS"] = timeout
+
+        # Convert timeout to hours and minutes
+        timeout_ms = int(os.environ["NCCL_TIMEOUT_MS"])
+        timeout_min = timeout_ms // 60000
+        timeout_hr = timeout_min // 60
+        timeout_min = timeout_min % 60
+
+        # Convert wait to string
+        if os.environ["NCCL_BLOCKING_WAIT"] == '1':
+            wait_str = "Enabled"
+        elif os.environ["NCCL_BLOCKING_WAIT"] == '0':
+            wait_str = "Disabled"
+        else:
+            wait_str = "Invalid"
+
+        print(f"NCCL Timeout: {timeout_hr} hr {timeout_min} min. NCCL Blocking Wait: {wait_str}") if rank == 0 else None
 
 def signal_handler(signum, frame):
     print("\nCtrl+C received. Terminating all processes...")
@@ -93,9 +133,9 @@ def cleanup_and_exit(rank, debug, pipe=None, queue=None):
     current_process = mp.current_process()
     
     if rank is not None:
-        print(f"Rank {rank} - Current process: {current_process.name}") if debug else None
+        print(f"Rank {rank} - Current process: {current_process.name} cleaning up...") if debug else None
     else:
-        print(f"Current process: {current_process.name}") if debug else None
+        print(f"Current process: {current_process.name} cleaning up...") if debug else None
 
     if current_process.name == 'MainProcess':
         # MainProcess-specific cleanup
@@ -133,8 +173,7 @@ def cleanup_and_exit(rank, debug, pipe=None, queue=None):
     else:
         print(f"Main process - Exiting program...") if debug else None
 
-    #sys.exit(0)
-    return
+    sys.exit(0)
 
 
 
