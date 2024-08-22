@@ -65,7 +65,7 @@ class SentimentDataset(torch.utils.data.Dataset):
         return item
 
 class BERTClassifier(nn.Module):
-    def __init__(self, bert_model, pooling, hidden_dim, hidden_activation, num_layers, n_classes, finetune_layers=1, rank=0):
+    def __init__(self, bert_model, pooling, hidden_dim, hidden_activation, num_layers, n_classes, dropout_rate, finetune_layers=1, rank=0):
         super().__init__()
         self.bert = bert_model
 
@@ -74,7 +74,7 @@ class BERTClassifier(nn.Module):
         self.bert.pooler = None
         # Add our custom pooling layer
         self.custom_pooling = PoolingLayer(pooling)
-        self.classifier = Classifier(bert_model.config.hidden_size, hidden_dim, hidden_activation, num_layers, n_classes)
+        self.classifier = Classifier(bert_model.config.hidden_size, hidden_dim, hidden_activation, num_layers, n_classes, dropout_rate)
 
         # Get the total number of layers in the BERT model
         total_bert_layers = len(self.bert.encoder.layer)
@@ -115,15 +115,19 @@ class BERTClassifier(nn.Module):
         return self.classifier(pooled_output)
     
 class Classifier(nn.Module):
-    def __init__(self, input_dim, hidden_dim, hidden_activation, num_layers, n_classes):
+    def __init__(self, input_dim, hidden_dim, hidden_activation, num_layers, n_classes, dropout_rate=0.0):
         super().__init__()
         layers = []
         layers.append(nn.Linear(input_dim, hidden_dim))
         layers.append(hidden_activation)
+        if dropout_rate > 0:
+            layers.append(nn.Dropout(dropout_rate))
         
         for _ in range(num_layers - 1):
             layers.append(nn.Linear(hidden_dim, hidden_dim))
             layers.append(hidden_activation)
+            if dropout_rate > 0:
+                layers.append(nn.Dropout(dropout_rate))
         
         layers.append(nn.Linear(hidden_dim, n_classes))
         
@@ -180,6 +184,8 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 target_score=None,
                 interactive=False,
                 response_pipe=None,
+                freeze_bert=False,
+                dropout_rate=0.0,
                 **optimizer_kwargs):
         """
         A flexible neural network classifier with Distributed Data Parallel (DDP) support.
@@ -303,13 +309,15 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.target_score = target_score
         self.interactive = interactive
         self.response_pipe = response_pipe
+        self.freeze_bert = freeze_bert
+        self.dropout_rate = dropout_rate
         
         self.loss = nn.CrossEntropyLoss(reduction="mean")
 
         # Update self.params to include the new parameters
         self.params += ['bert_model', 'bert_tokenizer', 'finetune_bert', 'pooling', 'hidden_dim', 'hidden_activation',
                         'num_layers', 'rank', 'debug', 'checkpoint_dir', 'checkpoint_interval', 'resume_from_checkpoint',
-                        'target_score', 'interactive']
+                        'target_score', 'interactive', 'response_pipe', 'freeze_bert', 'dropout_rate']
 
     def build_graph(self):
         if not hasattr(self, 'n_classes_') or self.n_classes_ is None:
@@ -323,16 +331,21 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 self.hidden_activation,
                 self.num_layers,
                 self.n_classes_,
+                self.dropout_rate,
                 self.finetune_layers,
-                rank=self.rank
+                self.rank
             )
+            if self.freeze_bert:
+                for param in model.bert.parameters():
+                    param.requires_grad = False
         else:
             model = Classifier(
                 self.input_dim,
                 self.hidden_dim,
                 self.hidden_activation,
                 self.num_layers,
-                self.n_classes_
+                self.n_classes_,
+                self.dropout_rate
             )
 
         if self.rank == 0:
@@ -343,6 +356,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             total_layers = 0
             trainable_layers = 0
 
+            print("\nModel Parameters:")
             for name, module in model.named_modules():
                 if isinstance(module, (nn.Linear, nn.Embedding, nn.LayerNorm)):
                     total_layers += 1
@@ -364,6 +378,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         return model
 
     def build_optimizer(self):
+        print(f"\nBuilding optimizer: {self.optimizer_class.__name__} with learning rate: {self.eta}, L2 strength: {self.l2_strength}") if self.rank == 0 else None
         if self.optimizer_class == ZeroRedundancyOptimizer:
             optimizer = ZeroRedundancyOptimizer(
                 self.model.parameters(),

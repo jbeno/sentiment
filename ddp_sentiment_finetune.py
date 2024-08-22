@@ -611,15 +611,15 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
 def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_layers, num_layers, hidden_dim, batch_size,
                           epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
                           checkpoint_dir, checkpoint_interval, resume_from_checkpoint, filename=None, use_saved_params=True,
-                          optimizer_name=None, scheduler_name=None, pooling='cls', target_score=None, interactive=False,
-                          response_pipe=None, accumulation_steps=1):
+                          optimizer_name=None, l2_strength=0.0, scheduler_name=None, pooling='cls', target_score=None, interactive=False,
+                          response_pipe=None, accumulation_steps=1, freeze_bert=False, dropout_rate=0.0):
     class_init_start = time.time()
     print(f"\nInitializing DDP Neural Classifier...") if rank == 0 else None
     hidden_activation = get_activation(hidden_activation)
     optimizer_class = get_optimizer(optimizer_name, device, rank, world_size)
     #scheduler_class = get_scheduler(scheduler_name, device, rank, world_size)
-    print(f"Layers: {num_layers}, Hidden Dim: {hidden_dim}, Hidden Act: {hidden_activation.__class__.__name__}, Optimizer: {optimizer_class.__name__}, Pooling: {pooling.upper()}, Batch Size: {batch_size}, Gradient Accumulation Steps: {accumulation_steps}") if rank == 0 else None
-    print(f"Max Epochs: {epochs}, LR: {lr}, Early Stop: {early_stop}, Fine-tune BERT: {finetune_bert}, Fine-tune Layers: {finetune_layers}, Target Score: {target_score}, Interactive: {interactive}") if rank == 0 else None
+    print(f"Layers: {num_layers}, Hidden Dim: {hidden_dim}, Hidden Act: {hidden_activation.__class__.__name__}, Dropout: {dropout_rate}, Optimizer: {optimizer_class.__name__}, L2 Strength: {l2_strength}, Pooling: {pooling.upper()}, Gradient Accumulation Steps: {accumulation_steps}") if rank == 0 else None
+    print(f"Batch Size: {batch_size}, Max Epochs: {epochs}, LR: {lr}, Early Stop: {early_stop}, Fine-tune BERT: {finetune_bert}, Fine-tune Layers: {finetune_layers}, Freeze BERT: {freeze_bert}, Target Score: {target_score}, Interactive: {interactive}") if rank == 0 else None
     
     classifier = TorchDDPNeuralClassifier(
         bert_model=bert_model,
@@ -646,7 +646,10 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
         target_score=target_score,
         interactive=interactive,
         response_pipe=response_pipe,
-        gradient_accumulation_steps=accumulation_steps
+        gradient_accumulation_steps=accumulation_steps,
+        freeze_bert=freeze_bert,
+        dropout_rate=dropout_rate,
+        l2_strength=l2_strength
     )
 
     if filename is not None:
@@ -720,8 +723,9 @@ def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict
 def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_name, hidden_activation, label_dict, numeric_dict,
          num_layers, hidden_dim, batch_size, epochs, lr, sample_percent, random_seed, early_stop, n_iter_no_change, tol,
          pooling, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint, save_preds, save_dir, model_file,
-         use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, empty_cache, decimal, scheduler_name,
-         finetune_bert, finetune_layers, target_score, interactive, mem_interval, accumulation_steps, chunk_size, input_queue, pipes, running):
+         use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, l2_strength, empty_cache, decimal, scheduler_name,
+         finetune_bert, finetune_layers, target_score, interactive, mem_interval, accumulation_steps, freeze_bert, dropout_rate,
+         chunk_size, input_queue, pipes, running):
 
     try:
         if interactive:
@@ -751,8 +755,8 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             bert_model if finetune_bert else None, bert_tokenizer if finetune_bert else None,
             finetune_bert, finetune_layers, num_layers, hidden_dim,
             batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
-            checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name,
-            scheduler_name, pooling, target_score, interactive, response_pipe, accumulation_steps)
+            checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name, l2_strength,
+            scheduler_name, pooling, target_score, interactive, response_pipe, accumulation_steps, freeze_bert, dropout_rate)
         classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
                        num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval)
 
@@ -807,12 +811,14 @@ if __name__ == '__main__':
     bert_group.add_argument('--pooling', type=str, default='cls', help="Pooling method for BERT embeddings: 'cls', 'mean', 'max' (default: 'cls')")
     bert_group.add_argument('--finetune_bert', action='store_true', default=False, help='Whether to fine-tune BERT weights. If True, specify number of finetune_layers (default: False)')
     bert_group.add_argument('--finetune_layers', type=int, default=1, help='Number of BERT layers to fine-tune. For example: 0 to freeze all, 12 or 24 to tune all, 1 to tune the last layer, etc. (default: 1)')
+    bert_group.add_argument('--freeze_bert', action='store_true', default=False, help='Whether to freeze BERT weights during training (default: False)')
 
     # Classifier configuration
     classifier_group = parser.add_argument_group('Classifier configuration')
     classifier_group.add_argument('--num_layers', type=int, default=1, help='Number of hidden layers for neural classifier (default: 1)')
     classifier_group.add_argument('--hidden_dim', type=int, default=300, help='Hidden dimension for neural classifier layers (default: 300)')
     classifier_group.add_argument('--hidden_activation', type=str, default='tanh', help="Hidden activation function: 'tanh', 'relu', 'sigmoid', 'leaky_relu' (default: 'tanh')")
+    classifier_group.add_argument('--dropout_rate', type=float, default=0.0, help='Dropout rate for neural classifier (default: 0.0)')
 
     # Training configuration
     training_group = parser.add_argument_group('Training configuration')
@@ -821,6 +827,7 @@ if __name__ == '__main__':
     training_group.add_argument('--epochs', type=int, default=100, help='Number of epochs to train (default: 100)')
     training_group.add_argument('--lr', type=float, default=0.001, help='Learning rate (default: 0.001)')
     training_group.add_argument('--optimizer', type=str, default=None, help="Optimizer to use, will auto-detect multiple GPUs and use 'zero', otherwise 'adam': 'zero', 'adam', 'sgd', 'adagrad', 'rmsprop' (default: None)")
+    training_group.add_argument('--l2_strength', type=float, default=0.0, help='L2 regularization strength for optimizer (default: 0.0)')
     training_group.add_argument('--scheduler', type=str, default=None, help="Learning rate scheduler to use: 'step', 'plateau', 'exponent', 'cosine' (default: None)")
     training_group.add_argument('--random_seed', type=int, default=42, help='Random seed (default: 42)')
     training_group.add_argument('--interactive', action='store_true', default=False, help='Interactive mode for training (default: False)')
@@ -947,6 +954,7 @@ if __name__ == '__main__':
                       args.num_workers,
                       args.prefetch,
                       args.optimizer,
+                      args.l2_strength,
                       args.empty_cache,
                       args.decimal,
                       args.scheduler,
@@ -956,6 +964,8 @@ if __name__ == '__main__':
                       args.interactive,
                       args.mem_interval,
                       args.accumulation_steps,
+                      args.freeze_bert,
+                      args.dropout_rate,
                       args.chunk_size,
                       input_queue,
                       pipes,
@@ -984,7 +994,7 @@ if __name__ == '__main__':
                 except Empty:
                     continue
 
-            processes.join()  # Ensure all processes are joined and finished
+        processes.join()  # Ensure all processes are joined and finished
 
 
     except KeyboardInterrupt:
