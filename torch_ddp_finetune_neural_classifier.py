@@ -14,6 +14,7 @@ import time
 import utils
 import sys
 import select
+from tqdm import tqdm
 from multiprocessing import Value
 from colors import *
 from utils import (format_time, print_state_summary, format_tolerance, get_nic_color, get_score_colors,
@@ -186,6 +187,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 response_pipe=None,
                 freeze_bert=False,
                 dropout_rate=0.0,
+                show_progress=False,
                 **optimizer_kwargs):
         """
         A flexible neural network classifier with Distributed Data Parallel (DDP) support.
@@ -311,6 +313,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.response_pipe = response_pipe
         self.freeze_bert = freeze_bert
         self.dropout_rate = dropout_rate
+        self.show_progress = show_progress
         
         self.loss = nn.CrossEntropyLoss(reduction="mean")
 
@@ -613,7 +616,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         if rank == 0:
             print(f"Model architecture:\n{self.model}") if debug else None
             print(f"Optimizer:\n{self.optimizer}") if debug else None
-            print(f"Starting training loop...")
+            print(f"\nStarting training loop...")
 
         self.model.train()
 
@@ -641,6 +644,13 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 sampler.set_epoch(epoch)  # Required for DistributedSampler to shuffle the data
             epoch_loss = 0.0
             batch_count = 0
+
+            # Create a progress bar for batches
+            if rank == 0 and self.show_progress:
+                pbar = tqdm(total=len(dataloader), desc=f"Epoch {epoch}/{last_epoch}", 
+                            bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]',
+                            leave=True)
+                
             for batch in dataloader:
                 # Handle finetuning BERT or just training the classifier head, which have different X inputs
                 if self.finetune_bert:
@@ -670,17 +680,30 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 epoch_loss += loss.item()
                 batch_count += 1
 
+                # Update progress bar
+                if rank == 0 and self.show_progress:
+                    pbar.update(1)
+                    pbar.set_postfix({'loss': f'{loss.item():.4f}'})
+
             # Calculate average epoch loss
             avg_epoch_loss = epoch_loss / batch_count
 
+            # Update progress bar with post-epoch processes
+            if rank == 0 and self.show_progress:
+                pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'status': 'Post-epoch processes'})
+
             # Consolidate optimizer state before saving
             if self.optimizer_class == ZeroRedundancyOptimizer:
+                if rank == 0 and self.show_progress:
+                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'status': 'Consolidating optimizer state'})
                 self.optimizer.consolidate_state_dict()
 
             dist.barrier()
 
             # Early stopping logic
             if self.early_stopping == 'score':
+                if rank == 0 and self.show_progress:
+                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'status': 'Computing validation score'})
                 current_score = self._update_no_improvement_count_early_stopping(X_val, y_val, epoch, debug)
                 if self.no_improvement_count >= self.n_iter_no_change:
                     stop_training = torch.tensor(1, device=self.device)
@@ -694,6 +717,8 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                     stop_training = torch.tensor(1, device=self.device)
 
             elif self.early_stopping == 'loss':
+                if rank == 0 and self.show_progress:
+                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'status': 'Checking early stopping'})
                 current_loss = self._update_no_improvement_count_errors(avg_epoch_loss, epoch, debug)
                 if self.no_improvement_count >= self.n_iter_no_change:
                     stop_training = torch.tensor(1, device=self.device)
@@ -701,6 +726,10 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
             # Get the no improvement count color based on value relative to n_iter_no_change
             nic_color = get_nic_color(self.no_improvement_count, self.n_iter_no_change)
+
+            # Close progress bar here
+            if rank == 0 and self.show_progress:
+                pbar.close()
 
             # Print epoch summary
             if self.early_stopping == 'score':

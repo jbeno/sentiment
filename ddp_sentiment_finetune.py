@@ -265,7 +265,7 @@ def load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug):
     return train, dev
 
 def process_data(bert_tokenizer, bert_model, pooling, world_size, train, dev, device, batch_size, rank, debug, save_archive,
-                 save_dir, num_workers, prefetch, empty_cache, finetune_bert, chunk_size=None):
+                 save_dir, num_workers, prefetch, empty_cache, finetune_bert, freeze_bert, chunk_size=None):
     data_process_start = time.time()
 
     print(f"\nProcessing data (Batch size: {batch_size}, Pooling: {pooling.upper() if pooling == 'cls' else pooling.capitalize()}, Fine Tune BERT: {finetune_bert}, Chunk size: {chunk_size})...") if rank == 0 else None
@@ -579,7 +579,6 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
             print(f"Batch Size: {batch_size}, Pooling: {pooling.upper() if pooling == 'cls' else pooling.capitalize()}, Empty Cache: {empty_cache}")
 
             # Display sample texts
-            print(f"\nDisplaying samples from {split.capitalize()} data:")
             display_sample_texts(sample_texts)
 
         total_batches = len(texts) // batch_size + 1
@@ -612,7 +611,7 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
                           epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
                           checkpoint_dir, checkpoint_interval, resume_from_checkpoint, filename=None, use_saved_params=True,
                           optimizer_name=None, l2_strength=0.0, scheduler_name=None, pooling='cls', target_score=None, interactive=False,
-                          response_pipe=None, accumulation_steps=1, freeze_bert=False, dropout_rate=0.0):
+                          response_pipe=None, accumulation_steps=1, freeze_bert=False, dropout_rate=0.0, show_progress=False):
     class_init_start = time.time()
     print(f"\nInitializing DDP Neural Classifier...") if rank == 0 else None
     hidden_activation = get_activation(hidden_activation)
@@ -649,7 +648,8 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
         gradient_accumulation_steps=accumulation_steps,
         freeze_bert=freeze_bert,
         dropout_rate=dropout_rate,
-        l2_strength=l2_strength
+        l2_strength=l2_strength,
+        show_progress=show_progress
     )
 
     if filename is not None:
@@ -725,7 +725,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
          pooling, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint, save_preds, save_dir, model_file,
          use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, l2_strength, empty_cache, decimal, scheduler_name,
          finetune_bert, finetune_layers, target_score, interactive, mem_interval, accumulation_steps, freeze_bert, dropout_rate,
-         chunk_size, input_queue, pipes, running):
+         chunk_size, show_progress, input_queue, pipes, running):
 
     try:
         if interactive:
@@ -748,7 +748,8 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             # Load, tokenize and encode data
             train, dev = load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug)
             X_train, X_dev, y_train, y_dev, X_dev_sent = process_data(bert_tokenizer, bert_model, pooling, world_size, train,
-                dev, device, batch_size, rank, debug, save_data, save_dir, num_workers, prefetch, empty_cache, finetune_bert, chunk_size)
+                dev, device, batch_size, rank, debug, save_data, save_dir, num_workers, prefetch, empty_cache, finetune_bert,
+                freeze_bert, chunk_size)
 
         # Initialize and train the neural classifier
         classifier, start_epoch, model_state_dict, optimizer_state_dict = initialize_classifier(
@@ -756,7 +757,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             finetune_bert, finetune_layers, num_layers, hidden_dim,
             batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
             checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name, l2_strength,
-            scheduler_name, pooling, target_score, interactive, response_pipe, accumulation_steps, freeze_bert, dropout_rate)
+            scheduler_name, pooling, target_score, interactive, response_pipe, accumulation_steps, freeze_bert, dropout_rate, show_progress)
         classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
                        num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval)
 
@@ -831,6 +832,7 @@ if __name__ == '__main__':
     training_group.add_argument('--scheduler', type=str, default=None, help="Learning rate scheduler to use: 'step', 'plateau', 'exponent', 'cosine' (default: None)")
     training_group.add_argument('--random_seed', type=int, default=42, help='Random seed (default: 42)')
     training_group.add_argument('--interactive', action='store_true', default=False, help='Interactive mode for training (default: False)')
+    training_group.add_argument('--show_progress', action='store_true', default=False, help='Show progress bars for training and evaluation (default: False)')
 
     # Checkpoint configuration
     checkpoint_group = parser.add_argument_group('Checkpoint configuration')
@@ -967,6 +969,7 @@ if __name__ == '__main__':
                       args.freeze_bert,
                       args.dropout_rate,
                       args.chunk_size,
+                      args.show_progress,
                       input_queue,
                       pipes,
                       running),

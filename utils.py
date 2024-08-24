@@ -106,7 +106,8 @@ def setup_environment(rank, world_size, backend, device, debug, port='12355', ho
     
     # Set NCCL blocking wait and timeout
     if backend == 'nccl':
-        os.environ["NCCL_BLOCKING_WAIT"] = wait
+        #os.environ["NCCL_BLOCKING_WAIT"] = wait
+        os.environ["TORCH_NCCL_BLOCKING_WAIT"] = wait
         os.environ["NCCL_TIMEOUT_MS"] = timeout
 
         # Convert timeout to hours and minutes
@@ -116,9 +117,9 @@ def setup_environment(rank, world_size, backend, device, debug, port='12355', ho
         timeout_min = timeout_min % 60
 
         # Convert wait to string
-        if os.environ["NCCL_BLOCKING_WAIT"] == '1':
+        if os.environ["TORCH_NCCL_BLOCKING_WAIT"] == '1':
             wait_str = "Enabled"
-        elif os.environ["NCCL_BLOCKING_WAIT"] == '0':
+        elif os.environ["TORCH_NCCL_BLOCKING_WAIT"] == '0':
             wait_str = "Disabled"
         else:
             wait_str = "Invalid"
