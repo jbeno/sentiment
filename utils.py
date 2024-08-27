@@ -176,8 +176,6 @@ def cleanup_and_exit(rank, debug, pipe=None, queue=None):
 
     sys.exit(0)
 
-
-
 def prepare_device(rank, device_type):
     if device_type == "cuda":
         device = torch.device('cuda', rank)
@@ -323,6 +321,38 @@ def set_threads(num_threads):
     os.environ['NUMEXPR_NUM_THREADS'] = str(num_threads)
     os.environ['VECLIB_MAXIMUM_THREADS'] = str(num_threads)
     os.environ['OPENBLAS_NUM_THREADS'] = str(num_threads)
+
+def print_label_dist(dataset, label_name='label'):
+    try:
+        if isinstance(dataset, (list, np.ndarray)) or torch.is_tensor(dataset):
+            # If dataset is a list, numpy array, or tensor
+            labels = dataset
+        elif isinstance(dataset, dict):
+            # If dataset is a dictionary-like object
+            labels = dataset[label_name]
+        elif hasattr(dataset, label_name):
+            # If dataset is an object with a 'label' attribute
+            labels = getattr(dataset, label_name)
+        elif hasattr(dataset, '__getitem__') and hasattr(dataset, '__len__'):
+            # If dataset is a custom iterable object
+            labels = [item[1] if isinstance(item, tuple) else item for item in dataset]
+        else:
+            raise TypeError("Unsupported dataset type. Unable to extract labels.")
+
+        # Convert to a list if it's not already
+        if not isinstance(labels, list):
+            labels = list(labels)
+
+        dist = sorted(Counter(labels).items())
+        for k, v in dist:
+            print(f"\t{str(k).capitalize():>14s}: {v}")
+    except Exception as e:
+        print(f"An error occurred while printing label distribution: {str(e)}")
+        print(f"Dataset type: {type(dataset)}")
+        if hasattr(dataset, '__dict__'):
+            print("Dataset attributes:", dataset.__dict__.keys())
+        elif hasattr(dataset, '__slots__'):
+            print("Dataset attributes:", dataset.__slots__)
 
 def print_state_summary(state_dict, indent=0):
     indent_str = ' ' * indent

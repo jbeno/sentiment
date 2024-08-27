@@ -50,7 +50,8 @@ from utils import (
     get_optimizer,
     get_shape_color,
     print_rank_memory_summary,
-    tensor_to_numpy
+    tensor_to_numpy,
+    print_label_dist,
     #get_scheduler
 )
 from torch_ddp_finetune_neural_classifier import TorchDDPNeuralClassifier, SentimentDataset
@@ -87,7 +88,7 @@ def save_data_archive(X_train, X_dev, y_train, y_dev, X_dev_sent, world_size, de
     np.savez_compressed(filepath, X_train=X_train, X_dev=X_dev, y_train=y_train, y_dev=y_dev, X_dev_sent=X_dev_sent)
     print(f"\nData saved to: {filepath}")
 
-def load_data_archive(data_file, device, rank):
+def load_data_archive(data_file, device, rank, sample_percent=None):
     load_archive_start = time.time()
     
     # Check if the archive file path is provided
@@ -107,10 +108,40 @@ def load_data_archive(data_file, device, rank):
             y_train = data['y_train']
             y_dev = data['y_dev']
             X_dev_sent = data['X_dev_sent']
-        print(f"Archived data loaded ({format_time(time.time() - load_archive_start)})") if rank == 0 else None
+        
+        # Sample data if sample_percent is provided
+        if sample_percent is not None:
+            print(f"Sampling {sample_percent:.0%} of data...") if rank == 0 else None
+            num_train_samples = int(len(X_train) * sample_percent)
+            num_dev_samples = int(len(X_dev) * sample_percent)
+            
+            # Create a permutation of indices
+            train_indices = np.random.permutation(len(X_train))[:num_train_samples]
+            dev_indices = np.random.permutation(len(X_dev))[:num_dev_samples]
+            
+            # Sample the data
+            X_train = X_train[train_indices]
+            y_train = y_train[train_indices]
+            X_dev = X_dev[dev_indices]
+            y_dev = y_dev[dev_indices]
+            X_dev_sent = X_dev_sent[dev_indices]
+            
+            print(f"Sampled Train size: {len(X_train)}, Sampled Dev size: {len(X_dev)}") if rank == 0 else None
+        
+        if rank == 0:
+            # Print a summary of the loaded data
+            print(f"X Train shape: {list(X_train.shape)}, y Train shape: {list(y_train.shape)}")
+            print(f"X Dev shape: {list(X_dev.shape)}, y Dev shape: {list(y_dev.shape)}")
+            print(f"X Dev Sentences shape: {list(X_dev_sent.shape)}")
+            # Print label distributions
+            print("Train label distribution:")
+            print_label_dist(y_train)
+            print("Dev label distribution:")
+            print_label_dist(y_dev)
+        print(f"Archived data loaded ({time.time() - load_archive_start:.2f}s)") if rank == 0 else None
     except Exception as e:
         raise RuntimeError(f"Failed to load data from archive file {data_file}: {str(e)}")
-    
+        
     return X_train, X_dev, y_train, y_dev, X_dev_sent
 
 def initialize_bert_model(weights_name, device, rank, debug):
@@ -145,11 +176,6 @@ def load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug):
                 raise ValueError(f"Unknown split: {split}")
             return data_split
     
-    def print_label_dist(dataset, label_name='label'):
-        dist = sorted(Counter(dataset[label_name]).items())
-        for k, v in dist:
-            print(f"\t{k.capitalize():>14s}: {v}")
-
     # Function to load data from Hugging Face or local based on ID and split name
     def get_data(id, split, rank, debug):
         # Identify the dataset and path from the ID
@@ -611,7 +637,8 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
                           epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
                           checkpoint_dir, checkpoint_interval, resume_from_checkpoint, filename=None, use_saved_params=True,
                           optimizer_name=None, l2_strength=0.0, scheduler_name=None, pooling='cls', target_score=None, interactive=False,
-                          response_pipe=None, accumulation_steps=1, freeze_bert=False, dropout_rate=0.0, show_progress=False):
+                          response_pipe=None, accumulation_steps=1, freeze_bert=False, dropout_rate=0.0, show_progress=False,
+                          advance_epochs=1):
     class_init_start = time.time()
     print(f"\nInitializing DDP Neural Classifier...") if rank == 0 else None
     hidden_activation = get_activation(hidden_activation)
@@ -649,7 +676,8 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
         freeze_bert=freeze_bert,
         dropout_rate=dropout_rate,
         l2_strength=l2_strength,
-        show_progress=show_progress
+        show_progress=show_progress,
+        advance_epochs=advance_epochs
     )
 
     if filename is not None:
@@ -725,7 +753,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
          pooling, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint, save_preds, save_dir, model_file,
          use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, l2_strength, empty_cache, decimal, scheduler_name,
          finetune_bert, finetune_layers, target_score, interactive, mem_interval, accumulation_steps, freeze_bert, dropout_rate,
-         chunk_size, show_progress, input_queue, pipes, running):
+         chunk_size, show_progress, advance_epochs, input_queue, pipes, running):
 
     try:
         if interactive:
@@ -743,7 +771,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         
         if data_file is not None and not finetune_bert:
             # Load previously processed data from an archive file
-            X_train, X_dev, y_train, y_dev, X_dev_sent = load_data_archive(data_file, device, rank)
+            X_train, X_dev, y_train, y_dev, X_dev_sent = load_data_archive(data_file, device, rank, sample_percent)
         else:
             # Load, tokenize and encode data
             train, dev = load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug)
@@ -757,7 +785,8 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             finetune_bert, finetune_layers, num_layers, hidden_dim,
             batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
             checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name, l2_strength,
-            scheduler_name, pooling, target_score, interactive, response_pipe, accumulation_steps, freeze_bert, dropout_rate, show_progress)
+            scheduler_name, pooling, target_score, interactive, response_pipe, accumulation_steps, freeze_bert, dropout_rate,
+            show_progress, advance_epochs)
         classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
                        num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval)
 
@@ -918,6 +947,8 @@ if __name__ == '__main__':
     else:
         input_queue = None
         pipes = None
+    
+    advance_epochs = 1  # Number of epochs to advance in interactive mode
 
     print(f"Spawning {world_size} process{suffix}...")
     running = Value('b', True)  # 'b' for boolean
@@ -970,6 +1001,7 @@ if __name__ == '__main__':
                       args.dropout_rate,
                       args.chunk_size,
                       args.show_progress,
+                      advance_epochs,
                       input_queue,
                       pipes,
                       running),
@@ -977,6 +1009,12 @@ if __name__ == '__main__':
                 join=False)
 
         if args.interactive:
+
+            def get_user_input(advance_epochs, rank, pipes):
+                prompt = f"\n[{bright_yellow}{bold}Enter{reset}] to continue for {advance_epochs} epoch{'s' if advance_epochs > 1 else ''}, [{bright_yellow}{bold}Q{reset}]uit, [{bright_yellow}{bold}S{reset}]ave, [{bright_yellow}{bold}H{reset}]elp: "
+                user_input = input(prompt).strip().lower()
+                pipes[rank][0].send(user_input)
+                return user_input
 
             while running.value:
                 try:
@@ -991,9 +1029,15 @@ if __name__ == '__main__':
                         if message == 'stop':
                             print(f"Stopping signal received from rank {rank}...") if args.debug else None
                             break
+                        elif message.startswith('advance_epochs:'):
+                            try:
+                                advance_epochs = int(float(message.split(':')[1]))  # Convert to float first, then to int
+                                print(f"Updated advance_epochs to {advance_epochs}") if args.debug else None
+                                get_user_input(advance_epochs, rank, pipes)
+                            except ValueError:
+                                print(f"Error updating advance_epochs. Received invalid value: {message.split(':')[1]}")
                     else:
-                        user_input = input(f"\nEnter command: [{bright_yellow}{bold}Enter{reset}], [{bright_yellow}{bold}#{reset}], [{bright_yellow}{bold}Q{reset}]uit, [{bright_yellow}{bold}S{reset}]ave, [{bright_yellow}{bold}E{reset}]pochs, [{bright_yellow}{bold}H{reset}]elp: ").strip().lower()
-                        pipes[rank][0].send(user_input)
+                        get_user_input(advance_epochs, rank, pipes)
                 except Empty:
                     continue
 

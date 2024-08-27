@@ -188,6 +188,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 freeze_bert=False,
                 dropout_rate=0.0,
                 show_progress=False,
+                advance_epochs=1,
                 **optimizer_kwargs):
         """
         A flexible neural network classifier with Distributed Data Parallel (DDP) support.
@@ -314,6 +315,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.freeze_bert = freeze_bert
         self.dropout_rate = dropout_rate
         self.show_progress = show_progress
+        self.advance_epochs = advance_epochs
         
         self.loss = nn.CrossEntropyLoss(reduction="mean")
 
@@ -526,6 +528,17 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         else:
             print(f"Rank {self.rank} has no response_pipe to send stop signal") if self.debug else None
 
+    def set_advance_epochs(self, value):
+        self.advance_epochs = value
+        if self.response_pipe:
+            try:
+                self.response_pipe.send(f'advance_epochs:{value}')
+                print(f"Rank {self.rank} set advance_epochs to {value}") if self.debug else None
+            except Exception as e:
+                print(f"Rank {self.rank} failed to set advance_epochs: {e}") if self.debug else None
+        else:
+            print(f"Rank {self.rank} has no response_pipe to set advance_epochs") if self.debug else None
+
 
     def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None,
             num_workers=0, prefetch=None, empty_cache=False, decimal=6, input_queue=None, mem_interval=10):
@@ -632,8 +645,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             last_epoch = self.max_iter
 
         print(f"Start epoch: {start_epoch}, Max Iterations: {self.max_iter}, Early Stop: {self.early_stopping}, Tolerance: {tol_str}, Number Iterations No Change: {self.n_iter_no_change}") if rank == 0 else None
-        print_rank_memory_summary(world_size, rank, all_local=True, verbose=False) if rank == 0 else None
-
+        
         # Training loop
         for epoch in range(start_epoch, last_epoch+1):
             if stop_training.item() == 1:
@@ -644,6 +656,252 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 sampler.set_epoch(epoch)  # Required for DistributedSampler to shuffle the data
             epoch_loss = 0.0
             batch_count = 0
+
+            # Interactive mode
+            if self.interactive and skip_epochs == 0:
+
+                # Create a global tensor for synchronization
+                global_tensor = torch.zeros(2, dtype=torch.long, device=self.device)
+
+                # Function to indicate invalid input
+                def invalid_input(command_tensor, message="Invalid input. Please try again."):
+                    print(f"{red}{message}{reset}")
+                    command_tensor[0] = -1 
+                    command_tensor[1] = -1
+
+                while True:  # Start a loop to handle the input
+
+                    dist.barrier()
+                    command_value = torch.tensor([0.0, 0.0], device=self.device)  # Tensor to store the command and an optional value
+
+                    if rank == 0:
+                        sys.stdout.flush()
+                        if input_queue is not None:
+                            input_queue.put(rank)
+                        user_input = self.response_pipe.recv()
+                        print(f"Rank {rank} received input: {user_input}") if debug else None
+                        
+                        # Parse the input
+                        user_input_split = user_input.split()
+                        if not user_input_split:  # If the input is empty (just Enter was pressed)
+                            command_value[0] = 0  # Continue
+                            command_value[1] = self.advance_epochs  # Use the advance_epochs value
+                        elif user_input_split[0].isdigit():
+                            # Check if the input is just a number
+                            command_value[0] = 0  # Continue
+                            command_value[1] = int(user_input_split[0])  # Number of epochs to skip
+                        else:
+                            # Set command based on the first input
+                            if user_input_split[0] in ['c', 'checkpoint']:
+                                command_value[0] = 10  # Change checkpoint interval
+                                if len(user_input_split) > 1:
+                                    try:
+                                        command_value[1] = int(user_input_split[1])  # New checkpoint interval
+                                    except ValueError:
+                                        invalid_input(command_value, "Invalid number for checkpoint interval. Please enter an integer.")
+                            elif user_input_split[0] in ['s', 'save']:
+                                command_value[0] = 1  # Save
+                            elif user_input_split[0] in ['q', 'quit']:
+                                command_value[0] = 2  # Quit
+                            elif user_input_split[0] in ['h', 'help']:
+                                command_value[0] = 3  # Help
+                            elif user_input_split[0] in ['e', 'epoch', 'epochs']:
+                                if len(user_input_split) > 1:
+                                    try:
+                                        command_value[0] = 4  # Set max epochs
+                                        command_value[1] = float(user_input_split[1])  # Associated value for max epochs
+                                    except ValueError:
+                                        invalid_input(command_value, "Invalid value for max epochs.")
+                                else:
+                                    invalid_input(command_value, "A number is required for max epochs.")
+                            elif user_input_split[0] in ['t', 'tol', 'tolerance']:
+                                if len(user_input_split) > 1:
+                                    try:
+                                        command_value[0] = 5  # Set tolerance
+                                        command_value[1] = float(user_input_split[1])  # Associated value for tolerance
+                                    except ValueError:
+                                        invalid_input(command_value, "Invalid value for tolerance.")
+                                else:
+                                    invalid_input(command_value, "A number is required for tolerance.")
+                            elif user_input_split[0] in ['n', 'num', 'number']:
+                                if len(user_input_split) > 1:
+                                    try:
+                                        command_value[0] = 6  # Set n_iter_no_change
+                                        command_value[1] = float(user_input_split[1])  # Associated value for n_iter_no_change
+                                    except ValueError:
+                                        invalid_input(command_value, "Invalid value for n_iter_no_change.")
+                                else:
+                                    invalid_input(command_value, "A number is required for n_iter_no_change.")
+                            elif user_input_split[0] in ['x', 'exit']:
+                                command_value[0] = 7  # Exit interactive mode
+                            elif user_input_split[0] in ['d', 'debug']:
+                                command_value[0] = 8  # Toggle debug mode
+                            elif user_input_split[0] in ['v', 'val', 'validation', 'target']:
+                                if len(user_input_split) > 1:
+                                    try:
+                                        command_value[0] = 9  # Set target validation score
+                                        command_value[1] = float(user_input_split[1])  # Associated value for target validation score
+                                    except ValueError:
+                                        invalid_input(command_value, "Invalid value for target validation score.")
+                                else:
+                                    invalid_input(command_value, "A number is required for the target validation score.")
+                            elif user_input_split[0] in ['m', 'mem', 'memory']:
+                                if len(user_input_split) > 1:
+                                    try:
+                                        command_value[0] = 11  # Set memory interval
+                                        command_value[1] = float(user_input_split[1])  # Associated value for memory interval
+                                    except ValueError:
+                                        invalid_input(command_value, "Invalid value for memory interval.")
+                                else:
+                                    invalid_input(command_value, "A number is required for the memory interval.")
+                            elif user_input_split[0] in ['g', 'gpu', 'gpus']:
+                                command_value[0] = 12  # Show GPU memory usage
+                            elif user_input_split[0] in ['l', 'lr', 'learning', 'rate']:
+                                if len(user_input_split) > 1:
+                                    try:
+                                        command_value[0] = 13  # Set learning rate
+                                        command_value[1] = float(user_input_split[1])  # Associated value for learning rate
+                                    except ValueError:
+                                        invalid_input(command_value, "Invalid value for learning rate.")
+                                else:
+                                    invalid_input(command_value, "A number is required for learning rate.")
+                            elif user_input_split[0] in ['p', 'prog', 'progress']:
+                                command_value[0] = 14  # Toggle progress bar display
+                            elif user_input_split[0] in ['a', 'advance', 'adv', 'advance_epochs']:
+                                if len(user_input_split) > 1:
+                                    try:
+                                        command_value[0] = 15  # Set advance epochs
+                                        command_value[1] = int(user_input_split[1])  # Associated value for advance epochs
+                                    except ValueError:
+                                        invalid_input(command_value, "Invalid value for advance epochs.")
+                                else:
+                                    invalid_input(command_value, "A number is required for advance epochs.")
+                            else:
+                                invalid_input(command_value, "Invalid command. Type 'help' for a list of commands.")
+
+                        # Set the global tensor
+                        global_tensor[0] = 1  # Signal that input is ready
+                        global_tensor[1] = command_value[0]  # Store the command
+
+                    # Broadcast the global tensor to all processes
+                    dist.broadcast(global_tensor, src=0)
+                    dist.broadcast(command_value, src=0)  # Broadcast the command value
+
+                    # Process the input
+                    command = int(global_tensor[1].item())
+                    value = command_value[1].item()
+
+                    # Handle the command
+                    if command == 0:  # Continue
+                        skip_epochs = int(value) if value > 0 else 0  # Set the skip_epochs based on the provided value
+                        if skip_epochs > 0 and rank == 0:
+                            print(f"Skipping {skip_epochs} epochs.")
+                        break  # Exit the loop and proceed to the next epoch
+                    if command == 1:  # Save
+                        if rank == 0:
+                            self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False)
+                            print("Model saved.") if debug else None
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 2:  # Quit
+                        print("Quitting training...") if rank == 0 else None
+                        stop_training = torch.tensor(1, device=self.device)  # Set the flag to stop training
+                        break  # Exit the loop to continue to the next epoch
+                    elif command == 3:  # Help
+                        if rank == 0:
+                            print(f"\nChoose from the following commands:")
+                            print(f"[{bold}{bright_yellow}Enter{reset}]            Continue to the next epoch, for the next prompt.")
+                            print(f"[{bold}{bright_yellow}#{reset}]                Skip the specified number of epochs before the next prompt. Example: '5'")
+                            print(f"[{bold}{bright_yellow}A{reset}]dvance    ____  Set the number of epochs to skip. Current: {self.advance_epochs}. Example: 'a 5'")
+                            print(f"[{bold}{bright_yellow}C{reset}]heckpoint ____  Set the checkpoint interval. Current: {self.checkpoint_interval}. Example: 'c 5'")
+                            print(f"[{bold}{bright_yellow}D{reset}]ebug            Toggle debug mode. Current: {debug}")
+                            print(f"[{bold}{bright_yellow}E{reset}]pochs     ____  Set the maximum number of epochs. Current: {self.max_iter}. Example: 'e 1000'")
+                            print(f"[{bold}{bright_yellow}G{reset}]PUs       ____  Show current GPU memory usage.")
+                            print(f"[{bold}{bright_yellow}H{reset}]elp             Display this help message")
+                            print(f"[{bold}{bright_yellow}L{reset}]earning   ____  Set the learning rate. Current: {self.eta:.{decimal}f}. Example: 'l 0.001'")
+                            print(f"[{bold}{bright_yellow}M{reset}]emory     ____  Set the interval to display GPU memory usage. Example: 'm 5'")
+                            print(f"[{bold}{bright_yellow}N{reset}]umber     ____  Set the number of iterations no change. Current: {self.n_iter_no_change}. Example: 'n 10'")
+                            print(f"[{bold}{bright_yellow}P{reset}]rogress         Toggle progress bar display. Current: {self.show_progress}")
+                            print(f"[{bold}{bright_yellow}Q{reset}]uit             Quit the training loop")
+                            print(f"[{bold}{bright_yellow}S{reset}]ave             Save the model as a checkpoint with DDP wrapper")
+                            print(f"[{bold}{bright_yellow}T{reset}]olerance  ____  Set the tolerance for early stopping. Current: {self.tol}. Example: 't 1e-03'")
+                            print(f"[{bold}{bright_yellow}V{reset}]al Score  ____  Set the target validation score for early stopping. Current: {self.target_score}. Example: 'v 0.95'")
+                            print(f"[{bold}{bright_yellow}X{reset}]it              Exit interactive mode. You won't be prompted for input again.")
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 4:  # Set max epochs
+                        self.max_iter = int(value)
+                        if start_epoch > 1:
+                            last_epoch = start_epoch + self.max_iter
+                        else:
+                            last_epoch = self.max_iter
+                        print(f"Updated max epochs to: {self.max_iter}") if rank == 0 else None
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 5:  # Set tolerance
+                        self.tol = value
+                        print(f"Updated tolerance to: {self.tol}") if rank == 0 else None
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 6:  # Set n_iter_no_change
+                        self.n_iter_no_change = int(value)
+                        print(f"Updated number of iterations no change to: {self.n_iter_no_change}") if rank == 0 else None
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 7:  # Exit interactive mode
+                        print("Exiting interactive mode...") if rank == 0 else None
+                        self.interactive = False
+                        self.send_stop_signal() # Send stop signal to master process to exit the interactive loop
+                        break  # Exit the loop to continue to the next epoch
+                    elif command == 8:  # Toggle debug mode
+                        debug = not debug
+                        print(f"Debug mode set to: {debug}") if rank == 0 else None
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 9:  # Set target validation score
+                        self.target_score = value
+                        print(f"Updated target validation score to: {self.target_score:.{decimal}f}") if rank == 0 else None
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 10:  # Change checkpoint interval
+                        if value > 0:
+                            self.checkpoint_interval = value
+                            print(f"Updated checkpoint interval to: {self.checkpoint_interval}") if rank == 0 else None
+                        else:
+                            invalid_input(command_value, "Invalid value for checkpoint interval. Please enter a positive integer.") if rank == 0 else None
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 11:  # Set memory interval
+                        if value > 0:
+                            mem_interval = int(value)
+                            print(f"Updated memory interval to: {mem_interval}") if rank == 0 else None
+                        else:
+                            invalid_input(command_value, "Invalid value for memory interval. Please enter a positive integer.") if rank == 0 else None
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 12:  # Show GPU memory usage
+                        print_rank_memory_summary(world_size, rank, all_local=True, verbose=False) if rank == 0 else None
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 13:  # Set learning rate
+                        self.eta = value
+                        for param_group in self.optimizer.param_groups:
+                            if 'lr' in param_group:
+                                param_group['lr'] = self.eta
+                        if rank == 0:
+                            print(f"Updated learning rate to: {self.eta:.{decimal}f}")
+                        continue  # Stay in the loop to wait for another command
+                    elif command == 14:  # Toggle progress bar display
+                        self.show_progress = not self.show_progress
+                        if rank == 0:
+                            print(f"Progress bar display set to: {self.show_progress}")
+                        continue
+                    elif command == 15:  # Set advance epochs
+                        self.set_advance_epochs(value)
+                        skip_epochs = int(value) if value > 1 else 1  # Set the skip_epochs based on the provided value
+                        if rank == 0:
+                            print(f"Advance epochs set to: {value}")
+                        continue
+                    elif command == -1:  # Invalid input
+                        continue  # Stay in the loop to wait for another command
+
+                    # Reset the global tensor for the next iteration
+                    if rank == 0:
+                        global_tensor[0] = 0
+                    dist.broadcast(global_tensor, src=0)
+
+                    # Ensure all ranks have processed the input before continuing
+                    dist.barrier()
 
             # Create a progress bar for batches
             if rank == 0 and self.show_progress:
@@ -690,12 +948,12 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
             # Update progress bar with post-epoch processes
             if rank == 0 and self.show_progress:
-                pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'status': 'Post-epoch processes'})
+                pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'status': 'Post-epoch processing...'})
 
             # Consolidate optimizer state before saving
             if self.optimizer_class == ZeroRedundancyOptimizer:
                 if rank == 0 and self.show_progress:
-                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'status': 'Consolidating optimizer state'})
+                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'status': 'Consolidating optimizer state...'})
                 self.optimizer.consolidate_state_dict()
 
             dist.barrier()
@@ -703,7 +961,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             # Early stopping logic
             if self.early_stopping == 'score':
                 if rank == 0 and self.show_progress:
-                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'status': 'Computing validation score'})
+                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'status': 'Computing validation score...'})
                 current_score = self._update_no_improvement_count_early_stopping(X_val, y_val, epoch, debug)
                 if self.no_improvement_count >= self.n_iter_no_change:
                     stop_training = torch.tensor(1, device=self.device)
@@ -729,6 +987,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
             # Close progress bar here
             if rank == 0 and self.show_progress:
+                pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'status': 'Epoch complete'})
                 pbar.close()
 
             # Print epoch summary
@@ -742,207 +1001,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             # Print memory summary
             if epoch % mem_interval == 0:
                 print_rank_memory_summary(world_size, rank, all_local=True, verbose=False) if rank == 0 else None
-
-            # Interactive mode
-            if self.interactive and skip_epochs == 0:
-
-                # Create a global tensor for synchronization
-                global_tensor = torch.zeros(2, dtype=torch.long, device=self.device)
-
-                while True:  # Start a loop to handle the input
-
-                    # Synchronize all processes after each epoch
-                    dist.barrier()
-
-                    command_value = torch.tensor([0.0, 0.0], device=self.device)  # Tensor to store the command and an optional value
-
-                    if rank == 0:
-                        sys.stdout.flush()
-                        if input_queue is not None:
-                            input_queue.put(rank)
-                        user_input = self.response_pipe.recv()
-                        print(f"Rank {rank} received input: {user_input}") if debug else None
-                        
-                        # Parse the input
-                        user_input_split = user_input.split()
-                        if not user_input_split:  # If the input is empty (just Enter was pressed)
-                            command_value[0] = 0  # Continue
-                            command_value[1] = 0  # No epochs to skip
-                        else:
-                            # Check if the input is just a number
-                            if user_input_split[0].isdigit():
-                                command_value[0] = 0  # Continue
-                                command_value[1] = int(user_input_split[0])  # Number of epochs to skip
-                            else:
-                                # Set command based on the first input
-                                if user_input_split[0] in ['c', 'checkpoint']:
-                                    command_value[0] = 10  # Change checkpoint interval
-                                    if len(user_input_split) > 1:
-                                        try:
-                                            command_value[1] = int(user_input_split[1])  # New checkpoint interval
-                                        except ValueError:
-                                            print("Invalid number for checkpoint interval. Please enter an integer.")
-                                            command_value[1] = -1  # Indicate invalid input
-                                elif user_input_split[0] in ['s', 'save']:
-                                    command_value[0] = 1  # Save
-                                elif user_input_split[0] in ['q', 'quit']:
-                                    command_value[0] = 2  # Quit
-                                elif user_input_split[0] in ['h', 'help']:
-                                    command_value[0] = 3  # Help
-                                elif user_input_split[0] in ['e', 'epoch', 'epochs'] and len(user_input_split) > 1:
-                                    try:
-                                        command_value[0] = 4  # Set max epochs
-                                        command_value[1] = float(user_input_split[1])  # Associated value for max epochs
-                                    except ValueError:
-                                        print("Invalid value for max epochs")
-                                elif user_input_split[0] in ['t', 'tol', 'tolerance'] and len(user_input_split) > 1:
-                                    try:
-                                        command_value[0] = 5  # Set tolerance
-                                        command_value[1] = float(user_input_split[1])  # Associated value for tolerance
-                                    except ValueError:
-                                        print("Invalid value for tolerance")
-                                elif user_input_split[0] in ['n', 'num', 'number'] and len(user_input_split) > 1:
-                                    try:
-                                        command_value[0] = 6  # Set n_iter_no_change
-                                        command_value[1] = float(user_input_split[1])  # Associated value for n_iter_no_change
-                                    except ValueError:
-                                        print("Invalid value for n_iter_no_change")
-                                elif user_input_split[0] in ['x', 'exit']:
-                                    command_value[0] = 7  # Exit interactive mode
-                                elif user_input_split[0] in ['d', 'debug']:
-                                    command_value[0] = 8  # Toggle debug mode
-                                elif user_input_split[0] in ['v', 'val', 'validation', 'target'] and len(user_input_split) > 1:
-                                    try:
-                                        command_value[0] = 9  # Set target validation score
-                                        command_value[1] = float(user_input_split[1])  # Associated value for target validation score
-                                    except ValueError:
-                                        print("Invalid value for target validation score")
-                                elif user_input_split[0] in ['m', 'mem', 'memory']:
-                                    if len(user_input_split) > 1:
-                                        try:
-                                            command_value[0] = 11  # Set memory interval
-                                            command_value[1] = float(user_input_split[1])  # Associated value for memory interval
-                                        except ValueError:
-                                            print("Invalid value for memory interval")
-                                    else:
-                                        print("A number is required for the memory interval")
-                                elif user_input_split[0] in ['g', 'gpu', 'gpus']:
-                                    command_value[0] = 12  # Show GPU memory usage
-                                elif user_input_split[0] in ['l', 'lr', 'learning', 'rate'] and len(user_input_split) > 1:
-                                    try:
-                                        command_value[0] = 13  # Set learning rate
-                                        command_value[1] = float(user_input_split[1])  # Associated value for learning rate
-                                    except ValueError:
-                                        print("Invalid value for learning rate")
-
-                        # Set the global tensor
-                        global_tensor[0] = 1  # Signal that input is ready
-                        global_tensor[1] = command_value[0]  # Store the command
-
-                    # Broadcast the global tensor to all processes
-                    dist.broadcast(global_tensor, src=0)
-                    dist.broadcast(command_value, src=0)  # Broadcast the command value
-
-                    # Process the input
-                    command = int(global_tensor[1].item())
-                    value = command_value[1].item()
-
-                    # Handle the command
-                    if command == 0:  # Continue
-                        skip_epochs = int(value) if value > 0 else 0  # Set the skip_epochs based on the provided value
-                        if skip_epochs > 0 and rank == 0:
-                            print(f"Skipping {skip_epochs} epochs.")
-                        break  # Exit the loop and proceed to the next epoch
-                    if command == 1:  # Save
-                        if rank == 0:
-                            self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False)
-                            print("Model saved.") if debug else None
-                        continue  # Stay in the loop to wait for another command
-                    elif command == 2:  # Quit
-                        print("Quitting training...") if rank == 0 else None
-                        stop_training = torch.tensor(1, device=self.device)  # Set the flag to stop training
-                        break  # Exit the loop to continue to the next epoch
-                    elif command == 3:  # Help
-                        if rank == 0:
-                            print(f"\nChoose from the following commands:")
-                            print(f"[{bold}{bright_yellow}Enter{reset}]            Continue to the next epoch, for the next prompt.")
-                            print(f"[{bold}{bright_yellow}#{reset}]                Skip the specified number of epochs before the next prompt. Example: '5'")
-                            print(f"[{bold}{bright_yellow}C{reset}]heckpoint ____  Set the checkpoint interval. Current: {self.checkpoint_interval}. Example: 'c 5'")
-                            print(f"[{bold}{bright_yellow}D{reset}]ebug            Toggle debug mode. Current: {debug}")
-                            print(f"[{bold}{bright_yellow}E{reset}]pochs     ____  Set the maximum number of epochs. Current: {self.max_iter}. Example: 'e 1000'")
-                            print(f"[{bold}{bright_yellow}G{reset}]PUs       ____  Show current GPU memory usage.")
-                            print(f"[{bold}{bright_yellow}H{reset}]elp             Display this help message")
-                            print(f"[{bold}{bright_yellow}L{reset}]earning   ____  Set the learning rate. Current: {self.eta:.{decimal}f}. Example: 'l 0.001'")
-                            print(f"[{bold}{bright_yellow}M{reset}]emory     ____  Set the interval to display GPU memory usage. Example: 'm 5'")
-                            print(f"[{bold}{bright_yellow}N{reset}]umber     ____  Set the number of iterations no change. Current: {self.n_iter_no_change}. Example: 'n 10'")
-                            print(f"[{bold}{bright_yellow}Q{reset}]uit             Quit the training loop")
-                            print(f"[{bold}{bright_yellow}S{reset}]ave             Save the model as a checkpoint with DDP wrapper")
-                            print(f"[{bold}{bright_yellow}T{reset}]olerance  ____  Set the tolerance for early stopping. Current: {self.tol}. Example: 't 1e-03'")
-                            print(f"[{bold}{bright_yellow}V{reset}]al Score  ____  Set the target validation score for early stopping. Current: {self.target_score}. Example: 'v 0.95'")
-                            print(f"[{bold}{bright_yellow}X{reset}]it              Exit interactive mode. You won't be prompted for input again.")
-                        continue  # Stay in the loop to wait for another command
-                    elif command == 4:  # Set max epochs
-                        self.max_iter = int(value)
-                        if start_epoch > 1:
-                            last_epoch = start_epoch + self.max_iter
-                        else:
-                            last_epoch = self.max_iter
-                        print(f"Updated max epochs to: {self.max_iter}") if rank == 0 else None
-                        continue  # Stay in the loop to wait for another command
-                    elif command == 5:  # Set tolerance
-                        self.tol = value
-                        print(f"Updated tolerance to: {self.tol}") if rank == 0 else None
-                        continue  # Stay in the loop to wait for another command
-                    elif command == 6:  # Set n_iter_no_change
-                        self.n_iter_no_change = int(value)
-                        print(f"Updated number of iterations no change to: {self.n_iter_no_change}") if rank == 0 else None
-                        continue  # Stay in the loop to wait for another command
-                    elif command == 7:  # Exit interactive mode
-                        print("Exiting interactive mode...") if rank == 0 else None
-                        self.interactive = False
-                        self.send_stop_signal() # Send stop signal to master process to exit the interactive loop
-                        break  # Exit the loop to continue to the next epoch
-                    elif command == 8:  # Toggle debug mode
-                        debug = not debug
-                        print(f"Debug mode set to: {debug}") if rank == 0 else None
-                        continue  # Stay in the loop to wait for another command
-                    elif command == 9:  # Set target validation score
-                        self.target_score = value
-                        print(f"Updated target validation score to: {self.target_score:.{decimal}f}") if rank == 0 else None
-                        continue  # Stay in the loop to wait for another command
-                    elif command == 10:  # Change checkpoint interval
-                        if value > 0:
-                            self.checkpoint_interval = value
-                            print(f"Updated checkpoint interval to: {self.checkpoint_interval}") if rank == 0 else None
-                        else:
-                            print(f"Invalid value for checkpoint interval. Please enter a positive integer.") if rank == 0 else None
-                        continue  # Stay in the loop to wait for another command
-                    elif command == 11:  # Set memory interval
-                        if value > 0:
-                            mem_interval = int(value)
-                            print(f"Updated memory interval to: {mem_interval}") if rank == 0 else None
-                        else:
-                            print(f"Invalid value for memory interval. Please enter a positive integer.") if rank == 0 else None
-                        continue  # Stay in the loop to wait for another command
-                    elif command == 12:  # Show GPU memory usage
-                        print_rank_memory_summary(world_size, rank, all_local=True, verbose=True) if rank == 0 else None
-                        continue  # Stay in the loop to wait for another command
-                    elif command == 13:  # Set learning rate
-                        self.eta = value
-                        for param_group in self.optimizer.param_groups:
-                            if 'lr' in param_group:
-                                param_group['lr'] = self.eta
-                        if rank == 0:
-                            print(f"Updated learning rate to: {self.eta:.{decimal}f}")
-                        continue  # Stay in the loop to wait for another command
-
-                    # Reset the global tensor for the next iteration
-                    if rank == 0:
-                        global_tensor[0] = 0
-                    dist.broadcast(global_tensor, src=0)
-
-                    # Ensure all ranks have processed the input before continuing
-                    dist.barrier()
 
             # Print early stopping message
             if stop_training.item() == 1:
