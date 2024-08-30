@@ -29,13 +29,7 @@ class SentimentDataset(torch.utils.data.Dataset):
         self.device = device
 
         if labels is not None:
-            try:
-                self.labels = convert_labels_to_tensor(labels, label_dict, device)
-            except Exception as e:
-                print(f"Error converting labels in SentimentDataset: {str(e)}")
-                print(f"First few labels: {labels[:5]}")
-                print(f"Label dict: {label_dict}")
-                raise
+            self.labels = convert_labels_to_tensor(labels, label_dict, device)
         else:
             self.labels = None
 
@@ -44,21 +38,16 @@ class SentimentDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         sentence = self.sentences[idx]
-        encoding = self.tokenizer.encode_plus(
+        encoding = self.tokenizer(
             sentence,
             add_special_tokens=True,
             max_length=self.max_length,
-            return_token_type_ids=False,
             padding='max_length',
             truncation=True,
-            return_attention_mask=True,
             return_tensors='pt',
         )
 
-        item = {
-            'input_ids': encoding['input_ids'].flatten(),
-            'attention_mask': encoding['attention_mask'].flatten(),
-        }
+        item = {key: val.squeeze(0) for key, val in encoding.items()}
 
         if self.labels is not None:
             item['labels'] = self.labels[idx]
@@ -114,7 +103,56 @@ class BERTClassifier(nn.Module):
         pooled_output = self.custom_pooling(bert_outputs.last_hidden_state, attention_mask)
         # Pass the pooled output to the classifier
         return self.classifier(pooled_output)
+
+class TransformerClassifier(nn.Module):
+    def __init__(self, transformer_model, pooling, hidden_dim, hidden_activation, num_layers, n_classes, dropout_rate, finetune_layers=1, rank=0):
+        super().__init__()
+        self.transformer = transformer_model
+        
+        # Remove the model's original pooler if it exists
+        if hasattr(self.transformer, 'pooler'):
+            self.transformer.pooler = None
+        
+        # Add our custom pooling layer
+        self.custom_pooling = PoolingLayer(pooling)
+        self.classifier = Classifier(self.transformer.config.hidden_size, hidden_dim, hidden_activation, num_layers, n_classes, dropout_rate)
+
+        # Get the total number of layers in the transformer model
+        if hasattr(self.transformer, 'encoder'):
+            total_layers = len(self.transformer.encoder.layer)
+        elif hasattr(self.transformer, 'layers'):
+            total_layers = len(self.transformer.layers)
+        else:
+            total_layers = 12  # default for most models, adjust if necessary
+
+        # Freeze all layers except the specified number of final layers
+        if finetune_layers == 0:
+            for param in self.transformer.parameters():
+                param.requires_grad = False
+        elif finetune_layers < total_layers:
+            modules_to_freeze = self.transformer.embeddings
+            if hasattr(self.transformer, 'encoder'):
+                modules_to_freeze = [modules_to_freeze, *self.transformer.encoder.layer[:-finetune_layers]]
+            elif hasattr(self.transformer, 'layers'):
+                modules_to_freeze = [modules_to_freeze, *self.transformer.layers[:-finetune_layers]]
+            for module in modules_to_freeze:
+                for param in module.parameters():
+                    param.requires_grad = False
+
+        # Count trainable and non-trainable parameters
+        trainable_params = sum(p.numel() for p in self.transformer.parameters() if p.requires_grad)
+        non_trainable_params = sum(p.numel() for p in self.transformer.parameters() if not p.requires_grad)
+
+        if rank == 0:
+            print(f"Transformer's original pooler removed. Using custom pooling type: {pooling}")
+            print(f"Transformer has {trainable_params:,} trainable parameters and {non_trainable_params:,} non-trainable parameters")
+            print(f"Fine-tuning the last {finetune_layers} out of {total_layers} Transformer layers")
     
+    def forward(self, **inputs):
+        outputs = self.transformer(**inputs)
+        pooled_output = self.custom_pooling(outputs.last_hidden_state, inputs['attention_mask'])
+        return self.classifier(pooled_output)
+
 class Classifier(nn.Module):
     def __init__(self, input_dim, hidden_dim, hidden_activation, num_layers, n_classes, dropout_rate=0.0):
         super().__init__()
@@ -276,7 +314,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         >>> model.fit(X_train, y_train, rank=0, world_size=1, device=torch.device('cuda:0'))
         >>> predictions = model.predict(X_test)
         """
-        # Pass all relevant parameters to the superclass constructor
+        # Call the superclass constructor
         super().__init__(
             batch_size=batch_size,
             max_iter=max_iter,
@@ -293,7 +331,8 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             device=device,
             **optimizer_kwargs
         )
-        # Set additional attributes specific to this class
+
+        # Set additional attributes
         self.bert_model = bert_model
         self.bert_tokenizer = bert_tokenizer
         self.finetune_bert = finetune_bert
@@ -319,10 +358,12 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         
         self.loss = nn.CrossEntropyLoss(reduction="mean")
 
-        # Update self.params to include the new parameters
-        self.params += ['bert_model', 'bert_tokenizer', 'finetune_bert', 'pooling', 'hidden_dim', 'hidden_activation',
-                        'num_layers', 'rank', 'debug', 'checkpoint_dir', 'checkpoint_interval', 'resume_from_checkpoint',
-                        'target_score', 'interactive', 'response_pipe', 'freeze_bert', 'dropout_rate']
+        # Extend self.params with the new parameters
+        self.params.extend([
+            'finetune_bert', 'pooling', 'hidden_dim', 'hidden_activation',
+            'num_layers', 'checkpoint_interval', 'target_score', 'interactive',
+            'freeze_bert', 'dropout_rate', 'show_progress', 'advance_epochs'
+        ])
 
     def build_graph(self):
         if not hasattr(self, 'n_classes_') or self.n_classes_ is None:
@@ -446,26 +487,27 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
     def save_model(self, directory='saves', epoch=None, optimizer=None, is_final=False):
         if not os.path.exists(directory):
-            print(f"Creating directory: {directory}")
             os.makedirs(directory)
-        
+
+        saveable_params = {param: getattr(self, param) for param in self.params 
+                        if param not in ['rank', 'response_pipe', 'bert_model', 'bert_tokenizer']}
+
         state = {
             'epoch': epoch,
-            'model_state_dict': self.model.state_dict(),
-            'params': self.__dict__
+            'model_state_dict': self.model.module.state_dict() if hasattr(self.model, 'module') else self.model.state_dict(),
+            'params': saveable_params
         }
         if optimizer:
             state['optimizer_state_dict'] = optimizer.state_dict()
-        
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
 
-        if is_final:
-            filename = f'final_model_{timestamp}.pth'
-        else:
-            filename = f'checkpoint_epoch_{epoch}_{timestamp}.pth'
-        
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        filename = f'final_model_{timestamp}.pth' if is_final else f'checkpoint_epoch_{epoch}_{timestamp}.pth'
         torch.save(state, os.path.join(directory, filename))
         print(f"Saved model: {os.path.join(directory, filename)}")
+
+        if self.debug and self.rank == 0:
+            print("Params saved:")
+            print_state_summary(saveable_params)
     
 
     def load_model(self, directory='checkpoints', filename=None, pattern='checkpoint_epoch', use_saved_params=True, rank=0, debug=False):
@@ -483,34 +525,42 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
         checkpoint = torch.load(latest_checkpoint, map_location=self.device)
         print(f"Loaded checkpoint: {latest_checkpoint}") if rank == 0 else None
-        # Get the model state dict if it exists
-        model_state_dict = checkpoint['model_state_dict'] if 'model_state_dict' in checkpoint else None
 
-        # Remove 'module.' prefix if exists
-        if model_state_dict is not None:
-            model_state_dict = {key.replace("module.", ""): value for key, value in model_state_dict.items()}
-            # Loop through the dictionary and print each key and value (nicely formatted f strings)
+        # Get the model state dict if it exists
+        model_state_dict = checkpoint.get('model_state_dict')
+        if model_state_dict:
+            # Remove 'module.' prefix if exists
+            model_state_dict = {k.replace("module.", ""): v for k, v in model_state_dict.items()}
             print(f"Retrieved model state dictionary.") if rank == 0 else None
-            print_state_summary(model_state_dict) if debug else None
+            if debug:
+                print_state_summary(model_state_dict)
         else:
             print(f"No model state dictionary found in checkpoint.") if rank == 0 else None
 
         # Get the optimizer state dict if it exists
-        optimizer_state_dict = checkpoint['optimizer_state_dict'] if 'optimizer_state_dict' in checkpoint else None
-        if optimizer_state_dict is not None:
+        optimizer_state_dict = checkpoint.get('optimizer_state_dict')
+        if optimizer_state_dict:
             print(f"Retrieved optimizer state dictionary.") if rank == 0 else None
-            print_state_summary(optimizer_state_dict) if debug else None
+            if debug:
+                print_state_summary(optimizer_state_dict)
         else:
             print(f"No optimizer state dictionary found in checkpoint.") if rank == 0 else None
 
         # Optionally update model parameters with the saved parameters
         if use_saved_params and 'params' in checkpoint:
-            if debug:
-                print(f"BEFORE updating model parameters:") if rank == 0 else None
+            saved_params = checkpoint['params']
+            
+            if debug and rank == 0:
+                print(f"BEFORE updating model parameters:")
                 print_state_summary(self.__dict__)
-            self.__dict__.update(checkpoint['params'])
-            if debug:
-                print(f"AFTER updating model parameters:") if rank == 0 else None
+            
+            # Update the parameters
+            for key, value in saved_params.items():
+                if hasattr(self, key):
+                    setattr(self, key, value)
+            
+            if debug and rank == 0:
+                print(f"AFTER updating model parameters:")
                 print_state_summary(self.__dict__)
 
         start_epoch = checkpoint.get('epoch', 0) + 1
@@ -648,8 +698,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         
         # Training loop
         for epoch in range(start_epoch, last_epoch+1):
-            if stop_training.item() == 1:
-                break  # Exit the training loop if stop_training was triggered
 
             epoch_start = time.time()
             if self.device.type == 'cuda' and world_size > 1:
@@ -902,6 +950,12 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
                     # Ensure all ranks have processed the input before continuing
                     dist.barrier()
+
+            if stop_training.item() == 1:
+                # Consolidate optimizer state before saving
+                if self.optimizer_class == ZeroRedundancyOptimizer:
+                    self.optimizer.consolidate_state_dict()
+                break  # Exit the training loop if stop_training was triggered
 
             # Create a progress bar for batches
             if rank == 0 and self.show_progress:

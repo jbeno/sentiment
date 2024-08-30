@@ -1,5 +1,6 @@
 import warnings
 # Suppress specific warnings
+warnings.filterwarnings("ignore", message="resume_download is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use force_download=True.", category=FutureWarning)
 warnings.filterwarnings("ignore", message="`resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.", category=FutureWarning)
 warnings.filterwarnings("ignore", message="TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class.", category=UserWarning, module=r"torch\._utils")
 warnings.filterwarnings("ignore", message="promote has been superseded by promote_options='default'", category=FutureWarning, module=r"datasets\.table")
@@ -29,7 +30,7 @@ from torch.distributed.optim import ZeroRedundancyOptimizer
 # Third-party library imports
 import numpy as np
 import pandas as pd
-from transformers import BertTokenizer, BertModel
+from transformers import BertTokenizer, BertModel, AutoTokenizer, AutoModel
 from sklearn.metrics import classification_report
 import sst
 from datasets import load_dataset
@@ -160,6 +161,19 @@ def initialize_bert_model(weights_name, device, rank, debug):
             print(f"Bert Model:\n{bert_model}")
         print(f"Tokenizer and model initialized ({format_time(time.time() - model_init_start)})")
     return bert_tokenizer, bert_model
+
+def initialize_transformer_model(weights_name, device, rank, debug):
+    model_init_start = time.time()
+    print(f"\nInitializing '{weights_name}' tokenizer and model...") if rank == 0 else None
+    tokenizer = AutoTokenizer.from_pretrained(weights_name)
+    model = AutoModel.from_pretrained(weights_name).to(device)
+    dist.barrier()
+    if rank == 0:
+        if debug:
+            print(f"Tokenizer:\n{tokenizer}")
+            print(f"Model:\n{model}")
+        print(f"Tokenizer and model initialized ({format_time(time.time() - model_init_start)})")
+    return tokenizer, model
 
 def load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug):
     data_load_start = time.time()
@@ -752,7 +766,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
          num_layers, hidden_dim, batch_size, epochs, lr, sample_percent, random_seed, early_stop, n_iter_no_change, tol,
          pooling, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint, save_preds, save_dir, model_file,
          use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, l2_strength, empty_cache, decimal, scheduler_name,
-         finetune_bert, finetune_layers, target_score, interactive, mem_interval, accumulation_steps, freeze_bert, dropout_rate,
+         finetune_transformer, finetune_layers, target_score, interactive, mem_interval, accumulation_steps, freeze_transformer, dropout_rate,
          chunk_size, show_progress, advance_epochs, input_queue, pipes, running):
 
     try:
@@ -766,32 +780,33 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         setup_environment(rank, world_size, backend, device, debug)
         fix_random_seeds(random_seed)
 
-        # Initialize BERT model and tokenizer
-        bert_tokenizer, bert_model = initialize_bert_model(weights_name, device, rank, debug)
-        
-        if data_file is not None and not finetune_bert:
+        # Initialize transformer model and tokenizer
+        tokenizer, transformer_model = initialize_transformer_model(weights_name, device, rank, debug)
+
+        if data_file is not None and not finetune_transformer:
             # Load previously processed data from an archive file
             X_train, X_dev, y_train, y_dev, X_dev_sent = load_data_archive(data_file, device, rank, sample_percent)
         else:
             # Load, tokenize and encode data
             train, dev = load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug)
-            X_train, X_dev, y_train, y_dev, X_dev_sent = process_data(bert_tokenizer, bert_model, pooling, world_size, train,
-                dev, device, batch_size, rank, debug, save_data, save_dir, num_workers, prefetch, empty_cache, finetune_bert,
-                freeze_bert, chunk_size)
+            X_train, X_dev, y_train, y_dev, X_dev_sent = process_data(tokenizer, transformer_model, pooling, world_size, train,
+                dev, device, batch_size, rank, debug, save_data, save_dir, num_workers, prefetch, empty_cache, finetune_transformer,
+                freeze_transformer, chunk_size)
 
-        # Initialize and train the neural classifier
+        # Initialize and train the transformer classifier
         classifier, start_epoch, model_state_dict, optimizer_state_dict = initialize_classifier(
-            bert_model if finetune_bert else None, bert_tokenizer if finetune_bert else None,
-            finetune_bert, finetune_layers, num_layers, hidden_dim,
+            transformer_model if finetune_transformer else None, tokenizer if finetune_transformer else None,
+            finetune_transformer, finetune_layers, num_layers, hidden_dim,
             batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
             checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name, l2_strength,
-            scheduler_name, pooling, target_score, interactive, response_pipe, accumulation_steps, freeze_bert, dropout_rate,
+            scheduler_name, pooling, target_score, interactive, response_pipe, accumulation_steps, freeze_transformer, dropout_rate,
             show_progress, advance_epochs)
+
         classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
                        num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval)
-
+        
         # Evaluate the model
-        evaluate_model(classifier, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
+        evaluate_model(classifier, tokenizer, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
                        save_dir, X_dev_sent)
         print(f"TOTAL Time: {format_time(time.time() - start_time)}") if rank == 0 else None
         dist.barrier()
@@ -816,6 +831,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         cleanup_and_exit(rank, debug, response_pipe, input_queue)
     
     return
+
 
 if __name__ == '__main__':
     set_start_method('spawn', force=True)
@@ -1053,8 +1069,4 @@ if __name__ == '__main__':
         cleanup_and_exit(None, args.debug, None, None)
 
     print("All processes finished.")
-
-
-
-
 

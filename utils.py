@@ -96,7 +96,12 @@ def setup_environment(rank, world_size, backend, device, debug, port='12355', ho
     # Set the DDP environment variables
     os.environ["MASTER_ADDR"] = host
     os.environ["MASTER_PORT"] = port
-    
+
+    # Enable DDP debug mode
+    if debug:
+        os.environ["NCCL_DEBUG"] = "INFO"
+        os.environ["TORCH_DISTRIBUTED_DEBUG"] = "DETAIL"
+
     # Initialize the process group
     dist.init_process_group(backend=backend, rank=rank, world_size=world_size)
     print(f"Rank {rank} - Device: {device}")
