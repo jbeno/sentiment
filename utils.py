@@ -10,8 +10,10 @@ from sklearn.metrics import f1_score
 from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 import sys
 import os
+import socket
 import signal
 import decimal
+import json
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -60,6 +62,18 @@ def tensor_to_numpy(tensor):
         return tensor.cpu().numpy() if tensor.is_cuda else tensor.numpy()
     return tensor
 
+def parse_dict(arg):
+    if arg is None:
+        return {}
+    if isinstance(arg, dict):
+        return arg
+    try:
+        # Try parsing as JSON
+        return json.loads(arg)
+    except json.JSONDecodeError:
+        # If not JSON, try key=value format
+        return dict(kv.split("=") for kv in arg.split())
+    
 def format_time(seconds):
     if seconds >= 1:
         hrs, secs = divmod(seconds, 3600)
@@ -91,11 +105,24 @@ def format_tolerance(tolerance):
 
     return str(normalized)
 
-def setup_environment(rank, world_size, backend, device, debug, port='12355', host='localhost', timeout='3600000', wait='1'):
+def find_available_port(start_port=12355, max_port=65535):
+    for port in range(start_port, max_port):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('', port))
+                return port
+        except OSError:
+            continue
+    raise IOError("No free ports")
+
+def setup_environment(rank, world_size, backend, device, debug, port=12355, host='localhost', timeout='3600000', wait='1'):
+    # Find a free port
+    free_port = find_available_port(start_port=port)
+    print(f"Free port found: {free_port}") if rank == 0 else None
 
     # Set the DDP environment variables
     os.environ["MASTER_ADDR"] = host
-    os.environ["MASTER_PORT"] = port
+    os.environ['MASTER_PORT'] = str(free_port)
 
     # Enable DDP debug mode
     if debug:
@@ -272,9 +299,7 @@ def get_activation(activation):
     else:
         raise ValueError(f"Unknown activation function: {activation}")
 
-def get_optimizer(optimizer_name, device, rank, world_size):
-    # Options are 'zero', 'adam', 'sgd', 'adagrad', 'rmsprop'
-    # If None and device CUDA and world_size > 1, use ZeroRedundancyOptimizer, else Adam
+def get_optimizer(optimizer_name, use_zero, device, rank, world_size):
     if optimizer_name is None:
         if device.type == 'cuda' and world_size > 1:
             print(f"Optimizer not specified. Using ZeroRedundancyOptimizer for CUDA and World Size > 1") if rank == 0 else None
@@ -282,43 +307,42 @@ def get_optimizer(optimizer_name, device, rank, world_size):
         else:
             print(f"Optimizer not specified. Using Adam") if rank == 0 else None
             return torch.optim.Adam
-    if optimizer_name == "adam":
+    if optimizer_name.lower() == "adam":
         return torch.optim.Adam
-    elif optimizer_name == "sgd":
+    elif optimizer_name.lower() == "sgd":
         return torch.optim.SGD
-    elif optimizer_name == "adagrad":
+    elif optimizer_name.lower() == "adagrad":
         return torch.optim.Adagrad
-    elif optimizer_name == "rmsprop":
+    elif optimizer_name.lower() == "rmsprop":
         return torch.optim.RMSprop
-    elif optimizer_name == "zero":
+    elif optimizer_name.lower() == "zero":
         return ZeroRedundancyOptimizer
+    elif optimizer_name.lower() == "adamw":
+        return torch.optim.AdamW
     else:
-        raise ValueError(f"Unknown optimizer: {optimizer_name}")
+        raise ValueError(f"Unknown optimizer: {optimizer_name}. Options are 'adam', 'sgd', 'adagrad', 'rmsprop', 'zero', 'adamw'")
 
 def get_scheduler(scheduler_name, device, rank, world_size):
-    # Options are 'none', 'step', 'multi_step', 'exponential', 'cosine', 'reduce_on_plateau'
-    # If None and device CUDA and world_size > 1, use None, else StepLR
     if scheduler_name is None:
-        if device.type == 'cuda' and world_size > 1:
-            print(f"Scheduler not specified. Using None for CUDA and World Size > 1") if rank == 0 else None
-            return None
-        else:
-            print(f"Scheduler not specified. Using StepLR") if rank == 0 else None
-            return optim.lr_scheduler.StepLR
-    if scheduler_name == "none":
         return None
-    elif scheduler_name == "step":
+    if scheduler_name.lower() == "none":
+        return None
+    elif scheduler_name.lower() == "step":
         return optim.lr_scheduler.StepLR
-    elif scheduler_name == "multi_step":
-        return optim.lr_scheduler.MultiStepLR
-    elif scheduler_name == "exponential":
-        return optim.lr_scheduler.ExponentialLR
-    elif scheduler_name == "cosine":
+    elif scheduler_name.lower() == 'cosine':
         return optim.lr_scheduler.CosineAnnealingLR
-    elif scheduler_name == "reduce_on_plateau":
+    elif scheduler_name.lower() == 'cosine_warmup':
+        return optim.lr_scheduler.CosineAnnealingWarmRestarts
+    elif scheduler_name.lower() == "multi_step":
+        return optim.lr_scheduler.MultiStepLR
+    elif scheduler_name.lower() == "exponential":
+        return optim.lr_scheduler.ExponentialLR
+    elif scheduler_name.lower() == "reduce_on_plateau":
         return optim.lr_scheduler.ReduceLROnPlateau
+    elif scheduler_name.lower() == 'cyclic':
+        return optim.lr_scheduler.CyclicLR
     else:
-        raise ValueError(f"Unknown scheduler: {scheduler_name}")
+        raise ValueError(f"Unknown scheduler: {scheduler_name}. Options are 'none', 'step', 'multi_step', 'exponential', 'cosine', 'cosine_warmup', 'reduce_on_plateau', 'cyclic'")
 
 def set_threads(num_threads):
     os.environ['OMP_NUM_THREADS'] = str(num_threads)

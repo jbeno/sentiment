@@ -53,7 +53,8 @@ from utils import (
     print_rank_memory_summary,
     tensor_to_numpy,
     print_label_dist,
-    #get_scheduler
+    get_scheduler,
+    parse_dict
 )
 from torch_ddp_finetune_neural_classifier import TorchDDPNeuralClassifier, SentimentDataset
 from colors import *
@@ -443,7 +444,17 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
     total_texts = len(texts)
     embeddings = []
 
+    # Ensure texts is a list
+    if isinstance(texts, np.ndarray):
+        texts = texts.tolist()
+    elif not isinstance(texts, (list, tuple)):
+        raise TypeError(f"texts must be a list, tuple, or numpy array. Got {type(texts)}")
+    
     def tokenize(texts, tokenizer, device):
+        # Convert NumPy array to list if necessary
+        if isinstance(texts, np.ndarray):
+            texts = texts.tolist()
+
         encoded = tokenizer.batch_encode_plus(
             texts,
             add_special_tokens=True,
@@ -650,14 +661,15 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
 def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_layers, num_layers, hidden_dim, batch_size,
                           epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
                           checkpoint_dir, checkpoint_interval, resume_from_checkpoint, filename=None, use_saved_params=True,
-                          optimizer_name=None, l2_strength=0.0, scheduler_name=None, pooling='cls', target_score=None, interactive=False,
-                          response_pipe=None, accumulation_steps=1, freeze_bert=False, dropout_rate=0.0, show_progress=False,
-                          advance_epochs=1):
+                          optimizer_name=None, use_zero=True, scheduler_name=None, l2_strength=0.0, pooling='cls',
+                          target_score=None, interactive=False, response_pipe=None, accumulation_steps=1, max_grad_norm=None,
+                          freeze_bert=False, dropout_rate=0.0, show_progress=False, advance_epochs=1, optimizer_kwargs={},
+                          scheduler_kwargs={}):
     class_init_start = time.time()
     print(f"\nInitializing DDP Neural Classifier...") if rank == 0 else None
     hidden_activation = get_activation(hidden_activation)
-    optimizer_class = get_optimizer(optimizer_name, device, rank, world_size)
-    #scheduler_class = get_scheduler(scheduler_name, device, rank, world_size)
+    optimizer_class = get_optimizer(optimizer_name, use_zero, device, rank, world_size)
+    scheduler_class = get_scheduler(scheduler_name, device, rank, world_size)
     print(f"Layers: {num_layers}, Hidden Dim: {hidden_dim}, Hidden Act: {hidden_activation.__class__.__name__}, Dropout: {dropout_rate}, Optimizer: {optimizer_class.__name__}, L2 Strength: {l2_strength}, Pooling: {pooling.upper()}, Gradient Accumulation Steps: {accumulation_steps}") if rank == 0 else None
     print(f"Batch Size: {batch_size}, Max Epochs: {epochs}, LR: {lr}, Early Stop: {early_stop}, Fine-tune BERT: {finetune_bert}, Fine-tune Layers: {finetune_layers}, Freeze BERT: {freeze_bert}, Target Score: {target_score}, Interactive: {interactive}") if rank == 0 else None
     
@@ -683,15 +695,20 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
         resume_from_checkpoint=resume_from_checkpoint,
         device=device,
         optimizer_class=optimizer_class,
+        use_zero=use_zero,
+        scheduler_class=scheduler_class,
         target_score=target_score,
         interactive=interactive,
         response_pipe=response_pipe,
         gradient_accumulation_steps=accumulation_steps,
+        max_grad_norm=max_grad_norm,
         freeze_bert=freeze_bert,
         dropout_rate=dropout_rate,
         l2_strength=l2_strength,
         show_progress=show_progress,
-        advance_epochs=advance_epochs
+        advance_epochs=advance_epochs,
+        optimizer_kwargs=optimizer_kwargs,
+        scheduler_kwargs=scheduler_kwargs
     )
 
     if filename is not None:
@@ -761,14 +778,72 @@ def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict
             print(f"Macro F1 Score: {macro_f1_score:.2f}")
             print(f"\nEvaluation completed ({format_time(time.time() - eval_start)})")
 
-# Main function for DDP training
-def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_name, hidden_activation, label_dict, numeric_dict,
-         num_layers, hidden_dim, batch_size, epochs, lr, sample_percent, random_seed, early_stop, n_iter_no_change, tol,
-         pooling, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint, save_preds, save_dir, model_file,
-         use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, l2_strength, empty_cache, decimal, scheduler_name,
-         finetune_transformer, finetune_layers, target_score, interactive, mem_interval, accumulation_steps, freeze_transformer, dropout_rate,
-         chunk_size, show_progress, advance_epochs, input_queue, pipes, running):
+def make_predictions(classifier, tokenizer, transformer_model, predict_file, numeric_dict, rank, debug, save_dir, device, pooling,
+                     world_size, batch_size, num_workers, prefetch, empty_cache, finetune_transformer, freeze_transformer, chunk_size):
+    predictions_start = time.time()
+    print("\nPredicting on unlabled test dataset...") if rank == 0 else None
+    # Load the test dataset
+    test_df = pd.read_csv(predict_file, index_col=None)
+    test_texts = test_df.sentence.values
+    print(f"Loaded test dataset at: {predict_file}") if rank == 0 else None
+    print(f"Test dataset size: {len(test_texts)}") if rank == 0 else None
+    print(f"Test dataset columns: {list(test_df.columns)}") if rank == 0 else None
+    print(f"Test dataset sample:\n{test_df[['sentence']].sample(3)}") if rank == 0 else None
+            
+    # Tokenize and encode the test dataset
+    if not finetune_transformer:
+        X_test = bert_phi(test_texts, tokenizer, transformer_model, pooling, world_size, device, batch_size, 
+                                    None, rank, debug, 'Test', 
+                                    num_workers, prefetch, empty_cache, None, None)
+    else:
+        X_test = test_texts
 
+    if rank == 0:
+        dataset = SentimentDataset(X_test, None, tokenizer)
+        dataloader = DataLoader(dataset, batch_size=classifier.batch_size, shuffle=False)
+        classifier.model.eval()
+        preds = []
+        with torch.no_grad():
+            if finetune_transformer:
+                dataset = SentimentDataset(X_test, [0] * len(X_test), tokenizer)
+                dataloader = DataLoader(dataset, batch_size=classifier.batch_size, shuffle=False)
+                preds = []
+                for batch in dataloader:
+                    input_ids = batch['input_ids'].to(device)
+                    attention_mask = batch['attention_mask'].to(device)
+                    outputs = classifier.model(input_ids, attention_mask=attention_mask)
+                    preds.append(outputs)
+                preds = torch.cat(preds, dim=0)
+            else:
+                if not torch.is_tensor(X_test):
+                    X_test = torch.tensor(X_test, device=device)
+                preds = classifier.model(X_test)
+            preds_labels = convert_numeric_to_labels(preds.argmax(dim=1).cpu().numpy(), numeric_dict)
+            test_df['prediction'] = preds_labels
+            print(f"Sample test predictions:\n{test_df[['sentence', 'prediction']].sample(3)}")
+
+            # Create a save directory if it doesn't exist
+            if not os.path.exists(save_dir):
+                print(f"Creating save directory: {save_dir}")
+                os.makedirs(save_dir)
+            # Create a filename timestamp
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            save_path = os.path.join(save_dir, f'test_predictions_{timestamp}.csv')
+            test_df.to_csv(save_path, index=False)
+            
+            print(f"Saved test predictions: {save_dir}/test_predictions_{timestamp}.csv")
+            print(f"Test prediction completed ({format_time(time.time() - predictions_start)})")
+    dist.barrier()
+
+# Main function for DDP training
+def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_name, hidden_activation, label_dict,
+         numeric_dict, num_layers, hidden_dim, batch_size, epochs, lr, sample_percent, random_seed, early_stop,
+         n_iter_no_change, tol, pooling, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint, save_preds,
+         save_dir, model_file, use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, optimizer_kwargs,
+         use_zero, l2_strength, empty_cache, decimal, scheduler_name, schedular_kwargs, finetune_transformer, finetune_layers,
+         target_score, interactive, mem_interval, accumulation_steps, freeze_transformer, dropout_rate, chunk_size,
+         show_progress, predict, predict_file, save_final_model, save_pickle, max_grad_norm, advance_epochs, input_queue,
+         pipes, running):
     try:
         if interactive:
             response_pipe = pipes[rank][1]  # Get the specific pipe for this rank
@@ -798,16 +873,23 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             transformer_model if finetune_transformer else None, tokenizer if finetune_transformer else None,
             finetune_transformer, finetune_layers, num_layers, hidden_dim,
             batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
-            checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name, l2_strength,
-            scheduler_name, pooling, target_score, interactive, response_pipe, accumulation_steps, freeze_transformer, dropout_rate,
-            show_progress, advance_epochs)
+            checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name, use_zero,
+            scheduler_name, l2_strength, pooling, target_score, interactive, response_pipe, accumulation_steps, max_grad_norm,
+            freeze_transformer, dropout_rate, show_progress, advance_epochs, optimizer_kwargs, schedular_kwargs)
 
         classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
-                       num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval)
+                       num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval, save_final_model, save_pickle)
         
         # Evaluate the model
         evaluate_model(classifier, tokenizer, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
                        save_dir, X_dev_sent)
+        
+        # Make predictions on unlabled test dataset
+        if predict:
+            make_predictions(classifier, tokenizer, transformer_model, predict_file, numeric_dict, rank, debug, save_dir, device, pooling,
+                             world_size, batch_size, num_workers, prefetch, empty_cache, finetune_transformer,
+                             freeze_transformer, chunk_size)
+
         print(f"TOTAL Time: {format_time(time.time() - start_time)}") if rank == 0 else None
         dist.barrier()
         if rank == 0:
@@ -848,9 +930,9 @@ if __name__ == '__main__':
     dataset_group.add_argument('--eval_dataset', type=str, default=None, help="(Optional) Different evaluation dataset to use: 'sst', 'sst_local', 'dynasent_r1', 'dynasent_r2', 'mteb_tweet' (default: None)")
     dataset_group.add_argument('--sample_percent', type=float, default=None, help='Percentage of data to use for training and evaluation (default: None)')
     dataset_group.add_argument('--chunk_size', type=int, default=None, help='Number of dataset samples to encode in each chunk (default: None, process all data at once)')
-    dataset_group.add_argument('--label_dict', type=dict, default={'negative': 0, 'neutral': 1, 'positive': 2}, help="Text label dictionary, string to numeric (default: {'negative': 0, 'neutral': 1, 'positive': 2})")
-    dataset_group.add_argument('--numeric_dict', type=dict, default={0: 'negative', 1: 'neutral', 2: 'positive'}, help="Numeric label dictionary, numeric to string (default: {0: 'negative', 1: 'neutral', 2: 'positive'})")
-
+    dataset_group.add_argument('--label_dict', type=parse_dict, default={'negative': 0, 'neutral': 1, 'positive': 2}, help="Text label dictionary, string to numeric (default: {'negative': 0, 'neutral': 1, 'positive': 2})")
+    dataset_group.add_argument('--numeric_dict', type=parse_dict, default={0: 'negative', 1: 'neutral', 2: 'positive'}, help="Numeric label dictionary, numeric to string (default: {0: 'negative', 1: 'neutral', 2: 'positive'})")
+ 
     # BERT tokenizer/model configuration
     bert_group = parser.add_argument_group('BERT tokenizer/model configuration')
     bert_group.add_argument('--weights_name', type=str, default='bert-base-uncased', help="Pre-trained model/tokenizer name from a Hugging Face repo. Can be root-level or namespaced (default: 'bert-base-uncased')")
@@ -872,9 +954,13 @@ if __name__ == '__main__':
     training_group.add_argument('--accumulation_steps', type=int, default=1, help='Number of steps to accumulate gradients before updating weights (default: 1)')
     training_group.add_argument('--epochs', type=int, default=100, help='Number of epochs to train (default: 100)')
     training_group.add_argument('--lr', type=float, default=0.001, help='Learning rate (default: 0.001)')
-    training_group.add_argument('--optimizer', type=str, default=None, help="Optimizer to use, will auto-detect multiple GPUs and use 'zero', otherwise 'adam': 'zero', 'adam', 'sgd', 'adagrad', 'rmsprop' (default: None)")
+    training_group.add_argument('--optimizer', type=str, default='adam', help="Optimizer to use: 'adam', 'sgd', 'adagrad', 'rmsprop', 'zero', 'adamw' (default: 'adam')")
+    training_group.add_argument('--use_zero', action='store_true', default=False, help='Use Zero Redundancy Optimizer for efficient DDP training, with the optimizer specified in --optimizer (default: False)')
     training_group.add_argument('--l2_strength', type=float, default=0.0, help='L2 regularization strength for optimizer (default: 0.0)')
-    training_group.add_argument('--scheduler', type=str, default=None, help="Learning rate scheduler to use: 'step', 'plateau', 'exponent', 'cosine' (default: None)")
+    training_group.add_argument('--optimizer_kwargs', type=parse_dict, default={}, help="Additional optimizer keyword arguments as a dictionary (default: None)")
+    training_group.add_argument('--scheduler', type=str, default=None, help="Learning rate scheduler to use: 'none', 'step', 'multi_step', 'exponential', 'cosine', 'reduce_on_plateau', 'cyclic' (default: None)")
+    training_group.add_argument('--scheduler_kwargs', type=parse_dict, default={}, help="Additional scheduler keyword arguments as a dictionary (default: None)") 
+    training_group.add_argument('--max_grad_norm', type=float, default=None, help='Maximum gradient norm for clipping (default: None)')
     training_group.add_argument('--random_seed', type=int, default=42, help='Random seed (default: 42)')
     training_group.add_argument('--interactive', action='store_true', default=False, help='Interactive mode for training (default: False)')
     training_group.add_argument('--show_progress', action='store_true', default=False, help='Show progress bars for training and evaluation (default: False)')
@@ -895,8 +981,9 @@ if __name__ == '__main__':
     # Saving options
     saving_group = parser.add_argument_group('Saving options')
     saving_group.add_argument('--save_data', action='store_true', default=False, help="Save processed data to disk as an .npz archive (X_train, X_dev, y_train, y_dev, y_dev_sent)")
-    saving_group.add_argument('--save_model', action='store_true', default=False, help="Save the final model after training in PyTorch .pth format")
-    saving_group.add_argument('--save_preds', action='store_true', default=False, help="Save predictions to CSV")
+    saving_group.add_argument('--save_model', action='store_true', default=False, help="Save the final model state after training in PyTorch .pth format (default: False)")
+    saving_group.add_argument('--save_pickle', action='store_true', default=False, help="Save the final model after training in pickle .pkl format (default: False)")
+    saving_group.add_argument('--save_preds', action='store_true', default=False, help="Save predictions to CSV (default: False)")
     saving_group.add_argument('--save_dir', type=str, default='saves', help="Directory to save archived data and predictions (default: saves)")
 
     # Loading options
@@ -904,6 +991,11 @@ if __name__ == '__main__':
     loading_group.add_argument('--data_file', type=str, default=None, help="Filename of the processed data to load as an .npz archive (default: None)")
     loading_group.add_argument('--model_file', type=str, default=None, help="Filename of the classifier model or checkpoint to load (default: None)")
     loading_group.add_argument('--use_saved_params', action='store_true', default=False, help="Use saved parameters for training, if loading a model")
+
+    # Prediction options
+    prediction_group = parser.add_argument_group('Prediction options')
+    prediction_group.add_argument('--predict', action='store_true', default=False, help='Make predictions on a provided unlabled dataset (default: False)')
+    prediction_group.add_argument('--predict_file', type=str, default=None, help='Filename of the unlabeled dataset to make predictions on (default: None)')
 
     # GPU and CPU processing
     gpu_cpu_group = parser.add_argument_group('GPU and CPU processing')
@@ -1003,10 +1095,13 @@ if __name__ == '__main__':
                       args.num_workers,
                       args.prefetch,
                       args.optimizer,
+                      args.optimizer_kwargs,
+                      args.use_zero,
                       args.l2_strength,
                       args.empty_cache,
                       args.decimal,
                       args.scheduler,
+                      args.scheduler_kwargs,
                       args.finetune_bert,
                       args.finetune_layers,
                       args.target_score,
@@ -1017,6 +1112,11 @@ if __name__ == '__main__':
                       args.dropout_rate,
                       args.chunk_size,
                       args.show_progress,
+                      args.predict,
+                      args.predict_file,
+                      args.save_model,
+                      args.save_pickle,
+                      args.max_grad_norm,
                       advance_epochs,
                       input_queue,
                       pipes,
