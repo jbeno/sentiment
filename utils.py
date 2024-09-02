@@ -116,13 +116,9 @@ def find_available_port(start_port=12355, max_port=65535):
     raise IOError("No free ports")
 
 def setup_environment(rank, world_size, backend, device, debug, port=12355, host='localhost', timeout='3600000', wait='1'):
-    # Find a free port
-    free_port = find_available_port(start_port=port)
-    print(f"Free port found: {free_port}") if rank == 0 else None
-
     # Set the DDP environment variables
     os.environ["MASTER_ADDR"] = host
-    os.environ['MASTER_PORT'] = str(free_port)
+    os.environ["MASTER_PORT"] = str(port)
 
     # Enable DDP debug mode
     if debug:
@@ -141,13 +137,11 @@ def setup_environment(rank, world_size, backend, device, debug, port=12355, host
         #os.environ["NCCL_BLOCKING_WAIT"] = wait
         os.environ["TORCH_NCCL_BLOCKING_WAIT"] = wait
         os.environ["NCCL_TIMEOUT_MS"] = timeout
-
         # Convert timeout to hours and minutes
         timeout_ms = int(os.environ["NCCL_TIMEOUT_MS"])
         timeout_min = timeout_ms // 60000
         timeout_hr = timeout_min // 60
         timeout_min = timeout_min % 60
-
         # Convert wait to string
         if os.environ["TORCH_NCCL_BLOCKING_WAIT"] == '1':
             wait_str = "Enabled"
@@ -155,7 +149,6 @@ def setup_environment(rank, world_size, backend, device, debug, port=12355, host
             wait_str = "Disabled"
         else:
             wait_str = "Invalid"
-
         print(f"NCCL Timeout: {timeout_hr} hr {timeout_min} min. NCCL Blocking Wait: {wait_str}") if rank == 0 else None
 
 def signal_handler(signum, frame):

@@ -382,7 +382,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
     def build_graph(self):
         if not hasattr(self, 'n_classes_') or self.n_classes_ is None:
-            raise ValueError("n_classes_ is not set. Make sure fit() is called before building the graph.")
+            raise ValueError(f"{red}n_classes_ is not set. Make sure fit() is called before building the graph.{reset}")
 
         if self.finetune_bert:
             model = BERTClassifier(
@@ -410,14 +410,14 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             )
 
         if self.rank == 0:
-            print("\nModel Architecture Summary:")
+            print(f"\n{bright_white}{bold}Model Architecture Summary:{reset}")
             print(model)
             total_params = 0
             trainable_params = 0
             total_layers = 0
             trainable_layers = 0
 
-            print("\nModel Parameters:")
+            print(f"\n{bright_white}{bold}Model Parameters:{reset}")
             for name, module in model.named_modules():
                 if isinstance(module, (nn.Linear, nn.Embedding, nn.LayerNorm)):
                     total_layers += 1
@@ -656,7 +656,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             save_final_model=False, save_pickle=False):
         training_start = time.time()
         if rank == 0:
-            print(f"\nFitting DDP Neural Classifier on training data...")
+            print(f"\n{bright_white}{bold}Fitting DDP Neural Classifier on training data...{reset}")
             print(f"Num Workers: {num_workers}, Prefetch: {prefetch}")
 
         # Build the dataset and dataloader
@@ -664,7 +664,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
         if self.finetune_bert:
             if self.bert_tokenizer is None:
-                raise ValueError("bert_tokenizer is required for fine-tuning BERT")
+                raise ValueError(f"{red}bert_tokenizer is required for fine-tuning BERT{reset}")
             dataset = SentimentDataset(X, y, self.bert_tokenizer, self.label_dict, device=self.device)
             self.classes_ = sorted(set(y))
             self.n_classes_ = len(self.classes_)
@@ -716,7 +716,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         # Check target_score compatibility
         if self.target_score is not None:
             if self.early_stopping != 'score':
-                print(f"Warning: target_score is set to {self.target_score}, but early_stopping is '{self.early_stopping}'. target_score will be ignored.") if rank == 0 else None
+                print(f"{bright_yellow}Warning: target_score is set to {self.target_score}, but early_stopping is '{self.early_stopping}'. target_score will be ignored.{reset}") if rank == 0 else None
                 self.target_score = None
             else:
                 print(f"Target score set to {self.target_score}. Training will stop if this validation score is reached.") if rank == 0 else None
@@ -741,7 +741,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         if rank == 0:
             print(f"Model architecture:\n{self.model}") if debug else None
             print(f"Optimizer:\n{self.optimizer}") if debug else None
-            print(f"\nStarting training loop...")
+            print(f"\n{bright_white}{bold}Starting training loop...{reset}")
 
         self.model.train()
 
@@ -1046,14 +1046,34 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
                 loss.backward()
                 
+                # Calculate gradient norms
+                parameters = [p for p in self.model.module.parameters() if p.grad is not None]
+                grad_norms = [p.grad.data.norm(2).item() for p in parameters]
+                min_norm = min(grad_norms)
+                max_norm = max(grad_norms)
+                mean_norm = sum(grad_norms) / len(grad_norms)
+                total_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), 2) for p in parameters]), 2)
+
+                clipped = False
                 if batch_count % self.gradient_accumulation_steps == 0:
                     # Gradient clipping
                     if self.max_grad_norm is not None:
-                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
-
+                        # Apply gradient clipping
+                        torch.nn.utils.clip_grad_norm_(self.model.module.parameters(), self.max_grad_norm)
+                        
+                        clipped = total_norm > self.max_grad_norm
+                        
+                        if clipped:
+                            # Recalculate norms after clipping
+                            grad_norms_after = [p.grad.data.norm(2).item() for p in parameters]
+                            min_norm_after = min(grad_norms_after)
+                            max_norm_after = max(grad_norms_after)
+                            mean_norm_after = sum(grad_norms_after) / len(grad_norms_after)
+                            total_norm_after = torch.norm(torch.stack([torch.norm(p.grad.detach(), 2) for p in parameters]), 2)
+                    
                     self.optimizer.step()
                     self.optimizer.zero_grad()
-                    
+
                     # Step schedulers that update per iteration
                     if isinstance(self.scheduler, (torch.optim.lr_scheduler.CyclicLR, torch.optim.lr_scheduler.OneCycleLR)):
                         self.scheduler.step()
@@ -1062,27 +1082,37 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
                 epoch_loss += loss.item() * self.gradient_accumulation_steps
                 batch_count += 1
-
                 current_lr = self.optimizer.param_groups[0]['lr']
 
-                print(f"Rank {rank}: Epoch: {epoch}, Batch: {batch_count}, Size: {X_batch.size(0)}, Loss: {loss.item():.6f}, Epoch Loss: {epoch_loss:.6f}, LR: {current_lr:.2e}") if debug else None
+                if clipped:
+                    grad_info = f"{bright_yellow}Grad Clipped:{reset} min={min_norm_after:.4f}, max={max_norm_after:.4f}, mean={mean_norm_after:.4f}"
+                else:
+                    grad_info = f"Grad Norms: min={min_norm:.4f}, max={max_norm:.4f}, mean={mean_norm:.4f}"
 
+                if debug:                    
+                    print(f"Rank {rank}: Epoch: {epoch}, Batch: {batch_count}, Size: {X_batch.size(0)}, Loss: {loss.item():.6f}, Epoch Loss: {epoch_loss:.6f}, LR: {current_lr:.2e},  {grad_info}")
+                    
                 # Update progress bar
                 if rank == 0 and self.show_progress:
+                    if clipped:
+                        grad_info_mini = f"{bright_yellow}C:{reset}{mean_norm_after:.4f}"
+                    else:
+                        grad_info_mini = f"M:{mean_norm:.4f}"
+                    
                     pbar.update(1)
-                    pbar.set_postfix({'loss': f'{loss.item():.4f}', 'lr': f'{current_lr:.2e}'})
+                    pbar.set_postfix({'loss': f'{loss.item():.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini})
 
             # Calculate average epoch loss
             avg_epoch_loss = epoch_loss / batch_count
 
             # Update progress bar with post-epoch processes
             if rank == 0 and self.show_progress:
-                pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'status': 'Post-epoch processing...'})
+                pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Post-epoch processing...'})
 
             # Consolidate optimizer state before saving
             if self.use_zero:
                 if rank == 0 and self.show_progress:
-                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'status': 'Consolidating optimizer state...'})
+                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Consolidating optimizer state...'})
                 self.optimizer.consolidate_state_dict()
 
             dist.barrier()
@@ -1090,7 +1120,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             # Early stopping logic
             if self.early_stopping == 'score':
                 if rank == 0 and self.show_progress:
-                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'status': 'Computing validation score...'})
+                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Computing validation score...'})
                 current_score = self._update_no_improvement_count_early_stopping(X_val, y_val, epoch, debug)
                 if self.no_improvement_count >= self.n_iter_no_change:
                     stop_training = torch.tensor(1, device=self.device)
@@ -1105,7 +1135,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
             elif self.early_stopping == 'loss':
                 if rank == 0 and self.show_progress:
-                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'status': 'Checking early stopping'})
+                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Checking early stopping'})
                 current_loss = self._update_no_improvement_count_errors(avg_epoch_loss, epoch, debug)
                 if self.no_improvement_count >= self.n_iter_no_change:
                     stop_training = torch.tensor(1, device=self.device)
@@ -1124,16 +1154,16 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
             # Close progress bar here
             if rank == 0 and self.show_progress:
-                pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'status': 'Epoch complete'})
+                pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Epoch complete'})
                 pbar.close()
 
             # Print epoch summary
             if self.early_stopping == 'score':
-                print(f"{nic_color}█{reset} Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset}: Avg Loss: {bright_white}{bold}{avg_epoch_loss:.{decimal}f}{reset} | Val Score: {current_score_color}{bold}{current_score:.{decimal}f}{reset}, Best Score: {best_score_color}{bold}{self.best_score:.{decimal}f}{reset}, Stop Count: {nic_color}{bold}{self.no_improvement_count}{reset} / {self.n_iter_no_change} | LR: {current_lr:.2e} | Time: {format_time(time.time() - epoch_start)}")  if rank == 0 else None
+                print(f"{nic_color}█{reset} Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset}: Avg Loss: {bright_white}{bold}{avg_epoch_loss:.{decimal}f}{reset} | Val Score: {current_score_color}{bold}{current_score:.{decimal}f}{reset}, Best Score: {best_score_color}{bold}{self.best_score:.{decimal}f}{reset}, Stop Count: {nic_color}{bold}{self.no_improvement_count}{reset} / {self.n_iter_no_change} | LR: {current_lr:.2e}, {grad_info} | Time: {format_time(time.time() - epoch_start)}")  if rank == 0 else None
             elif self.early_stopping == 'loss':
-                print(f"{nic_color}█{reset} Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset}: Avg Loss: {current_loss_color}{bold}{avg_epoch_loss:.{decimal}f}{reset} | Best Loss: {best_error_color}{bold}{self.best_error:.{decimal}f}{reset}, Stop Count: {nic_color}{bold}{self.no_improvement_count}{reset} / {self.n_iter_no_change} | LR: {current_lr:.2e} | Time: {format_time(time.time() - epoch_start)}")  if rank == 0 else None
+                print(f"{nic_color}█{reset} Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset}: Avg Loss: {current_loss_color}{bold}{avg_epoch_loss:.{decimal}f}{reset} | Best Loss: {best_error_color}{bold}{self.best_error:.{decimal}f}{reset}, Stop Count: {nic_color}{bold}{self.no_improvement_count}{reset} / {self.n_iter_no_change} | LR: {current_lr:.2e}, {grad_info} | Time: {format_time(time.time() - epoch_start)}")  if rank == 0 else None
             else:
-                print(f"Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset} / {self.max_iter}: Avg Loss: {bright_white}{bold}{avg_epoch_loss:.{decimal}f}{reset} | Total Loss: {epoch_loss:10.{decimal}f} | LR: {current_lr:.2e} | Batch Count: {batch_count} | Time: {format_time(time.time() - epoch_start)}")  if rank == 0 else None
+                print(f"Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset} / {self.max_iter}: Avg Loss: {bright_white}{bold}{avg_epoch_loss:.{decimal}f}{reset} | Total Loss: {epoch_loss:10.{decimal}f} | LR: {current_lr:.2e}, {grad_info} | Batch Count: {batch_count} | Time: {format_time(time.time() - epoch_start)}")  if rank == 0 else None
 
             # Print memory summary
             if epoch % mem_interval == 0:
