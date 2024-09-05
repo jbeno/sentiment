@@ -11,7 +11,7 @@ torch>=2.2.0; sys_platform != "linux" and sys_platform != "win32"
 torch>=2.2.0+${DEVICE}; sys_platform == "linux" or sys_platform == "win32"
 torchvision==0.16.2
 torchaudio==2.1.2
-transformers==4.37.1
+transformers>=4.38.0
 datasets==2.14.6
 spacy==3.7.2
 dspy-ai==2.3.1
