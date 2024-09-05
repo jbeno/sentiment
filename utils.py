@@ -289,6 +289,8 @@ def get_activation(activation):
         return nn.Identity()
     elif activation == "leaky_relu":
         return nn.LeakyReLU()
+    elif activation == "gelu":
+        return nn.GELU()
     else:
         raise ValueError(f"Unknown activation function: {activation}")
 

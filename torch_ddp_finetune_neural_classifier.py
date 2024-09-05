@@ -1015,7 +1015,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
             if stop_training.item() == 1:
                 # Consolidate optimizer state before saving
-                if self.optimizer_class == ZeroRedundancyOptimizer:
+                if self.use_zero:
                     self.optimizer.consolidate_state_dict()
                 break  # Exit the training loop if stop_training was triggered
 
