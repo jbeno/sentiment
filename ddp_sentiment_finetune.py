@@ -31,7 +31,7 @@ from torch.distributed.optim import ZeroRedundancyOptimizer
 import numpy as np
 import pandas as pd
 from transformers import BertTokenizer, BertModel, AutoTokenizer, AutoModel
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 import sst
 from datasets import load_dataset
 import wandb
@@ -57,6 +57,7 @@ from utils import (
     get_scheduler,
     parse_dict
 )
+from datawaza_funcs import eval_model
 from torch_ddp_finetune_neural_classifier import TorchDDPNeuralClassifier, SentimentDataset
 from colors import *
 
@@ -69,6 +70,24 @@ logging.getLogger("huggingface_hub.repocard").setLevel(logging.ERROR)
 from torch.utils.data import Dataset
 
 from multiprocessing import Queue, Pipe, set_start_method
+
+def load_label_dicts(label_template):
+    if label_template == 'neg_neu_pos':
+        label_dict = {'negative': 0, 'neutral': 1, 'positive': 2}
+        numeric_dict = {0: 'negative', 1: 'neutral', 2: 'positive'}
+    elif label_template == 'bin_neu':
+        label_dict = {'non-neutral': 0, 'neutral': 1}
+        numeric_dict = {0: 'non-neutral', 1: 'neutral'}
+    elif label_template == 'bin_pos':
+        label_dict = {'non-positive': 0, 'positive': 1}
+        numeric_dict = {0: 'non-positive', 1: 'positive'}
+    elif label_template == 'bin_neg':
+        label_dict = {'non-negative': 0, 'negative': 1}
+        numeric_dict = {0: 'non-negative', 1: 'negative'}
+    else:
+        raise ValueError(f"Unknown label template: {label_template}. Options are: 'neg_neu_pos', 'bin_neu', 'bin_pos', 'bin_neg'")
+    
+    return label_dict, numeric_dict
 
 def save_data_archive(X_train, X_dev, y_train, y_dev, X_dev_sent, world_size, device_type, data_dir):
     # Create directory if it doesn't exist
@@ -224,6 +243,18 @@ def load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug):
             dataset_name = 'Merged DynaSent Round 1, Round 2 and SST'
             dataset_source = 'Local'
             dataset_path = os.path.join('data', 'merged')
+        elif id == 'merged_neutral':
+            dataset_name = 'Merged DynaSent Round 1, Round 2 and SST: Neutral Only'
+            dataset_source = 'Local'
+            dataset_path = os.path.join('data', 'merged')
+        elif id == 'merged_positive':
+            dataset_name = 'Merged DynaSent Round 1, Round 2 and SST: Positive Only'
+            dataset_source = 'Local'
+            dataset_path = os.path.join('data', 'merged')
+        elif id == 'merged_negative':
+            dataset_name = 'Merged DynaSent Round 1, Round 2 and SST: Negative Only'
+            dataset_source = 'Local'
+            dataset_path = os.path.join('data', 'merged')
         else:
             raise ValueError(f"Unknown dataset: {id}")
         print(f"{split.capitalize()} Data: {dataset_name} from {dataset_source}: '{dataset_path}'") if rank == 0 else None
@@ -260,6 +291,33 @@ def load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug):
                 data_split = pd.read_csv(os.path.join(dataset_path, 'train_all.csv'), index_col=None)
             elif split == 'dev':
                 data_split = pd.read_csv(os.path.join(dataset_path, 'dev_all.csv'), index_col=None)
+        elif id == 'merged_neutral':
+            if split == 'train':
+                data_split = pd.read_csv(os.path.join(dataset_path, 'train_all_binary.csv'), index_col=None)
+                data_split = data_split.rename(columns={'label': 'label_orig'})
+                data_split = data_split.rename(columns={'neutral_label': 'label'})
+            elif split == 'dev':
+                data_split = pd.read_csv(os.path.join(dataset_path, 'dev_all_binary.csv'), index_col=None)
+                data_split = data_split.rename(columns={'label': 'label_orig'})
+                data_split = data_split.rename(columns={'neutral_label': 'label'})
+        elif id == 'merged_positive':
+            if split == 'train':
+                data_split = pd.read_csv(os.path.join(dataset_path, 'train_all_binary.csv'), index_col=None)
+                data_split = data_split.rename(columns={'label': 'label_orig'})
+                data_split = data_split.rename(columns={'positive_label': 'label'})
+            elif split == 'dev':
+                data_split = pd.read_csv(os.path.join(dataset_path, 'dev_all_binary.csv'), index_col=None)
+                data_split = data_split.rename(columns={'label': 'label_orig'})
+                data_split = data_split.rename(columns={'positive_label': 'label'})
+        elif id == 'merged_negative':
+            if split == 'train':
+                data_split = pd.read_csv(os.path.join(dataset_path, 'train_all_binary.csv'), index_col=None)
+                data_split = data_split.rename(columns={'label': 'label_orig'})
+                data_split = data_split.rename(columns={'negative_label': 'label'})
+            elif split == 'dev':
+                data_split = pd.read_csv(os.path.join(dataset_path, 'dev_all_binary.csv'), index_col=None)
+                data_split = data_split.rename(columns={'label': 'label_orig'})
+                data_split = data_split.rename(columns={'negative_label': 'label'})
 
         return data_split
 
@@ -735,7 +793,8 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
     return classifier, start_epoch, model_state_dict, optimizer_state_dict
 
 def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
-                   save_dir, X_dev_sent, wandb_run=None):
+                   save_dir, X_dev_sent, wandb_run=None, decimal=2, pos_label=1, threshold=0.5, save_plots=False,
+                   model_name=None, weights_name=None):
     eval_start = time.time()
     print(f"\n{sky_blue}Evaluating model...{reset}") if rank == 0 else None
     model.model.eval()
@@ -761,6 +820,39 @@ def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict
             all_preds = torch.cat(all_preds, dim=0)[:len(y_dev)]
             preds_labels = convert_numeric_to_labels(all_preds.argmax(dim=1).cpu().numpy(), numeric_dict)
             print(f"Predictions: {len(preds_labels)}, True labels: {len(y_dev)}") if debug else None
+
+            # Convert text labels to numeric labels
+            y_dev_numeric = np.array([label_dict[label] for label in y_dev])
+            preds_labels_numeric = np.array([label_dict[label] for label in preds_labels])
+
+            # Set model name based on run name
+            if model_name is None:
+                if wandb_run is not None:
+                    model_name = wandb_run.name
+                elif weights_name is not None:
+                    model_name = weights_name
+                else:
+                    model_name = 'Neural Classifier'
+            
+            # Use the DataWaza eval_model function
+            metrics = eval_model(
+                y_test=y_dev_numeric,
+                y_pred=preds_labels_numeric,
+                class_map=numeric_dict,
+                estimator=model,
+                x_test=X_dev,
+                class_type='multi' if len(numeric_dict) > 2 else 'binary',
+                model_name=model_name,
+                plot=False,
+                save_plots=save_plots,
+                save_dir=save_dir,
+                debug=debug,
+                pos_label=pos_label,
+                decimal=decimal,
+                return_metrics=True,
+                threshold=threshold
+            )
+
             # Save predictions if requested
             if save_preds:
                 df = pd.DataFrame({
@@ -784,16 +876,23 @@ def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict
                             columns=["X_dev_sent", "y_dev", "preds_labels"]
                         )
                     })
-            print(f"\n{sky_blue}Classification report:{reset}")
-            print(classification_report(y_dev, preds_labels, digits=3, zero_division=0))
+            #print(f"\n{bright_white}{bold}Classification report:{reset}")
+            #print(classification_report(y_dev, preds_labels, digits=3, zero_division=0))
+            class_report = classification_report(y_dev, preds_labels, digits=decimal, zero_division=0, output_dict=True)
+
+            # Create a confusion matrix
+            cm = confusion_matrix(y_dev, preds_labels, labels=list(numeric_dict.values()))
+
             macro_f1_score = model.score(X_dev, y_dev, device, debug)
-            print(f"Macro F1 Score: {bright_cyan}{bold}{macro_f1_score:.2f}{reset}")
+            print(f"\n{bright_white}{bold}Macro F1 Score:{reset} {bright_cyan}{bold}{macro_f1_score:.2f}{reset}")
 
             # Log evaluation metrics to Weights & Biases
             if wandb_run is not None:
                 wandb.log({
                     'eval/macro_f1_score': macro_f1_score,
-                    'eval/classification_report': classification_report(y_dev, preds_labels, digits=3, zero_division=0, output_dict=True)
+                    'eval/classification_report': class_report,
+                    'eval/confusion_matrix': cm,
+                    'eval/metrics': metrics,
                 })
 
             print(f"\nEvaluation completed ({format_time(time.time() - eval_start)})")
@@ -863,7 +962,8 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
          use_zero, l2_strength, empty_cache, decimal, scheduler_name, schedular_kwargs, finetune_transformer, finetune_layers,
          target_score, interactive, mem_interval, accumulation_steps, freeze_transformer, dropout_rate, chunk_size,
          show_progress, predict, predict_file, save_final_model, save_pickle, max_grad_norm, port, color_theme,
-         use_wandb, wandb_project, wandb_run_name, val_percent, advance_epochs, input_queue, pipes, running):
+         use_wandb, wandb_project, wandb_run_name, val_percent, label_template, pos_label, threshold, save_plots, model_name,
+         advance_epochs, input_queue, pipes, running):
     try:
         if interactive:
             response_pipe = pipes[rank][1]  # Get the specific pipe for this rank
@@ -874,6 +974,10 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         device = prepare_device(rank, device_type)
         setup_environment(rank, world_size, backend, device, debug, port)
         fix_random_seeds(random_seed)
+
+        # Load the dictionary for labels and numeric values if template provided
+        if label_template is not None:
+            label_dict, numeric_dict = load_label_dicts(label_template)
 
         # Initialize wandb
         if use_wandb and rank == 0:
@@ -927,6 +1031,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
                 "val_percent": val_percent,
                 "advance_epochs": advance_epochs,
                 "show_progress": show_progress,
+                "threshold": threshold,
             })
             print(f"Wand run initialized.") if rank == 0 else None
         else:
@@ -961,7 +1066,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         
         # Evaluate the model
         evaluate_model(classifier, tokenizer, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
-                       save_dir, X_dev_sent, wandb_run)
+                       save_dir, X_dev_sent, wandb_run, decimal, pos_label, threshold, save_plots, model_name, weights_name)
         
         # Make predictions on unlabled test dataset
         if predict:
@@ -1015,7 +1120,9 @@ if __name__ == '__main__':
     dataset_group.add_argument('--chunk_size', type=int, default=None, help='Number of dataset samples to encode in each chunk (default: None, process all data at once)')
     dataset_group.add_argument('--label_dict', type=parse_dict, default={'negative': 0, 'neutral': 1, 'positive': 2}, help="Text label dictionary, string to numeric (default: {'negative': 0, 'neutral': 1, 'positive': 2})")
     dataset_group.add_argument('--numeric_dict', type=parse_dict, default={0: 'negative', 1: 'neutral', 2: 'positive'}, help="Numeric label dictionary, numeric to string (default: {0: 'negative', 1: 'neutral', 2: 'positive'})")
- 
+    dataset_group.add_argument('--label_template', type=str, default=None, help="Predefined class label template with dictionary mappings: 'neg_neu_pos', 'bin_neu', 'bin_pos', 'bin_neg' (default: None)")
+    dataset_group.add_argument('--pos_label', type=int, default=1, help="Positive class label for binary classification, must be integer (default: 1)")
+
     # BERT tokenizer/model configuration
     bert_group = parser.add_argument_group('BERT tokenizer/model configuration')
     bert_group.add_argument('--weights_name', type=str, default='bert-base-uncased', help="Pre-trained model/tokenizer name from a Hugging Face repo. Can be root-level or namespaced (default: 'bert-base-uncased')")
@@ -1030,7 +1137,7 @@ if __name__ == '__main__':
     classifier_group.add_argument('--hidden_dim', type=int, default=300, help='Hidden dimension for neural classifier layers (default: 300)')
     classifier_group.add_argument('--hidden_activation', type=str, default='tanh', help="Hidden activation function: 'tanh', 'relu', 'sigmoid', 'leaky_relu', 'gelu' (default: 'tanh')")
     classifier_group.add_argument('--dropout_rate', type=float, default=0.0, help='Dropout rate for neural classifier (default: 0.0)')
-
+ 
     # Training configuration
     training_group = parser.add_argument_group('Training configuration')
     training_group.add_argument('--batch_size', type=int, default=32, help='Batch size for both encoding text and training classifier (default: 32)')
@@ -1068,13 +1175,19 @@ if __name__ == '__main__':
     wandb_group.add_argument('--wandb_project', type=str, default=None, help="Weights and Biases project name (default: None)")
     wandb_group.add_argument('--wandb_run', type=str, default=None, help="Weights and Biases run name (default: None)")
 
+    # Evaluation options
+    evaluation_group = parser.add_argument_group('Evaluation options')
+    evaluation_group.add_argument('--threshold', type=float, default=0.5, help='Threshold for binary classification evaluation (default: 0.5)')
+    evaluation_group.add_argument('--model_name', type=str, default=None, help='Model name for display in evaluation plots (default: None)')
+
     # Saving options
     saving_group = parser.add_argument_group('Saving options')
     saving_group.add_argument('--save_data', action='store_true', default=False, help="Save processed data to disk as an .npz archive (X_train, X_dev, y_train, y_dev, y_dev_sent)")
     saving_group.add_argument('--save_model', action='store_true', default=False, help="Save the final model state after training in PyTorch .pth format (default: False)")
     saving_group.add_argument('--save_pickle', action='store_true', default=False, help="Save the final model after training in pickle .pkl format (default: False)")
     saving_group.add_argument('--save_preds', action='store_true', default=False, help="Save predictions to CSV (default: False)")
-    saving_group.add_argument('--save_dir', type=str, default='saves', help="Directory to save archived data and predictions (default: saves)")
+    saving_group.add_argument('--save_plots', action='store_true', default=False, help="Save evaluation plots (default: False)")
+    saving_group.add_argument('--save_dir', type=str, default='saves', help="Directory to save archived data, predictions, plots (default: saves)")
 
     # Loading options
     loading_group = parser.add_argument_group('Loading options')
@@ -1226,6 +1339,11 @@ if __name__ == '__main__':
                       args.wandb_project,
                       args.wandb_run,
                       args.val_percent,
+                      args.label_template,
+                      args.pos_label,
+                      args.threshold,
+                      args.save_plots,
+                      args.model_name,
                       advance_epochs,
                       input_queue,
                       pipes,

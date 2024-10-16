@@ -522,6 +522,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         else:
             self.classes_ = sorted(set(y))
             self.n_classes_ = len(self.classes_)
+            print(f"Classes: {self.classes_}, Number of classes: {self.n_classes_}") if self.rank == 0 else None
             class2index = dict(zip(self.classes_, range(self.n_classes_)))
             
             y = torch.tensor([class2index[label] for label in y], dtype=torch.long)
@@ -1282,7 +1283,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                     self.scheduler.step()
 
             # Log to wandb
-            if self.wandb_run:
+            if self.wandb_run and rank == 0:
                 # Prepare logging dictionary
                 log_dict = {
                     "other/epoch": epoch,
