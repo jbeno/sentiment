@@ -9,6 +9,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch_model_base import TorchModelBase
 import torch.optim as optim
 from torch.distributed.optim import ZeroRedundancyOptimizer
+from sklearn.model_selection import train_test_split
 import os
 import time
 import utils
@@ -20,7 +21,15 @@ from colors import *
 from utils import (format_time, print_state_summary, format_tolerance, get_nic_color, get_score_colors,
                    print_rank_memory_summary, convert_labels_to_tensor, convert_numeric_to_labels, tensor_to_numpy,
                    get_scheduler)
+import wandb
+import torch.onnx
+import io
+import warnings
 
+# Ignore some warnings related to ONNX conversion
+warnings.filterwarnings("ignore", message="Converting a tensor to a Python boolean")
+warnings.filterwarnings("ignore", message="Converting a tensor to a Python number")
+warnings.filterwarnings("ignore", message="Converting a tensor to a Python list")
 
 class SentimentDataset(torch.utils.data.Dataset):
     def __init__(self, sentences, labels, tokenizer, label_dict=None, max_length=512, device='cpu'):
@@ -230,6 +239,8 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 dropout_rate=0.0,
                 show_progress=False,
                 advance_epochs=1,
+                wandb_run = None,
+                random_seed=42,
                 optimizer_kwargs={},
                 scheduler_kwargs={}):
         """
@@ -363,6 +374,8 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.scheduler_class = scheduler_class
         self.scheduler = None
         self.scheduler_kwargs = scheduler_kwargs or {}
+        self.wandb_run = wandb_run
+        self.random_seed = random_seed
         
         self.loss = nn.CrossEntropyLoss(reduction="mean")
 
@@ -410,14 +423,14 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             )
 
         if self.rank == 0:
-            print(f"\n{bright_white}{bold}Model Architecture Summary:{reset}")
+            print(f"\n{sky_blue}Model Architecture Summary:{reset}")
             print(model)
             total_params = 0
             trainable_params = 0
             total_layers = 0
             trainable_layers = 0
 
-            print(f"\n{bright_white}{bold}Model Parameters:{reset}")
+            print(f"\n{sky_blue}Model Parameters:{reset}")
             for name, module in model.named_modules():
                 if isinstance(module, (nn.Linear, nn.Embedding, nn.LayerNorm)):
                     total_layers += 1
@@ -519,6 +532,39 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             dataset = torch.utils.data.TensorDataset(X, y)
 
         return dataset
+
+    @staticmethod
+    def _build_validation_split(*args, validation_fraction=0.2, random_seed=42):
+        """
+        Split `*args` into train and dev portions for early stopping.
+        We use `train_test_split`. For args of length N, then delivers
+        N*2 objects, arranged as
+
+        X1_train, X1_test, X2_train, X2_test, ..., y_train, y_test
+
+        Parameters
+        ----------
+        *args: List of objects to split.
+
+        validation_fraction: float
+            Percentage of the examples to use for the dev portion. In
+            `fit`, this is determined by `self.validation_fraction`.
+            We give it as an argument here to facilitate unit testing.
+
+        Returns
+        -------
+        Pair of tuples `train` and `dev`
+
+        """
+        if validation_fraction == 1.0:
+            return args, args
+        results = train_test_split(*args, test_size=validation_fraction,
+                                   random_state=random_seed,
+                                   shuffle=True,
+                                   stratify=args[-1] if isinstance(args[-1], np.ndarray) else None)
+        train = results[::2]
+        dev = results[1::2]
+        return train, dev
 
     def _update_no_improvement_count_early_stopping(self, X, y, epoch, debug):
         current_score = self.score(X, y)
@@ -650,13 +696,76 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         else:
             print(f"Rank {self.rank} has no response_pipe to set advance_epochs") if self.debug else None
 
+    def compute_accuracy(self, y_true, y_pred):
+        return (y_true == y_pred).mean()
+
+    def compute_train_metrics(self, X, y, epoch, debug=False, device=None):
+        if device is None:
+            device = self.device
+        self.model.eval()
+        with torch.no_grad():
+            preds = self.predict(X, device=device, debug=debug)
+            train_score = utils.safe_macro_f1(y, preds)
+            train_accuracy = self.compute_accuracy(y, preds)
+        self.model.train()
+        if debug and self.rank == 0:
+            print(f"Train Score at epoch {epoch}: F1 = {train_score:.6f}, Accuracy = {train_accuracy:.6f}")
+        return train_score, train_accuracy
+
+    def compute_validation_metrics(self, X, y, epoch, debug=False, device=None):
+        if device is None:
+            device = self.device
+        self.model.eval()
+        val_loss = 0.0
+        total_samples = 0
+        all_preds = []
+        all_labels = []
+        with torch.no_grad():
+            if self.finetune_bert:
+                dataset = SentimentDataset(X, y, self.bert_tokenizer, self.label_dict, device=device)
+                dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
+                for batch in dataloader:
+                    input_ids = batch['input_ids'].to(device)
+                    attention_mask = batch['attention_mask'].to(device)
+                    labels = batch['labels'].to(device)
+                    outputs = self.model(input_ids, attention_mask=attention_mask)
+                    loss = self.loss(outputs, labels)
+                    val_loss += loss.item() * labels.size(0)
+                    total_samples += labels.size(0)
+                    all_preds.extend(outputs.argmax(dim=1).cpu().numpy())
+                    all_labels.extend(labels.cpu().numpy())
+            else:
+                X = tensor_to_numpy(X)
+                y = np.array(y)
+                if y.dtype == object:
+                    y = np.array([self.label_dict[label] for label in y])
+                dataset = torch.utils.data.TensorDataset(torch.FloatTensor(X), torch.LongTensor(y))
+                dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
+                for X_batch, y_batch in dataloader:
+                    X_batch = X_batch.to(device)
+                    y_batch = y_batch.to(device)
+                    outputs = self.model(X_batch)
+                    loss = self.loss(outputs, y_batch)
+                    val_loss += loss.item() * y_batch.size(0)
+                    total_samples += y_batch.size(0)
+                    all_preds.extend(outputs.argmax(dim=1).cpu().numpy())
+                    all_labels.extend(y_batch.cpu().numpy())
+        
+        avg_val_loss = val_loss / total_samples
+        val_score = utils.safe_macro_f1(all_labels, all_preds)
+        val_accuracy = self.compute_accuracy(np.array(all_labels), np.array(all_preds))
+        
+        if debug and self.rank == 0:
+            print(f"Validation at epoch {epoch}: Loss = {avg_val_loss:.6f}, F1 = {val_score:.6f}, Accuracy = {val_accuracy:.6f}")
+        self.model.train()
+        return avg_val_loss, val_score, val_accuracy
 
     def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None,
             num_workers=0, prefetch=None, empty_cache=False, decimal=6, input_queue=None, mem_interval=10,
             save_final_model=False, save_pickle=False):
         training_start = time.time()
         if rank == 0:
-            print(f"\n{bright_white}{bold}Fitting DDP Neural Classifier on training data...{reset}")
+            print(f"\n{sky_blue}Fitting DDP Neural Classifier on training data...{reset}")
             print(f"Num Workers: {num_workers}, Prefetch: {prefetch}")
 
         # Build the dataset and dataloader
@@ -691,7 +800,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             if rank == 0:
                 print(f"Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: {self.validation_fraction}")
                 print(f"Training will stop early if the score does not improve by at least {tol_str} for {self.n_iter_no_change} iterations.")
-                (X_train, y_train), (X_val, y_val) = self._build_validation_split(X, y, validation_fraction=self.validation_fraction)
+                (X_train, y_train), (X_val, y_val) = self._build_validation_split(X, y, validation_fraction=self.validation_fraction, random_seed=self.random_seed)
                 data_list = [X_train, y_train, X_val, y_val]
             else:
                 data_list = [None, None, None, None]
@@ -727,6 +836,10 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.initialize()
         dist.barrier()
 
+        if self.wandb_run is not None:
+            print(f"Watching model with Weights & Biases...") if rank == 0 else None
+            wandb.watch(self.model, log='all', log_freq=1)
+
         if model_state_dict is not None:
             self.model.load_state_dict(model_state_dict)
         
@@ -741,7 +854,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         if rank == 0:
             print(f"Model architecture:\n{self.model}") if debug else None
             print(f"Optimizer:\n{self.optimizer}") if debug else None
-            print(f"\n{bright_white}{bold}Starting training loop...{reset}")
+            print(f"\n{sky_blue}Starting training loop...{reset}")
 
         self.model.train()
 
@@ -749,6 +862,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         stop_training = torch.tensor(0, device=self.device)  # Signal to stop training in DDP setup
         skip_epochs = 0  # Counter to skip epochs without prompting in interactive mode
         target_hit = False  # Flag to indicate if the target score was reached
+        val_loss = None  # Validation loss
         
         # Set the last epoch based on the start epoch and max iterations
         if start_epoch > 1:
@@ -1085,12 +1199,12 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 current_lr = self.optimizer.param_groups[0]['lr']
 
                 if clipped:
-                    grad_info = f"{bright_yellow}Grad Clipped:{reset} min={min_norm_after:.4f}, max={max_norm_after:.4f}, mean={mean_norm_after:.4f}"
+                    grad_info = f"{bright_yellow}Clip{reset} ↓ {bright_white}{bold}{min_norm_after:.{decimal}f}{reset} ↑ {bright_white}{bold}{max_norm_after:.{decimal}f}{reset} M {bright_white}{bold}{mean_norm_after:.{decimal}f}{reset}"
                 else:
-                    grad_info = f"Grad Norms: min={min_norm:.4f}, max={max_norm:.4f}, mean={mean_norm:.4f}"
+                    grad_info = f"Grad ↓ {bright_white}{bold}{min_norm:.{decimal}f}{reset} ↑ {bright_white}{bold}{max_norm:.{decimal}f}{reset} M {bright_white}{bold}{mean_norm:.{decimal}f}{reset}"
 
                 if debug:                    
-                    print(f"Rank {rank}: Epoch: {epoch}, Batch: {batch_count}, Size: {X_batch.size(0)}, Loss: {loss.item():.6f}, Epoch Loss: {epoch_loss:.6f}, LR: {current_lr:.2e},  {grad_info}")
+                    print(f"Rank {rank}: Epoch: {epoch}, Batch: {batch_count}, Size: {X_batch.size(0)}, Loss: {loss.item():.6f}, Epoch Loss: {epoch_loss:.6f}, LR: {current_lr:.2e}, {grad_info}")
                     
                 # Update progress bar
                 if rank == 0 and self.show_progress:
@@ -1119,19 +1233,37 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
             # Early stopping logic
             if self.early_stopping == 'score':
-                if rank == 0 and self.show_progress:
-                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Computing validation score...'})
-                current_score = self._update_no_improvement_count_early_stopping(X_val, y_val, epoch, debug)
-                if self.no_improvement_count >= self.n_iter_no_change:
-                    stop_training = torch.tensor(1, device=self.device)
-                current_score_color, best_score_color = get_score_colors(current_score, self.best_score)
 
-                # Check if target score is reached
-                if self.target_score is not None and current_score >= self.target_score:
-                    target_hit = True
-                    if rank == 0:
-                        print(f"Reached target validation score of {self.target_score}. Stopping training.")
-                    stop_training = torch.tensor(1, device=self.device)
+                # Compute train score and accuracy
+                if rank == 0:
+                    if self.show_progress:
+                        pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Computing train metrics...'})
+                    train_score, train_accuracy = self.compute_train_metrics(X_train, y_train, epoch, debug)
+                
+                # Compute validation loss, score, and accuracy
+                if rank == 0:
+                    if self.show_progress:
+                        pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Computing validation metrics...'})
+                    val_loss, val_score, val_accuracy = self.compute_validation_metrics(X_val, y_val, epoch, debug)
+
+                    current_score = val_score
+                    if self.best_score is None or current_score > self.best_score + self.tol:
+                        self.best_score = current_score
+                        self.no_improvement_count = 0
+                    else:
+                        self.no_improvement_count += 1
+                    
+                    if self.no_improvement_count >= self.n_iter_no_change:
+                        stop_training = torch.tensor(1, device=self.device)
+                    
+                    current_score_color, best_score_color = get_score_colors(current_score, self.best_score)
+                    
+                    # Check if target score is reached
+                    if self.target_score is not None and current_score >= self.target_score:
+                        target_hit = True
+                        if rank == 0:
+                            print(f"Reached target validation score of {self.target_score}. Stopping training.")
+                        stop_training = torch.tensor(1, device=self.device)
 
             elif self.early_stopping == 'loss':
                 if rank == 0 and self.show_progress:
@@ -1149,17 +1281,50 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 else:
                     self.scheduler.step()
 
+            # Log to wandb
+            if self.wandb_run:
+                # Prepare logging dictionary
+                log_dict = {
+                    "other/epoch": epoch,
+                    "train/loss": avg_epoch_loss,
+                    "train/macro_f1_score": train_score,
+                    "train/accuracy": train_accuracy,
+                    "other/learning_rate": current_lr,
+                    "gradients/min_norm": min_norm,
+                    "gradients/max_norm": max_norm,
+                    "gradients/mean_norm": mean_norm,
+                    "train/stop_count": self.no_improvement_count,
+                    "other/stop_limit": self.n_iter_no_change
+                }
+                if clipped:
+                    log_dict["gradients/clipped"] = True
+                    log_dict["gradients/min_norm_after_clip"] = min_norm_after
+                    log_dict["gradients/max_norm_after_clip"] = max_norm_after                    
+                if self.early_stopping == 'score':
+                    log_dict["validation/loss"] = val_loss
+                    log_dict["validation/macro_f1_score"] = current_score
+                    log_dict["validation/best_macro_f1_score"] = self.best_score
+                    log_dict["validation/accuracy"] = val_accuracy
+                
+                # Log to wandb
+                if self.wandb_run:
+                    self.wandb_run.log(log_dict)
+
             # Get the no improvement count color based on value relative to n_iter_no_change
             nic_color = get_nic_color(self.no_improvement_count, self.n_iter_no_change)
 
-            # Close progress bar here
+            # Close progress bar
             if rank == 0 and self.show_progress:
                 pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Epoch complete'})
                 pbar.close()
 
             # Print epoch summary
             if self.early_stopping == 'score':
-                print(f"{nic_color}█{reset} Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset}: Avg Loss: {bright_white}{bold}{avg_epoch_loss:.{decimal}f}{reset} | Val Score: {current_score_color}{bold}{current_score:.{decimal}f}{reset}, Best Score: {best_score_color}{bold}{self.best_score:.{decimal}f}{reset}, Stop Count: {nic_color}{bold}{self.no_improvement_count}{reset} / {self.n_iter_no_change} | LR: {current_lr:.2e}, {grad_info} | Time: {format_time(time.time() - epoch_start)}")  if rank == 0 else None
+                print(f"{nic_color}█{reset} Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset}: "
+                      f"Loss T {bright_white}{bold}{avg_epoch_loss:.{decimal}f}{reset} V {bright_white}{bold}{val_loss:.{decimal}f}{reset} | "
+                      f"F1 T {bright_white}{bold}{train_score:.{decimal}f}{reset} V {current_score_color}{bold}{val_score:.{decimal}f}{reset} B {best_score_color}{bold}{self.best_score:.{decimal}f}{reset} SC {nic_color}{bold}{self.no_improvement_count}{reset}/{self.n_iter_no_change} | "
+                      f"Acc T {bright_white}{bold}{train_accuracy:.{decimal}f}{reset} V {bright_white}{bold}{val_accuracy:.{decimal}f}{reset} | "
+                      f"LR {bright_white}{bold}{current_lr:.2e}{reset} | {grad_info} | {format_time(time.time() - epoch_start)}")  if rank == 0 else None
             elif self.early_stopping == 'loss':
                 print(f"{nic_color}█{reset} Epoch {bright_white}{bold}{epoch:{num_digits}d}{reset}: Avg Loss: {current_loss_color}{bold}{avg_epoch_loss:.{decimal}f}{reset} | Best Loss: {best_error_color}{bold}{self.best_error:.{decimal}f}{reset}, Stop Count: {nic_color}{bold}{self.no_improvement_count}{reset} / {self.n_iter_no_change} | LR: {current_lr:.2e}, {grad_info} | Time: {format_time(time.time() - epoch_start)}")  if rank == 0 else None
             else:
@@ -1207,6 +1372,30 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             for param in self.model.parameters():
                 dist.broadcast(param.data, 0)
         
+        # Save the wandb model in onnx format
+        if self.wandb_run and rank == 0:
+            print("Saving model in ONNX format...")
+            
+            # Suppress TracerWarnings
+            warnings.filterwarnings("ignore", category=torch.jit.TracerWarning)
+            
+            # Create a dummy input tensor
+            if self.finetune_bert:
+                dummy_input = (
+                    torch.zeros(1, 512, dtype=torch.long, device=self.device),  # input_ids
+                    torch.zeros(1, 512, dtype=torch.long, device=self.device)   # attention_mask
+                )
+            else:
+                dummy_input = torch.zeros(1, self.input_dim, device=self.device)
+            
+            # Export the model to ONNX format
+            onnx_file_path = 'model.onnx'
+            torch.onnx.export(self.model.module, dummy_input, onnx_file_path, opset_version=11)
+            
+            # Save the ONNX model to wandb
+            wandb.save(onnx_file_path)
+            print(f"Model saved in ONNX format to {onnx_file_path} and uploaded to Weights & Biases.")
+
         # Save the final model
         if rank == 0 and save_final_model:
             self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=True, save_pickle=save_pickle)
@@ -1294,4 +1483,4 @@ class TorchDDPNeuralClassifier(TorchModelBase):
     def to(self, device):
         if self.model:
             self.model = self.model.to(device)
-        return self#
+        return self

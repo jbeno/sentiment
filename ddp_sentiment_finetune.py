@@ -34,6 +34,7 @@ from transformers import BertTokenizer, BertModel, AutoTokenizer, AutoModel
 from sklearn.metrics import classification_report
 import sst
 from datasets import load_dataset
+import wandb
 
 # Custom utility imports
 from utils import (
@@ -103,7 +104,7 @@ def load_data_archive(data_file, device, rank, sample_percent=None):
     
     # Attempt to load the data from the archive file
     try:
-        print(f"\n{bright_white}{bold}Loading archived data from: {data_file}...{reset}") if rank == 0 else None
+        print(f"\n{sky_blue}Loading archived data from: {data_file}...{reset}") if rank == 0 else None
         with np.load(data_file, allow_pickle=True) as data:
             X_train = data['X_train']
             X_dev = data['X_dev']
@@ -165,7 +166,7 @@ def initialize_bert_model(weights_name, device, rank, debug):
 
 def initialize_transformer_model(weights_name, device, rank, debug):
     model_init_start = time.time()
-    print(f"\n{bright_white}{bold}Initializing '{weights_name}' tokenizer and model...{reset}") if rank == 0 else None
+    print(f"\n{sky_blue}Initializing '{weights_name}' tokenizer and model...{reset}") if rank == 0 else None
     tokenizer = AutoTokenizer.from_pretrained(weights_name)
     model = AutoModel.from_pretrained(weights_name).to(device)
     dist.barrier()
@@ -263,7 +264,7 @@ def load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug):
         return data_split
 
     if rank == 0:
-        print(f"\n{bright_white}{bold}Loading data...{reset}")
+        print(f"\n{sky_blue}Loading data...{reset}")
         if eval_dataset is not None:
             print("Using different datasets for training and evaluation")
         else:
@@ -309,7 +310,7 @@ def process_data(bert_tokenizer, bert_model, pooling, world_size, train, dev, de
                  save_dir, num_workers, prefetch, empty_cache, finetune_bert, freeze_bert, chunk_size=None):
     data_process_start = time.time()
 
-    print(f"\n{bright_white}{bold}Processing data...{reset}") if rank == 0 else None
+    print(f"\n{sky_blue}Processing data...{reset}") if rank == 0 else None
     print(f"(Batch size: {batch_size}, Pooling: {pooling.upper() if pooling == 'cls' else pooling.capitalize()}, Fine Tune BERT: {finetune_bert}, Chunk size: {chunk_size})...") if rank == 0 else None
     print(f"Extracting sentences and labels...") if rank == 0 else None
     
@@ -402,7 +403,7 @@ def process_data_chunks(texts, tokenizer, model, pooling, world_size, device, ba
         return bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, sample_texts, rank, debug, split,
                         num_workers, prefetch, empty_cache)
     
-    print(f"\n{bright_white}{bold}Processing {split} data in chunks of size {chunk_size}...{reset}") if rank == 0 else None
+    print(f"\n{sky_blue}Processing {split} data in chunks of size {chunk_size}...{reset}") if rank == 0 else None
     
     all_embeddings = []
     num_chunks = math.ceil(len(texts) / chunk_size)
@@ -412,7 +413,7 @@ def process_data_chunks(texts, tokenizer, model, pooling, world_size, device, ba
         chunk_end = min((i + 1) * chunk_size, len(texts))
         chunk_texts = texts[chunk_start:chunk_end]
         
-        print(f"\n{bright_white}{bold}Processing chunk {i+1}/{num_chunks} (samples {chunk_start} to {chunk_end-1})...{reset}") if rank == 0 else None
+        print(f"\n{sky_blue}Processing chunk {i+1}/{num_chunks} (samples {chunk_start} to {chunk_end-1})...{reset}") if rank == 0 else None
         
         # Only pass sample_texts for the first chunk
         current_sample_texts = sample_texts if i == 0 else None
@@ -482,7 +483,7 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
     def display_sample_texts(sample_texts):
         if sample_texts is None:
             return
-        print(f"\n{bright_white}{bold}Displaying samples from {split.capitalize()} data:{reset}")
+        print(f"\n{sky_blue}Displaying samples from {split.capitalize()} data:{reset}")
         for text in sample_texts:
             # Tokenize the text and get the tokens
             tokens = tokenizer.tokenize(text[1])
@@ -511,7 +512,7 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
             # Display sample texts
             display_sample_texts(sample_texts)
 
-            print(f"\n{bright_white}{bold}Encoding {split.capitalize()} data of {total_texts} texts distributed across {world_size} GPUs...{reset}")
+            print(f"\n{sky_blue}Encoding {split.capitalize()} data of {total_texts} texts distributed across {world_size} GPUs...{reset}")
             print(f"Batch Size: {batch_size}, Pooling: {pooling.upper() if pooling == 'cls' else pooling.capitalize()}, Empty Cache: {empty_cache}")
 
         dist.barrier()
@@ -627,7 +628,7 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
         # Take a more straightforward approach for CPU or single GPU
         if rank == 0:
             device_string = 'GPU' if device.type == 'cuda' else 'CPU'
-            print(f"\n{bright_white}{bold}Encoding {split.capitalize()} data of {total_texts} texts on a single {device_string}...{reset}")
+            print(f"\n{sky_blue}Encoding {split.capitalize()} data of {total_texts} texts on a single {device_string}...{reset}")
             print(f"Batch Size: {batch_size}, Pooling: {pooling.upper() if pooling == 'cls' else pooling.capitalize()}, Empty Cache: {empty_cache}")
 
             # Display sample texts
@@ -664,10 +665,10 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
                           checkpoint_dir, checkpoint_interval, resume_from_checkpoint, filename=None, use_saved_params=True,
                           optimizer_name=None, use_zero=True, scheduler_name=None, l2_strength=0.0, pooling='cls',
                           target_score=None, interactive=False, response_pipe=None, accumulation_steps=1, max_grad_norm=None,
-                          freeze_bert=False, dropout_rate=0.0, show_progress=False, advance_epochs=1, optimizer_kwargs={},
-                          scheduler_kwargs={}):
+                          freeze_bert=False, dropout_rate=0.0, show_progress=False, advance_epochs=1, wandb_run=None, val_percent=0.1,
+                          random_seed=42, optimizer_kwargs={}, scheduler_kwargs={}):
     class_init_start = time.time()
-    print(f"\n{bright_white}{bold}Initializing DDP Neural Classifier...{reset}") if rank == 0 else None
+    print(f"\n{sky_blue}Initializing DDP Neural Classifier...{reset}") if rank == 0 else None
     hidden_activation = get_activation(hidden_activation)
     optimizer_class = get_optimizer(optimizer_name, use_zero, device, rank, world_size)
     scheduler_class = get_scheduler(scheduler_name, device, rank, world_size)
@@ -708,6 +709,9 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
         l2_strength=l2_strength,
         show_progress=show_progress,
         advance_epochs=advance_epochs,
+        wandb_run=wandb_run,
+        validation_fraction=val_percent,
+        random_seed=random_seed,
         optimizer_kwargs=optimizer_kwargs,
         scheduler_kwargs=scheduler_kwargs
     )
@@ -731,9 +735,9 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
     return classifier, start_epoch, model_state_dict, optimizer_state_dict
 
 def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
-                   save_dir, X_dev_sent):
+                   save_dir, X_dev_sent, wandb_run=None):
     eval_start = time.time()
-    print(f"\n{bright_white}{bold}Evaluating model...{reset}") if rank == 0 else None
+    print(f"\n{sky_blue}Evaluating model...{reset}") if rank == 0 else None
     model.model.eval()
     with torch.no_grad():
         print("Making predictions...") if rank == 0 and debug else None
@@ -773,16 +777,31 @@ def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict
                 save_path = os.path.join(save_dir, f'predictions_{timestamp}.csv')
                 df.to_csv(save_path, index=False)
                 print(f"Saved predictions: {save_dir}/predictions_{timestamp}.csv")
-            print(f"\n{bright_white}{bold}Classification report:{reset}")
+                if wandb_run is not None:
+                    wandb_run.log({
+                        "eval/predictions": wandb.Table(
+                            data=[[sent, true, pred] for sent, true, pred in zip(X_dev_sent, y_dev, preds_labels)],
+                            columns=["X_dev_sent", "y_dev", "preds_labels"]
+                        )
+                    })
+            print(f"\n{sky_blue}Classification report:{reset}")
             print(classification_report(y_dev, preds_labels, digits=3, zero_division=0))
             macro_f1_score = model.score(X_dev, y_dev, device, debug)
             print(f"Macro F1 Score: {bright_cyan}{bold}{macro_f1_score:.2f}{reset}")
+
+            # Log evaluation metrics to Weights & Biases
+            if wandb_run is not None:
+                wandb.log({
+                    'eval/macro_f1_score': macro_f1_score,
+                    'eval/classification_report': classification_report(y_dev, preds_labels, digits=3, zero_division=0, output_dict=True)
+                })
+
             print(f"\nEvaluation completed ({format_time(time.time() - eval_start)})")
 
 def make_predictions(classifier, tokenizer, transformer_model, predict_file, numeric_dict, rank, debug, save_dir, device, pooling,
                      world_size, batch_size, num_workers, prefetch, empty_cache, finetune_transformer, freeze_transformer, chunk_size):
     predictions_start = time.time()
-    print(f"\n{bright_white}{bold}Predicting on unlabled test dataset...{reset}") if rank == 0 else None
+    print(f"\n{sky_blue}Predicting on unlabled test dataset...{reset}") if rank == 0 else None
     # Load the test dataset
     test_df = pd.read_csv(predict_file, index_col=None)
     test_texts = test_df.sentence.values
@@ -843,8 +862,8 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
          save_dir, model_file, use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, optimizer_kwargs,
          use_zero, l2_strength, empty_cache, decimal, scheduler_name, schedular_kwargs, finetune_transformer, finetune_layers,
          target_score, interactive, mem_interval, accumulation_steps, freeze_transformer, dropout_rate, chunk_size,
-         show_progress, predict, predict_file, save_final_model, save_pickle, max_grad_norm, port, color_theme, advance_epochs,
-         input_queue, pipes, running):
+         show_progress, predict, predict_file, save_final_model, save_pickle, max_grad_norm, port, color_theme,
+         use_wandb, wandb_project, wandb_run_name, val_percent, advance_epochs, input_queue, pipes, running):
     try:
         if interactive:
             response_pipe = pipes[rank][1]  # Get the specific pipe for this rank
@@ -855,6 +874,63 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         device = prepare_device(rank, device_type)
         setup_environment(rank, world_size, backend, device, debug, port)
         fix_random_seeds(random_seed)
+
+        # Initialize wandb
+        if use_wandb and rank == 0:
+            wandb_run = wandb.init(project=wandb_project, name=wandb_run_name, config={
+                "dataset": dataset,
+                "eval_dataset": eval_dataset,
+                "weights_name": weights_name,
+                "hidden_activation": hidden_activation,
+                "num_layers": num_layers,
+                "hidden_dim": hidden_dim,
+                "batch_size": batch_size,
+                "epochs": epochs,
+                "learning_rate": lr,
+                "sample_percent": sample_percent,
+                "random_seed": random_seed,
+                "early_stop": early_stop,
+                "n_iter_no_change": n_iter_no_change,
+                "tolerance": tol,
+                "pooling": pooling,
+                "optimizer": optimizer_name,
+                "scheduler": scheduler_name,
+                "finetune_transformer": finetune_transformer,
+                "finetune_layers": finetune_layers,
+                "dropout_rate": dropout_rate,
+                "l2_strength": l2_strength,
+                "freeze_transformer": freeze_transformer,
+                "accumulation_steps": accumulation_steps,
+                "max_grad_norm": max_grad_norm,
+                "checkpoint_dir": checkpoint_dir,
+                "checkpoint_interval": checkpoint_interval,
+                "resume_from_checkpoint": resume_from_checkpoint,
+                "model_file": model_file,
+                "use_saved_params": use_saved_params,
+                "save_data": save_data,
+                "data_file": data_file,
+                "num_workers": num_workers,
+                "prefetch": prefetch,
+                "empty_cache": empty_cache,
+                "decimal": decimal,
+                "target_score": target_score,
+                "interactive": interactive,
+                "mem_interval": mem_interval,
+                "save_final_model": save_final_model,
+                "save_pickle": save_pickle,
+                "predict": predict,
+                "predict_file": predict_file,
+                "save_preds": save_preds,
+                "save_dir": save_dir,
+                "port": port,
+                "color_theme": color_theme,
+                "val_percent": val_percent,
+                "advance_epochs": advance_epochs,
+                "show_progress": show_progress,
+            })
+            print(f"Wand run initialized.") if rank == 0 else None
+        else:
+            wandb_run = None
 
         # Initialize transformer model and tokenizer
         tokenizer, transformer_model = initialize_transformer_model(weights_name, device, rank, debug)
@@ -876,20 +952,26 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
             checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name, use_zero,
             scheduler_name, l2_strength, pooling, target_score, interactive, response_pipe, accumulation_steps, max_grad_norm,
-            freeze_transformer, dropout_rate, show_progress, advance_epochs, optimizer_kwargs, schedular_kwargs)
+            freeze_transformer, dropout_rate, show_progress, advance_epochs, wandb_run, val_percent, random_seed,
+            optimizer_kwargs, schedular_kwargs)
 
         classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
                        num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval, save_final_model, save_pickle)
         
+        
         # Evaluate the model
         evaluate_model(classifier, tokenizer, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
-                       save_dir, X_dev_sent)
+                       save_dir, X_dev_sent, wandb_run)
         
         # Make predictions on unlabled test dataset
         if predict:
             make_predictions(classifier, tokenizer, transformer_model, predict_file, numeric_dict, rank, debug, save_dir, device, pooling,
                              world_size, batch_size, num_workers, prefetch, empty_cache, finetune_transformer,
                              freeze_transformer, chunk_size)
+
+        # Finish the wandb run
+        if rank == 0 and use_wandb:
+            wandb.finish()
 
         print(f"TOTAL Time: {format_time(time.time() - start_time)}") if rank == 0 else None
         dist.barrier()
@@ -946,7 +1028,7 @@ if __name__ == '__main__':
     classifier_group = parser.add_argument_group('Classifier configuration')
     classifier_group.add_argument('--num_layers', type=int, default=1, help='Number of hidden layers for neural classifier (default: 1)')
     classifier_group.add_argument('--hidden_dim', type=int, default=300, help='Hidden dimension for neural classifier layers (default: 300)')
-    classifier_group.add_argument('--hidden_activation', type=str, default='tanh', help="Hidden activation function: 'tanh', 'relu', 'sigmoid', 'leaky_relu' (default: 'tanh')")
+    classifier_group.add_argument('--hidden_activation', type=str, default='tanh', help="Hidden activation function: 'tanh', 'relu', 'sigmoid', 'leaky_relu', 'gelu' (default: 'tanh')")
     classifier_group.add_argument('--dropout_rate', type=float, default=0.0, help='Dropout rate for neural classifier (default: 0.0)')
 
     # Training configuration
@@ -978,6 +1060,13 @@ if __name__ == '__main__':
     early_stopping_group.add_argument('--n_iter_no_change', type=int, default=5, help='Number of iterations with no improvement to stop training (default: 5)')
     early_stopping_group.add_argument('--tol', type=float, default=1e-5, help='Tolerance for early stopping (default: 1e-5)')
     early_stopping_group.add_argument('--target_score', type=float, default=None, help='Target score for early stopping (default: None)')
+    early_stopping_group.add_argument('--val_percent', type=float, default=0.1, help='Fraction of training data to use for validation (default: 0.1)')
+
+    # Weights and bias integration
+    wandb_group = parser.add_argument_group('Weights and bias integration')
+    wandb_group.add_argument('--wandb', action='store_true', default=False, help='Use Weights and Biases for logging (default: False)')
+    wandb_group.add_argument('--wandb_project', type=str, default=None, help="Weights and Biases project name (default: None)")
+    wandb_group.add_argument('--wandb_run', type=str, default=None, help="Weights and Biases run name (default: None)")
 
     # Saving options
     saving_group = parser.add_argument_group('Saving options')
@@ -1012,7 +1101,7 @@ if __name__ == '__main__':
     debug_group = parser.add_argument_group('Debugging and logging')
     debug_group.add_argument('--debug', action='store_true', default=False, help='Debug or verbose mode to print more details (default: False)')
     debug_group.add_argument('--mem_interval', type=int, default=10, help='Memory check interval in epochs (default: 10)')
-    debug_group.add_argument('--decimal', type=int, default=6, help='Decimal places for floating point numbers (default: 6)')
+    debug_group.add_argument('--decimal', type=int, default=4, help='Decimal places for floating point numbers (default: 4)')
     debug_group.add_argument('--color_theme', type=str, default='dark', help="Color theme for console output: 'light', 'dark' (default: 'dark')")
 
     args = parser.parse_args()
@@ -1028,7 +1117,7 @@ if __name__ == '__main__':
     else:
         raise ValueError(f"{red}Invalid color theme: {args.color_theme}. Options are 'light' or 'dark'.{reset}")
 
-    print(f"\n{bright_white}{bold}Starting DDP PyTorch Training...{reset}")
+    print(f"\n{sky_blue}Starting DDP PyTorch Training...{reset}")
 
     if args.debug:
         for group in parser._action_groups:
@@ -1133,6 +1222,10 @@ if __name__ == '__main__':
                       args.max_grad_norm,
                       args.port,
                       args.color_theme,
+                      args.wandb,
+                      args.wandb_project,
+                      args.wandb_run,
+                      args.val_percent,
                       advance_epochs,
                       input_queue,
                       pipes,
