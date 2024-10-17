@@ -764,6 +764,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
     def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None,
             num_workers=0, prefetch=None, empty_cache=False, decimal=6, input_queue=None, mem_interval=10,
             save_final_model=False, save_pickle=False):
+
         training_start = time.time()
         if rank == 0:
             print(f"\n{sky_blue}Fitting DDP Neural Classifier on training data...{reset}")

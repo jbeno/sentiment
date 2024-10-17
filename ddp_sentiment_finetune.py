@@ -724,7 +724,7 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
                           optimizer_name=None, use_zero=True, scheduler_name=None, l2_strength=0.0, pooling='cls',
                           target_score=None, interactive=False, response_pipe=None, accumulation_steps=1, max_grad_norm=None,
                           freeze_bert=False, dropout_rate=0.0, show_progress=False, advance_epochs=1, wandb_run=None, val_percent=0.1,
-                          random_seed=42, optimizer_kwargs={}, scheduler_kwargs={}):
+                          random_seed=42, label_dict=None, optimizer_kwargs={}, scheduler_kwargs={}):
     class_init_start = time.time()
     print(f"\n{sky_blue}Initializing DDP Neural Classifier...{reset}") if rank == 0 else None
     hidden_activation = get_activation(hidden_activation)
@@ -770,6 +770,7 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
         wandb_run=wandb_run,
         validation_fraction=val_percent,
         random_seed=random_seed,
+        label_dict=label_dict,
         optimizer_kwargs=optimizer_kwargs,
         scheduler_kwargs=scheduler_kwargs
     )
@@ -1057,7 +1058,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
             checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name, use_zero,
             scheduler_name, l2_strength, pooling, target_score, interactive, response_pipe, accumulation_steps, max_grad_norm,
-            freeze_transformer, dropout_rate, show_progress, advance_epochs, wandb_run, val_percent, random_seed,
+            freeze_transformer, dropout_rate, show_progress, advance_epochs, wandb_run, val_percent, random_seed, label_dict,
             optimizer_kwargs, schedular_kwargs)
 
         classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
