@@ -120,6 +120,9 @@ def setup_environment(rank, world_size, backend, device, debug, port=12355, host
     os.environ["MASTER_ADDR"] = host
     os.environ["MASTER_PORT"] = str(port)
 
+    # Prevent tokenizer parallelism
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    
     # Enable DDP debug mode
     if debug:
         os.environ["NCCL_DEBUG"] = "INFO"

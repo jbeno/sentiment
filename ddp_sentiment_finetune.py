@@ -749,6 +749,7 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
         tol=tol,
         eta=lr,
         rank=rank,
+        world_size=world_size,
         debug=debug,
         checkpoint_dir=checkpoint_dir,
         checkpoint_interval=checkpoint_interval,
@@ -851,7 +852,8 @@ def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict
                 pos_label=pos_label,
                 decimal=decimal,
                 return_metrics=True,
-                threshold=threshold
+                threshold=threshold,
+                wandb_run=wandb_run
             )
 
             # Save predictions if requested
@@ -892,7 +894,7 @@ def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict
                 wandb.log({
                     'eval/macro_f1_score': macro_f1_score,
                     'eval/classification_report': class_report,
-                    'eval/confusion_matrix': cm,
+                    #'eval/confusion_matrix': cm,
                     'eval/metrics': metrics,
                 })
 

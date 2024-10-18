@@ -14,6 +14,9 @@ from sklearn.metrics import (mean_absolute_error, mean_squared_error, confusion_
                              ConfusionMatrixDisplay, RocCurveDisplay, roc_curve, precision_recall_curve, PrecisionRecallDisplay,
                              roc_auc_score, make_scorer, precision_score, recall_score, f1_score, accuracy_score)
 
+# Weights and Biases
+import wandb
+
 # Typing imports
 from typing import Optional, Union, Tuple, List, Dict, Any
 
@@ -124,7 +127,8 @@ def eval_model(
         conf_fontsize: int = 14,
         return_metrics: bool = False,
         output: bool = True,
-        debug: bool = False
+        debug: bool = False,
+        wandb_run: Optional[Any] = None
 ) -> Optional[Dict[str, Union[int, float]]]:
     """
     Evaluate a classification model's performance and plot results.
@@ -741,6 +745,8 @@ def eval_model(
             plt.tight_layout()
             if save_plots:
                 plt.savefig(os.path.join(save_dir, f'confusion_matrix_{timestamp}.png'))
+                if wandb_run is not None:
+                    wandb_run.log({f'confusion_matrix_{timestamp}': wandb.Image(plt)})
             if plot:
                 plt.show()
             plt.close()
@@ -771,6 +777,8 @@ def eval_model(
             plt.tight_layout()
             if save_plots:
                 plt.savefig(os.path.join(save_dir, f'confusion_matrix_{timestamp}.png'))
+                if wandb_run is not None:
+                    wandb_run.log({f'confusion_matrix_{timestamp}': wandb.Image(plt)})
             if plot:
                 plt.show()
             plt.close()
@@ -879,6 +887,8 @@ def eval_model(
             plt.tight_layout()
             if save_plots:
                 plt.savefig(os.path.join(save_dir, f'binary_class_plots_{timestamp}.png'))
+                if wandb_run is not None:
+                    wandb_run.log({f'binary_class_plots_{timestamp}.png': wandb.Image(plt)})
             if plot:
                 plt.show()
             plt.close()
@@ -891,14 +901,14 @@ def eval_model(
         custom_metrics = {
             "ROC AUC": roc_auc,
             "Threshold": threshold,
-            "Class Type": class_type,
-            "Class Map": class_map,
-            "Positive Label": pos_label,
-            "Title": title,
-            "Model Name": model_name,
-            "Class Weight": class_weight,
-            "Multi-Class": multi_class,
-            "Average": average
+            #"Class Type": class_type,
+            #"Class Map": class_map,
+            #"Positive Label": pos_label,
+            #"Title": title,
+            #"Model Name": model_name,
+            #"Class Weight": class_weight,
+            #"Multi-Class": multi_class,
+            #"Average": average
         }
 
         # Assemble the final metrics based on class type

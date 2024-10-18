@@ -228,6 +228,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 tol=1e-5,
                 device=None,
                 rank=None,
+                world_size=None,
                 debug=False,
                 checkpoint_dir=None,
                 checkpoint_interval=None,
@@ -359,6 +360,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.hidden_activation = hidden_activation
         self.num_layers = num_layers
         self.rank = rank
+        self.world_size = world_size
         self.debug = debug
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_interval = checkpoint_interval
@@ -717,49 +719,119 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         if device is None:
             device = self.device
         self.model.eval()
-        val_loss = 0.0
-        total_samples = 0
+        
+        # Initialize tensors for loss and sample count
+        val_loss = torch.tensor(0.0, device=device)
+        total_samples = torch.tensor(0, device=device)
         all_preds = []
         all_labels = []
+        
         with torch.no_grad():
             if self.finetune_bert:
+                # Create dataset and DistributedSampler
                 dataset = SentimentDataset(X, y, self.bert_tokenizer, self.label_dict, device=device)
-                dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
+                sampler = torch.utils.data.distributed.DistributedSampler(
+                    dataset, num_replicas=self.world_size, rank=self.rank, shuffle=False
+                )
+                dataloader = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler)
+                
                 for batch in dataloader:
                     input_ids = batch['input_ids'].to(device)
                     attention_mask = batch['attention_mask'].to(device)
                     labels = batch['labels'].to(device)
+                    
                     outputs = self.model(input_ids, attention_mask=attention_mask)
                     loss = self.loss(outputs, labels)
-                    val_loss += loss.item() * labels.size(0)
+                    
+                    # Accumulate loss and sample count
+                    val_loss += loss * labels.size(0)
                     total_samples += labels.size(0)
-                    all_preds.extend(outputs.argmax(dim=1).cpu().numpy())
-                    all_labels.extend(labels.cpu().numpy())
+                    
+                    # Collect predictions and labels
+                    all_preds.append(outputs.argmax(dim=1))
+                    all_labels.append(labels)
             else:
                 X = tensor_to_numpy(X)
                 y = np.array(y)
                 if y.dtype == object:
                     y = np.array([self.label_dict[label] for label in y])
                 dataset = torch.utils.data.TensorDataset(torch.FloatTensor(X), torch.LongTensor(y))
-                dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
+                sampler = torch.utils.data.distributed.DistributedSampler(
+                    dataset, num_replicas=self.world_size, rank=self.rank, shuffle=False
+                )
+                dataloader = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler)
+                
                 for X_batch, y_batch in dataloader:
                     X_batch = X_batch.to(device)
                     y_batch = y_batch.to(device)
+                    
                     outputs = self.model(X_batch)
                     loss = self.loss(outputs, y_batch)
-                    val_loss += loss.item() * y_batch.size(0)
+                    
+                    val_loss += loss * y_batch.size(0)
                     total_samples += y_batch.size(0)
-                    all_preds.extend(outputs.argmax(dim=1).cpu().numpy())
-                    all_labels.extend(y_batch.cpu().numpy())
+                    
+                    all_preds.append(outputs.argmax(dim=1))
+                    all_labels.append(y_batch)
         
-        avg_val_loss = val_loss / total_samples
+        # Concatenate predictions and labels
+        all_preds = torch.cat(all_preds)
+        all_labels = torch.cat(all_labels)
+        
+        # Gather sizes from all ranks
+        local_size = torch.tensor([all_preds.size(0)], device=device)  # int64 by default
+        sizes_list = [torch.zeros(1, device=device, dtype=torch.int64) for _ in range(self.world_size)]
+        torch.distributed.all_gather(sizes_list, local_size)
+        sizes = [int(size.item()) for size in sizes_list]
+        max_size = max(sizes)
+
+        # Pad tensors to the maximum size
+        pad_size = max_size - all_preds.size(0)
+        if pad_size > 0:
+            all_preds = torch.cat([
+                all_preds,
+                torch.zeros(pad_size, dtype=all_preds.dtype, device=device)
+            ])
+            all_labels = torch.cat([
+                all_labels,
+                torch.zeros(pad_size, dtype=all_labels.dtype, device=device)
+            ])
+
+        
+        # Prepare lists for gathering tensors
+        gathered_preds = [torch.zeros(max_size, dtype=all_preds.dtype, device=device) for _ in range(self.world_size)]
+        gathered_labels = [torch.zeros(max_size, dtype=all_labels.dtype, device=device) for _ in range(self.world_size)]
+        
+        # Gather predictions and labels from all ranks
+        torch.distributed.all_gather(gathered_preds, all_preds)
+        torch.distributed.all_gather(gathered_labels, all_labels)
+        
+        # Remove padding and concatenate
+        all_preds = torch.cat([preds[:sizes[i]] for i, preds in enumerate(gathered_preds)])
+        all_labels = torch.cat([labels[:sizes[i]] for i, labels in enumerate(gathered_labels)])
+        
+        # Reduce loss and sample count across all processes
+        torch.distributed.all_reduce(val_loss, op=torch.distributed.ReduceOp.SUM)
+        torch.distributed.all_reduce(total_samples, op=torch.distributed.ReduceOp.SUM)
+        
+        # Compute average validation loss
+        avg_val_loss = val_loss.item() / total_samples.item()
+        
+        # Move tensors to CPU for metric computation
+        all_preds = all_preds.cpu().numpy()
+        all_labels = all_labels.cpu().numpy()
+        
+        # Compute validation metrics
         val_score = utils.safe_macro_f1(all_labels, all_preds)
-        val_accuracy = self.compute_accuracy(np.array(all_labels), np.array(all_preds))
+        val_accuracy = self.compute_accuracy(all_labels, all_preds)
         
+        # Debug statements
         if debug and self.rank == 0:
             print(f"Validation at epoch {epoch}: Loss = {avg_val_loss:.6f}, F1 = {val_score:.6f}, Accuracy = {val_accuracy:.6f}")
+        
         self.model.train()
         return avg_val_loss, val_score, val_accuracy
+
 
     def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None,
             num_workers=0, prefetch=None, empty_cache=False, decimal=6, input_queue=None, mem_interval=10,
@@ -838,9 +910,9 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.initialize()
         dist.barrier()
 
-        if self.wandb_run is not None:
-            print(f"Watching model with Weights & Biases...") if rank == 0 else None
-            wandb.watch(self.model, log='all', log_freq=1)
+        # if self.wandb_run is not None:
+        #     print(f"Watching model with Weights & Biases...") if rank == 0 else None
+        #     wandb.watch(self.model, log='all', log_freq=1)
 
         if model_state_dict is not None:
             self.model.load_state_dict(model_state_dict)
@@ -876,7 +948,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         
         # Training loop
         for epoch in range(start_epoch, last_epoch+1):
-
             epoch_start = time.time()
             if self.device.type == 'cuda' and world_size > 1:
                 sampler.set_epoch(epoch)  # Required for DistributedSampler to shuffle the data
@@ -885,7 +956,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
             # Interactive mode
             if self.interactive and skip_epochs == 0:
-
                 # Create a global tensor for synchronization
                 global_tensor = torch.zeros(2, dtype=torch.long, device=self.device)
 
@@ -1163,12 +1233,14 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 loss.backward()
                 
                 # Calculate gradient norms
-                parameters = [p for p in self.model.module.parameters() if p.grad is not None]
+                #parameters = [p for p in self.model.module.parameters() if p.grad is not None]
+                parameters = [p for p in self.model.parameters() if p.grad is not None and p.requires_grad]
                 grad_norms = [p.grad.data.norm(2).item() for p in parameters]
                 min_norm = min(grad_norms)
                 max_norm = max(grad_norms)
                 mean_norm = sum(grad_norms) / len(grad_norms)
-                total_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), 2) for p in parameters]), 2)
+                #total_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), 2) for p in parameters]), 2)
+                total_norm = torch.norm(torch.stack([p.grad.data.norm(2) for p in parameters]), 2)
 
                 clipped = False
                 if batch_count % self.gradient_accumulation_steps == 0:
@@ -1195,7 +1267,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                         self.scheduler.step()
                     elif isinstance(self.scheduler, torch.optim.lr_scheduler.CosineAnnealingWarmRestarts):
                         self.scheduler.step(epoch - 1 + batch_count / len(dataloader))
-
                 epoch_loss += loss.item() * self.gradient_accumulation_steps
                 batch_count += 1
                 current_lr = self.optimizer.param_groups[0]['lr']
@@ -1205,8 +1276,11 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 else:
                     grad_info = f"Grad ↓ {bright_white}{bold}{min_norm:.{decimal}f}{reset} ↑ {bright_white}{bold}{max_norm:.{decimal}f}{reset} M {bright_white}{bold}{mean_norm:.{decimal}f}{reset}"
 
-                if debug:                    
-                    print(f"Rank {rank}: Epoch: {epoch}, Batch: {batch_count}, Size: {X_batch.size(0)}, Loss: {loss.item():.6f}, Epoch Loss: {epoch_loss:.6f}, LR: {current_lr:.2e}, {grad_info}")
+                if debug:     
+                    if self.finetune_bert:
+                        print(f"Rank {rank}: Epoch: {epoch}, Batch: {batch_count}, Input IDs Size: {input_ids.size(0)}, Attention Mask Size: {attention_mask.size(0)}, Labels Size: {labels.size(0)}, Loss: {loss.item():.6f}, Epoch Loss: {epoch_loss:.6f}, LR: {current_lr:.2e}, {grad_info}")
+                    else:
+                        print(f"Rank {rank}: Epoch: {epoch}, Batch: {batch_count}, Size: {X_batch.size(0)}, Loss: {loss.item():.6f}, Epoch Loss: {epoch_loss:.6f}, LR: {current_lr:.2e}, {grad_info}")
                     
                 # Update progress bar
                 if rank == 0 and self.show_progress:
@@ -1232,22 +1306,20 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 self.optimizer.consolidate_state_dict()
 
             dist.barrier()
-
             # Early stopping logic
             if self.early_stopping == 'score':
 
                 # Compute train score and accuracy
-                if rank == 0:
-                    if self.show_progress:
-                        pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Computing train metrics...'})
-                    train_score, train_accuracy = self.compute_train_metrics(X_train, y_train, epoch, debug)
+                if rank == 0 and self.show_progress:
+                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Computing train metrics...'})
+                train_score, train_accuracy = self.compute_train_metrics(X_train, y_train, epoch, debug)
                 
                 # Compute validation loss, score, and accuracy
-                if rank == 0:
-                    if self.show_progress:
-                        pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Computing validation metrics...'})
-                    val_loss, val_score, val_accuracy = self.compute_validation_metrics(X_val, y_val, epoch, debug)
+                if rank == 0 and self.show_progress:
+                    pbar.set_postfix({'loss': f'{avg_epoch_loss:.4f}', 'lr': f'{current_lr:.2e}', 'grad': grad_info_mini, 'status': 'Computing validation metrics...'})
+                val_loss, val_score, val_accuracy = self.compute_validation_metrics(X_val, y_val, epoch, debug)
 
+                if rank == 0:
                     current_score = val_score
                     if self.best_score is None or current_score > self.best_score + self.tol:
                         self.best_score = current_score
