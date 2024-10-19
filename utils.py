@@ -281,7 +281,20 @@ def convert_numeric_to_labels(numeric_preds, numeric_dict):
 def convert_sst_label(s):
     return s.split(" ")[-1]
 
-def get_activation(activation):
+class SwishGLU(nn.Module):
+    def __init__(self, input_dim: int, output_dim: int):
+        super(SwishGLU, self).__init__()
+        # Linear projection to 2 * output_dim to split for gate and projection
+        self.projection = nn.Linear(input_dim, 2 * output_dim)
+        self.activation = nn.SiLU()  # Swish activation
+
+    def forward(self, x):
+        # Split the projection into two parts: one for projection, one for gate
+        projected, gate = self.projection(x).tensor_split(2, dim=-1)
+        # Apply Swish (SiLU) activation to the gate and multiply with the projection
+        return projected * self.activation(gate)
+    
+def get_activation(activation, hidden_dim):
     if activation == "relu":
         return nn.ReLU()
     elif activation == "tanh":
@@ -294,6 +307,10 @@ def get_activation(activation):
         return nn.LeakyReLU()
     elif activation == "gelu":
         return nn.GELU()
+    elif activation == "swish":
+        return Swish()
+    elif activation == "swishglu":
+        return SwishGLU(hidden_dim, hidden_dim)
     else:
         raise ValueError(f"Unknown activation function: {activation}")
 

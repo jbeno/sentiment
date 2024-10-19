@@ -727,7 +727,7 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
                           random_seed=42, label_dict=None, optimizer_kwargs={}, scheduler_kwargs={}):
     class_init_start = time.time()
     print(f"\n{sky_blue}Initializing DDP Neural Classifier...{reset}") if rank == 0 else None
-    hidden_activation = get_activation(hidden_activation)
+    hidden_activation = get_activation(hidden_activation, hidden_dim)
     optimizer_class = get_optimizer(optimizer_name, use_zero, device, rank, world_size)
     scheduler_class = get_scheduler(scheduler_name, device, rank, world_size)
     print(f"Layers: {num_layers}, Hidden Dim: {hidden_dim}, Hidden Act: {hidden_activation.__class__.__name__}, Dropout: {dropout_rate}, Optimizer: {optimizer_class.__name__}, L2 Strength: {l2_strength}, Pooling: {pooling.upper()}, Accumulation Steps: {accumulation_steps}, Max Grad Norm: {max_grad_norm}") if rank == 0 else None
@@ -1064,7 +1064,8 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             optimizer_kwargs, schedular_kwargs)
 
         classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
-                       num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval, save_final_model, save_pickle)
+                       num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval, save_final_model, save_pickle,
+                       save_dir)
         
         
         # Evaluate the model
@@ -1138,7 +1139,7 @@ if __name__ == '__main__':
     classifier_group = parser.add_argument_group('Classifier configuration')
     classifier_group.add_argument('--num_layers', type=int, default=1, help='Number of hidden layers for neural classifier (default: 1)')
     classifier_group.add_argument('--hidden_dim', type=int, default=300, help='Hidden dimension for neural classifier layers (default: 300)')
-    classifier_group.add_argument('--hidden_activation', type=str, default='tanh', help="Hidden activation function: 'tanh', 'relu', 'sigmoid', 'leaky_relu', 'gelu' (default: 'tanh')")
+    classifier_group.add_argument('--hidden_activation', type=str, default='tanh', help="Hidden activation function: 'tanh', 'relu', 'sigmoid', 'leaky_relu', 'gelu', 'swish', 'swishglu' (default: 'tanh')")
     classifier_group.add_argument('--dropout_rate', type=float, default=0.0, help='Dropout rate for neural classifier (default: 0.0)')
  
     # Training configuration

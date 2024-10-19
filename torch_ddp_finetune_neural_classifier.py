@@ -705,15 +705,101 @@ class TorchDDPNeuralClassifier(TorchModelBase):
     def compute_train_metrics(self, X, y, epoch, debug=False, device=None):
         if device is None:
             device = self.device
+        
+        # Temporarily set to eval mode
         self.model.eval()
+        
         with torch.no_grad():
-            preds = self.predict(X, device=device, debug=debug)
-            train_score = utils.safe_macro_f1(y, preds)
-            train_accuracy = self.compute_accuracy(y, preds)
-        self.model.train()
+            all_preds = []
+            all_labels = []
+            
+            if self.finetune_bert:
+                dataset = SentimentDataset(X, y, self.bert_tokenizer, self.label_dict, device=device)
+                sampler = torch.utils.data.distributed.DistributedSampler(
+                    dataset, num_replicas=self.world_size, rank=self.rank, shuffle=False
+                )
+                dataloader = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler)
+                
+                for batch in dataloader:
+                    input_ids = batch['input_ids'].to(device)
+                    attention_mask = batch['attention_mask'].to(device)
+                    labels = batch['labels'].to(device)
+                    
+                    outputs = self.model(input_ids, attention_mask=attention_mask)
+                    
+                    all_preds.append(outputs.argmax(dim=1))
+                    all_labels.append(labels)
+            else:
+                X = tensor_to_numpy(X)
+                y = np.array(y)
+                if y.dtype == object:
+                    y = np.array([self.label_dict[label] for label in y])
+                dataset = torch.utils.data.TensorDataset(torch.FloatTensor(X), torch.LongTensor(y))
+                sampler = torch.utils.data.distributed.DistributedSampler(
+                    dataset, num_replicas=self.world_size, rank=self.rank, shuffle=False
+                )
+                dataloader = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler)
+                
+                for X_batch, y_batch in dataloader:
+                    X_batch = X_batch.to(device)
+                    y_batch = y_batch.to(device)
+                    
+                    outputs = self.model(X_batch)
+                    
+                    all_preds.append(outputs.argmax(dim=1))
+                    all_labels.append(y_batch)
+        
+        # Concatenate predictions and labels
+        all_preds = torch.cat(all_preds)
+        all_labels = torch.cat(all_labels)
+        
+        # Gather sizes from all ranks
+        local_size = torch.tensor([all_preds.size(0)], device=device)
+        sizes_list = [torch.zeros(1, device=device, dtype=torch.int64) for _ in range(self.world_size)]
+        torch.distributed.all_gather(sizes_list, local_size)
+        sizes = [int(size.item()) for size in sizes_list]
+        max_size = max(sizes)
+
+        # Pad tensors to the maximum size
+        pad_size = max_size - all_preds.size(0)
+        if pad_size > 0:
+            all_preds = torch.cat([
+                all_preds,
+                torch.zeros(pad_size, dtype=all_preds.dtype, device=device)
+            ])
+            all_labels = torch.cat([
+                all_labels,
+                torch.zeros(pad_size, dtype=all_labels.dtype, device=device)
+            ])
+        
+        # Prepare lists for gathering tensors
+        gathered_preds = [torch.zeros(max_size, dtype=all_preds.dtype, device=device) for _ in range(self.world_size)]
+        gathered_labels = [torch.zeros(max_size, dtype=all_labels.dtype, device=device) for _ in range(self.world_size)]
+        
+        # Gather predictions and labels from all ranks
+        torch.distributed.all_gather(gathered_preds, all_preds)
+        torch.distributed.all_gather(gathered_labels, all_labels)
+        
+        # Remove padding and concatenate
+        all_preds = torch.cat([preds[:sizes[i]] for i, preds in enumerate(gathered_preds)])
+        all_labels = torch.cat([labels[:sizes[i]] for i, labels in enumerate(gathered_labels)])
+        
+        # Move tensors to CPU for metric computation
+        all_preds = all_preds.cpu().numpy()
+        all_labels = all_labels.cpu().numpy()
+        
+        # Compute training metrics
+        train_score = utils.safe_macro_f1(all_labels, all_preds)
+        train_accuracy = self.compute_accuracy(all_labels, all_preds)
+        
+        # Debug statements
         if debug and self.rank == 0:
             print(f"Train Score at epoch {epoch}: F1 = {train_score:.6f}, Accuracy = {train_accuracy:.6f}")
+        
+        self.model.train()
+    
         return train_score, train_accuracy
+                
 
     def compute_validation_metrics(self, X, y, epoch, debug=False, device=None):
         if device is None:
@@ -779,7 +865,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         all_labels = torch.cat(all_labels)
         
         # Gather sizes from all ranks
-        local_size = torch.tensor([all_preds.size(0)], device=device)  # int64 by default
+        local_size = torch.tensor([all_preds.size(0)], device=device)
         sizes_list = [torch.zeros(1, device=device, dtype=torch.int64) for _ in range(self.world_size)]
         torch.distributed.all_gather(sizes_list, local_size)
         sizes = [int(size.item()) for size in sizes_list]
@@ -796,7 +882,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 all_labels,
                 torch.zeros(pad_size, dtype=all_labels.dtype, device=device)
             ])
-
         
         # Prepare lists for gathering tensors
         gathered_preds = [torch.zeros(max_size, dtype=all_preds.dtype, device=device) for _ in range(self.world_size)]
@@ -835,7 +920,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
     def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None,
             num_workers=0, prefetch=None, empty_cache=False, decimal=6, input_queue=None, mem_interval=10,
-            save_final_model=False, save_pickle=False):
+            save_final_model=False, save_pickle=False, save_dir='saves'):
 
         training_start = time.time()
         if rank == 0:
@@ -1463,8 +1548,13 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 dummy_input = torch.zeros(1, self.input_dim, device=self.device)
             
             # Export the model to ONNX format
-            onnx_file_path = 'model.onnx'
-            torch.onnx.export(self.model.module, dummy_input, onnx_file_path, opset_version=11)
+            if not os.path.exists(save_dir):
+                print(f"Creating save directory: {save_dir}")
+                os.makedirs(save_dir)
+            # Create a filename timestamp
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            onnx_file_path = os.path.join(save_dir, f'model_{timestamp}.onnx')
+            torch.onnx.export(self.model.module, dummy_input, onnx_file_path, opset_version=13)
             
             # Save the ONNX model to wandb
             wandb.save(onnx_file_path)
