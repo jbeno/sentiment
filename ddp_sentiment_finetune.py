@@ -89,7 +89,7 @@ def load_label_dicts(label_template):
     
     return label_dict, numeric_dict
 
-def save_data_archive(X_train, X_dev, y_train, y_dev, X_dev_sent, world_size, device_type, data_dir):
+def save_data_archive(X_train, X_val, X_test, y_train, y_val, y_test, X_test_sent, world_size, device_type, data_dir):
     # Create directory if it doesn't exist
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
@@ -102,12 +102,17 @@ def save_data_archive(X_train, X_dev, y_train, y_dev, X_dev_sent, world_size, de
 
     # Convert tensors to NumPy arrays if necessary
     X_train = tensor_to_numpy(X_train)
-    X_dev = tensor_to_numpy(X_dev)
+    X_val = tensor_to_numpy(X_val) if X_val is not None else None
+    X_test = tensor_to_numpy(X_test)
     y_train = tensor_to_numpy(y_train)
-    y_dev = tensor_to_numpy(y_dev)
+    y_val = tensor_to_numpy(y_val) if y_val is not None else None
+    y_test = tensor_to_numpy(y_test)
 
     # Save data to archive file
-    np.savez_compressed(filepath, X_train=X_train, X_dev=X_dev, y_train=y_train, y_dev=y_dev, X_dev_sent=X_dev_sent)
+    if X_val is not None:
+        np.savez_compressed(filepath, X_train=X_train, X_val=X_val, X_test=X_test, y_train=y_train, y_val=y_val, y_test=y_test, X_test_sent=X_test_sent)
+    else:
+        np.savez_compressed(filepath, X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test, X_test_sent=X_test_sent)
     print(f"\nData saved to: {filepath}")
 
 def load_data_archive(data_file, device, rank, sample_percent=None):
@@ -126,45 +131,58 @@ def load_data_archive(data_file, device, rank, sample_percent=None):
         print(f"\n{sky_blue}Loading archived data from: {data_file}...{reset}") if rank == 0 else None
         with np.load(data_file, allow_pickle=True) as data:
             X_train = data['X_train']
-            X_dev = data['X_dev']
+            X_val = data['X_val'] if 'X_val' in data else None
+            X_test = data['X_test']
             y_train = data['y_train']
-            y_dev = data['y_dev']
-            X_dev_sent = data['X_dev_sent']
+            y_val = data['y_val'] if 'y_val' in data else None
+            y_test = data['y_test']
+            X_test_sent = data['X_test_sent']
         
         # Sample data if sample_percent is provided
         if sample_percent is not None:
             print(f"Sampling {sample_percent:.0%} of data...") if rank == 0 else None
             num_train_samples = int(len(X_train) * sample_percent)
-            num_dev_samples = int(len(X_dev) * sample_percent)
+            num_val_samples = int(len(X_val) * sample_percent) if X_val is not None else None
+            num_test_samples = int(len(X_test) * sample_percent)
             
             # Create a permutation of indices
             train_indices = np.random.permutation(len(X_train))[:num_train_samples]
-            dev_indices = np.random.permutation(len(X_dev))[:num_dev_samples]
+            val_indices = np.random.permutation(len(X_val))[:num_val_samples] if X_val is not None else None
+            test_indices = np.random.permutation(len(X_test))[:num_test_samples]
             
             # Sample the data
             X_train = X_train[train_indices]
             y_train = y_train[train_indices]
-            X_dev = X_dev[dev_indices]
-            y_dev = y_dev[dev_indices]
-            X_dev_sent = X_dev_sent[dev_indices]
+            X_val = X_val[val_indices] if X_val is not None else None
+            y_val = y_val[val_indices] if y_val is not None else None
+            X_test = X_test[test_indices]
+            y_test = y_test[test_indices]
+            X_test_sent = X_test_sent[test_indices]
             
-            print(f"Sampled Train size: {len(X_train)}, Sampled Dev size: {len(X_dev)}") if rank == 0 else None
+            if X_val is not None:
+                print(f"Sampled Train size: {len(X_train)}, Sampled Validation size: {len(X_val)}, Sampled Evaluation size: {len(X_test)}") if rank == 0 else None
+            else:
+                print(f"Sampled Train size: {len(X_train)}, Sampled Evaluation size: {len(X_test)}") if rank == 0 else None
         
         if rank == 0:
             # Print a summary of the loaded data
             print(f"X Train shape: {list(X_train.shape)}, y Train shape: {list(y_train.shape)}")
-            print(f"X Dev shape: {list(X_dev.shape)}, y Dev shape: {list(y_dev.shape)}")
-            print(f"X Dev Sentences shape: {list(X_dev_sent.shape)}")
+            print(f"X Validation shape: {list(X_val.shape)}, y Validation shape: {list(y_val.shape)}") if X_val is not None else None
+            print(f"X Test shape: {list(X_test.shape)}, y Dev shape: {list(y_test.shape)}")
+            print(f"X Test Sentences shape: {list(X_test_sent.shape)}")
             # Print label distributions
             print("Train label distribution:")
             print_label_dist(y_train)
-            print("Dev label distribution:")
-            print_label_dist(y_dev)
+            if X_val is not None:
+                print("Validation label distribution:")
+                print_label_dist(y_val)
+            print("Test label distribution:")
+            print_label_dist(y_test)
         print(f"Archived data loaded ({time.time() - load_archive_start:.2f}s)") if rank == 0 else None
     except Exception as e:
         raise RuntimeError(f"Failed to load data from archive file {data_file}: {str(e)}")
         
-    return X_train, X_dev, y_train, y_dev, X_dev_sent
+    return X_train, X_val, X_test, y_train, y_val, y_test, X_test_sent
 
 def initialize_bert_model(weights_name, device, rank, debug):
     model_init_start = time.time()
@@ -186,33 +204,79 @@ def initialize_bert_model(weights_name, device, rank, debug):
 def initialize_transformer_model(weights_name, device, rank, debug):
     model_init_start = time.time()
     print(f"\n{sky_blue}Initializing '{weights_name}' tokenizer and model...{reset}") if rank == 0 else None
-    tokenizer = AutoTokenizer.from_pretrained(weights_name)
-    model = AutoModel.from_pretrained(weights_name).to(device)
-    dist.barrier()
-    if rank == 0:
-        if debug:
-            print(f"Tokenizer:\n{tokenizer}")
-            print(f"Model:\n{model}")
-        print(f"Tokenizer and model initialized ({format_time(time.time() - model_init_start)})")
-    return tokenizer, model
+    
+    max_retries = 3
+    retry_delay = 5
+    
+    for attempt in range(max_retries):
+        try:
+            # Only rank 0 checks and downloads files
+            if rank == 0:
+                # Try loading with local_files_only first to check if files exist
+                try:
+                    print(f"Checking for local files...")
+                    _ = AutoTokenizer.from_pretrained(weights_name, local_files_only=True)
+                    _ = AutoModel.from_pretrained(weights_name, local_files_only=True)
+                    print(f"Found all files in cache, skipping download")
+                except Exception as e:
+                    print(f"Some files not found locally, downloading...")
+                    # Download tokenizer files
+                    tokenizer = AutoTokenizer.from_pretrained(weights_name, local_files_only=False)
+                    # Download model files
+                    _ = AutoModel.from_pretrained(weights_name, local_files_only=False)
+                    print(f"Download complete")
+            
+            # Wait for rank 0 to finish checking/downloading
+            dist.barrier()
+            
+            # Now all ranks can load from local files
+            if rank == 0:
+                print(f"All ranks loading tokenizer from local files...")
+            tokenizer = AutoTokenizer.from_pretrained(weights_name, local_files_only=True)
+            
+            if rank == 0:
+                print(f"All ranks loading model from local files...")
+            model = AutoModel.from_pretrained(weights_name, local_files_only=True).to(device)
+            
+            # Final sync point
+            dist.barrier()
+            
+            if rank == 0:
+                if debug:
+                    print(f"Tokenizer:\n{tokenizer}")
+                    print(f"Model:\n{model}")
+                print(f"Tokenizer and model initialized ({format_time(time.time() - model_init_start)})")
+            return tokenizer, model
+            
+        except Exception as e:
+            if attempt < max_retries - 1:
+                if rank == 0:
+                    print(f"\n{yellow}Attempt {attempt + 1} failed. Retrying in {retry_delay} seconds...{reset}")
+                    print(f"Error: {str(e)}")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                if rank == 0:
+                    print(f"\n{red}Failed to initialize tokenizer/model after {max_retries} attempts{reset}")
+                raise e
 
-def load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug):
+    raise RuntimeError("Failed to initialize transformer model and tokenizer")
+
+def load_data(dataset, eval_dataset, sample_percent, eval_split, use_val_split, val_percent,
+              world_size, rank, debug):
     data_load_start = time.time()
 
     # Function to get a subset of data based on split name
     def get_split(data, split):
-            if split == 'train':
-                data_split = data['train'].to_pandas()
-            elif split == 'dev':
-                data_split = data['validation'].to_pandas()
-            elif split == 'test':
-                data_split = data['test'].to_pandas()
+            split = 'validation' if split == 'dev' else split
+            if split in ['train', 'validation', 'test']:
+                data_split = data[split].to_pandas()
             else:
                 raise ValueError(f"Unknown split: {split}")
             return data_split
     
     # Function to load data from Hugging Face or local based on ID and split name
-    def get_data(id, split, rank, debug):
+    def get_data(id, split, purpose, rank, debug):
         # Identify the dataset and path from the ID
         dataset_source = 'Hugging Face'
         dataset_subset = None
@@ -257,12 +321,25 @@ def load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug):
             dataset_path = os.path.join('data', 'merged')
         else:
             raise ValueError(f"Unknown dataset: {id}")
-        print(f"{split.capitalize()} Data: {dataset_name} from {dataset_source}: '{dataset_path}'") if rank == 0 else None
-        print(f"Dataset URL: {dataset_url}") if dataset_url is not None and rank == 0 else None
+        print(f"{purpose} Data: {dataset_name} from {dataset_source}: '{dataset_path}'") if rank == 0 else None
+        #print(f"Dataset URL: {dataset_url}") if dataset_url is not None and rank == 0 else None
 
         # Load the dataset, do any pre-processing, and select appropriate split
         if id == 'sst_local':
-            data_split = sst.train_reader(dataset_path) if split == 'train' else sst.dev_reader(dataset_path)
+            if split == 'train':
+                src = os.path.join(dataset_path, 'sst3-train.csv')
+                data_split = sst.sentiment_reader(src, include_subtrees=False, dedup=False)
+            elif split in ['dev', 'validation']:
+                src = os.path.join(dataset_path, 'sst3-dev.csv')
+                data_split = sst.sentiment_reader(src, include_subtrees=False, dedup=False)
+            elif split in ['test', 'test-labeled']:
+                src = os.path.join(dataset_path, 'sst3-test-labeled.csv')
+                data_split = sst.sentiment_reader(src, include_subtrees=False, dedup=False)
+            elif split == 'test-unlabeled':
+                src = os.path.join(dataset_path, 'sst3-test-unlabeled.csv')
+                data_split = sst.sentiment_reader(src, include_subtrees=False, dedup=False)
+            else:
+                raise ValueError(f"Unknown split: {split}")
         elif id == 'sst':
             data = load_dataset(dataset_path)
             data = data.rename_column('label', 'label_orig') 
@@ -289,15 +366,21 @@ def load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug):
         elif id == 'merged_local':
             if split == 'train':
                 data_split = pd.read_csv(os.path.join(dataset_path, 'train_all.csv'), index_col=None)
-            elif split == 'dev':
-                data_split = pd.read_csv(os.path.join(dataset_path, 'dev_all.csv'), index_col=None)
+            elif split in ['dev', 'validation']:
+                data_split = pd.read_csv(os.path.join(dataset_path, 'val_all.csv'), index_col=None)
+            elif split == 'test':
+                data_split = pd.read_csv(os.path.join(dataset_path, 'test_all.csv'), index_col=None)
         elif id == 'merged_neutral':
             if split == 'train':
                 data_split = pd.read_csv(os.path.join(dataset_path, 'train_all_binary.csv'), index_col=None)
                 data_split = data_split.rename(columns={'label': 'label_orig'})
                 data_split = data_split.rename(columns={'neutral_label': 'label'})
-            elif split == 'dev':
-                data_split = pd.read_csv(os.path.join(dataset_path, 'dev_all_binary.csv'), index_col=None)
+            elif split in ['dev', 'validation']:
+                data_split = pd.read_csv(os.path.join(dataset_path, 'val_all_binary.csv'), index_col=None)
+                data_split = data_split.rename(columns={'label': 'label_orig'})
+                data_split = data_split.rename(columns={'neutral_label': 'label'})
+            elif split == 'test':
+                data_split = pd.read_csv(os.path.join(dataset_path, 'test_all_binary.csv'), index_col=None)
                 data_split = data_split.rename(columns={'label': 'label_orig'})
                 data_split = data_split.rename(columns={'neutral_label': 'label'})
         elif id == 'merged_positive':
@@ -305,8 +388,12 @@ def load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug):
                 data_split = pd.read_csv(os.path.join(dataset_path, 'train_all_binary.csv'), index_col=None)
                 data_split = data_split.rename(columns={'label': 'label_orig'})
                 data_split = data_split.rename(columns={'positive_label': 'label'})
-            elif split == 'dev':
-                data_split = pd.read_csv(os.path.join(dataset_path, 'dev_all_binary.csv'), index_col=None)
+            elif split in ['dev', 'validation']:
+                data_split = pd.read_csv(os.path.join(dataset_path, 'val_all_binary.csv'), index_col=None)
+                data_split = data_split.rename(columns={'label': 'label_orig'})
+                data_split = data_split.rename(columns={'positive_label': 'label'})
+            elif split == 'test':
+                data_split = pd.read_csv(os.path.join(dataset_path, 'test_all_binary.csv'), index_col=None)
                 data_split = data_split.rename(columns={'label': 'label_orig'})
                 data_split = data_split.rename(columns={'positive_label': 'label'})
         elif id == 'merged_negative':
@@ -314,57 +401,84 @@ def load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug):
                 data_split = pd.read_csv(os.path.join(dataset_path, 'train_all_binary.csv'), index_col=None)
                 data_split = data_split.rename(columns={'label': 'label_orig'})
                 data_split = data_split.rename(columns={'negative_label': 'label'})
-            elif split == 'dev':
-                data_split = pd.read_csv(os.path.join(dataset_path, 'dev_all_binary.csv'), index_col=None)
+            elif split in ['dev', 'validation']:
+                data_split = pd.read_csv(os.path.join(dataset_path, 'val_all_binary.csv'), index_col=None)
                 data_split = data_split.rename(columns={'label': 'label_orig'})
                 data_split = data_split.rename(columns={'negative_label': 'label'})
+            elif split == 'test':
+                data_split = pd.read_csv(os.path.join(dataset_path, 'test_all_binary.csv'), index_col=None)
+                data_split = data_split.rename(columns={'label': 'label_orig'})
+                data_split = data_split.rename(columns={'negative_label': 'label'})
+        else:
+            raise ValueError(f"Unknown dataset: {id}")
 
         return data_split
 
     if rank == 0:
         print(f"\n{sky_blue}Loading data...{reset}")
         if eval_dataset is not None:
-            print("Using different datasets for training and evaluation")
+            print(f"Using different datasets for training and evaluation")
         else:
             eval_dataset = dataset
-            print("Using the same dataset for training and evaluation")
+            print(f"Using the same dataset for training and evaluation")
+        print(f"Splits:")
+        print(f"- Train: Using {dataset} 'train' split")
+        if use_val_split:
+            print(f"- Validation: Using {dataset} 'validation' split")
+        else:
+            print(f"- Validation: Using {val_percent} of {dataset} 'train' split")
+        print(f"- Evaluation: Using {eval_dataset} '{eval_split}' split")
+
+        train = get_data(dataset, 'train', 'Train', rank, debug)
+        if use_val_split:
+            validation = get_data(dataset, 'validation', 'Validation', rank, debug)
+        else:
+            validation = None
+        test = get_data(eval_dataset, eval_split, 'Evaluation', rank, debug)
         
-        train = get_data(dataset, 'train', rank, debug)
-        dev = get_data(eval_dataset, 'dev', rank, debug)
-        
-        print(f"Train size: {len(train)}, Dev size: {len(dev)}")
+        print(f"Train size: {len(train)}")
+        print(f"Validation size: {len(validation)}") if validation is not None else None
+        print(f"Evaluation size: {len(test)}")
 
         if sample_percent is not None:
             print(f"Sampling {sample_percent:.0%} of data...")
             train = train.sample(frac=sample_percent)
-            dev = dev.sample(frac=sample_percent)
-            print(f"Sampled Train size: {len(train)}, Sampled Dev size: {len(dev)}")
+            if validation is not None:
+                validation = validation.sample(frac=sample_percent)
+            test = test.sample(frac=sample_percent)
+            print(f"Sampled Train size: {len(train)}")
+            print(f"Sampled Validation size: {len(validation)}") if validation is not None else None
+            print(f"Sampled Evaluation size: {len(test)}")
 
     else:
         train = None
-        dev = None
+        validation = None
+        test = None
 
     # Broadcast the data to all ranks
     if world_size > 1:
-        object_list = [train, dev]
+        object_list = [train, validation, test]
         dist.broadcast_object_list(object_list, src=0)
-        train, dev = object_list
+        train, validation, test = object_list
 
         dist.barrier()
         print(f"Data broadcasted to all ranks") if rank == 0 and debug else None
-        print(f"Rank {rank}: Train size: {len(train)}, Dev size: {len(dev)}") if debug else None
+        print(f"Rank {rank}: Train size: {len(train)}, Validation size: {len(validation) if validation is not None else None}, Evaluation size: {len(test)}") if debug else None
 
     if rank == 0:
         print("Train label distribution:")
         print_label_dist(train)
-        print("Dev label distribution:")
-        print_label_dist(dev)
+        if validation is not None:
+            print("Validation label distribution:")
+            print_label_dist(validation)
+        print("Evaluation label distribution:")
+        print_label_dist(test)
         print(f"Data loaded ({format_time(time.time() - data_load_start)})")
     dist.barrier()
         
-    return train, dev
+    return train, validation, test
 
-def process_data(bert_tokenizer, bert_model, pooling, world_size, train, dev, device, batch_size, rank, debug, save_archive,
+def process_data(bert_tokenizer, bert_model, pooling, world_size, train, validation, test, device, batch_size, rank, debug, save_archive,
                  save_dir, num_workers, prefetch, empty_cache, finetune_bert, freeze_bert, chunk_size=None):
     data_process_start = time.time()
 
@@ -374,86 +488,108 @@ def process_data(bert_tokenizer, bert_model, pooling, world_size, train, dev, de
     
     # Extract y labels
     y_train = train.label.values
-    y_dev = dev.label.values
+    y_val = validation.label.values if validation is not None else None
+    y_test = test.label.values
     
     # Extract X sentences
     X_train_sent = train.sentence.values
-    X_dev_sent = dev.sentence.values
+    X_val_sent = validation.sentence.values if validation is not None else None
+    X_test_sent = test.sentence.values
 
     if rank == 0:
         # Generate random indices
         train_indices = np.random.choice(len(X_train_sent), 3, replace=False)
-        dev_indices = np.random.choice(len(X_dev_sent), 3, replace=False)
+        val_indices = np.random.choice(len(X_val_sent), 3, replace=False) if validation is not None else None
+        test_indices = np.random.choice(len(X_test_sent), 3, replace=False)
         
         # Collect sample sentences
         train_samples = []
-        dev_samples = []
+        val_samples = []
+        test_samples = []
         for i in train_indices:
             train_samples.append((f'Train[{i}]: ', X_train_sent[i], f' - {y_train[i].upper()}'))
-        for i in dev_indices:
-            dev_samples.append((f'Dev[{i}]: ', X_dev_sent[i], f' - {y_dev[i].upper()}'))
+        if validation is not None:
+            for i in val_indices:
+                val_samples.append((f'Validation[{i}]: ', X_val_sent[i], f' - {y_val[i].upper()}'))
+        for i in test_indices:
+            test_samples.append((f'Evaluation[{i}]: ', X_test_sent[i], f' - {y_test[i].upper()}'))
     else:
         train_samples = None
-        dev_samples = None
+        val_samples = None
+        test_samples = None
     
     # Process X sentences (tokenize and encode with BERT) if we're not fine-tuning BERT
     if finetune_bert:
         # For fine-tuning, we just return the sentences
         X_train = X_train_sent
-        X_dev = X_dev_sent
+        X_val = X_val_sent
+        X_test = X_test_sent
     else:
         # Process X sentences (tokenize and encode with BERT) for non-fine-tuning workflow
         X_train = process_data_chunks(X_train_sent, bert_tokenizer, bert_model, pooling, world_size, device, batch_size, 
-                                      train_samples, rank, debug, split='train', num_workers=num_workers, prefetch=prefetch,
+                                      train_samples, rank, debug, split='Train', num_workers=num_workers, prefetch=prefetch,
                                       empty_cache=empty_cache, chunk_size=chunk_size)
-        X_dev = process_data_chunks(X_dev_sent, bert_tokenizer, bert_model, pooling, world_size, device, batch_size, 
-                                    dev_samples, rank, debug, split='dev', num_workers=num_workers, prefetch=prefetch,
+        X_val = process_data_chunks(X_val_sent, bert_tokenizer, bert_model, pooling, world_size, device, batch_size, 
+                                    val_samples, rank, debug, split='Validation', num_workers=num_workers, prefetch=prefetch,
+                                    empty_cache=empty_cache, chunk_size=chunk_size) if validation is not None else None
+        X_test = process_data_chunks(X_test_sent, bert_tokenizer, bert_model, pooling, world_size, device, batch_size, 
+                                    test_samples, rank, debug, split='Evaluation', num_workers=num_workers, prefetch=prefetch,
                                     empty_cache=empty_cache, chunk_size=chunk_size)
     
     # Data integrity check, make sure the sizes are consistent across ranks
     if not finetune_bert and device.type == 'cuda' and world_size > 1:
         # Gather sizes from all ranks
         train_sizes = [torch.tensor(X_train.shape[0], device=device) for _ in range(world_size)]
-        dev_sizes = [torch.tensor(X_dev.shape[0], device=device) for _ in range(world_size)]
+        val_sizes = [torch.tensor(X_val.shape[0], device=device) for _ in range(world_size)] if validation is not None else None
+        test_sizes = [torch.tensor(X_test.shape[0], device=device) for _ in range(world_size)]
         
         dist.all_gather(train_sizes, train_sizes[rank])
-        dist.all_gather(dev_sizes, dev_sizes[rank])
+        dist.all_gather(val_sizes, val_sizes[rank]) if validation is not None else None
+        dist.all_gather(test_sizes, test_sizes[rank])
 
         if rank == 0:
             # Convert to CPU for easier handling
             train_sizes = [size.cpu().item() for size in train_sizes]
-            dev_sizes = [size.cpu().item() for size in dev_sizes]
+            val_sizes = [size.cpu().item() for size in val_sizes] if validation is not None else None
+            test_sizes = [size.cpu().item() for size in test_sizes]
 
             if debug:
                 print("\nDataset size summary:")
                 print(f"Train sizes across ranks: {train_sizes}")
-                print(f"Dev sizes across ranks: {dev_sizes}")
+                print(f"Validation sizes across ranks: {val_sizes}") if validation is not None else None
+                print(f"Test sizes across ranks: {test_sizes}")
                 
-                if len(set(train_sizes)) > 1 or len(set(dev_sizes)) > 1:
+                if len(set(train_sizes)) > 1 or len(set(test_sizes)) > 1 or (validation is not None and len(set(val_sizes)) > 1):
                     print(f"{red}WARNING: Mismatch in dataset sizes across ranks!{red}")
                     print(f"Train size mismatch: {max(train_sizes) - min(train_sizes)}")
-                    print(f"Dev size mismatch: {max(dev_sizes) - min(dev_sizes)}")
+                    print(f"Validation size mismatch: {max(val_sizes) - min(val_sizes)}") if validation is not None else None
+                    print(f"Test size mismatch: {max(test_sizes) - min(test_sizes)}")
                 else:
                     print("All ranks have consistent dataset sizes.")
                 
                 print(f"Total train samples: {sum(train_sizes)}")
-                print(f"Total dev samples: {sum(dev_sizes)}")
+                print(f"Total validation samples: {sum(val_sizes)}") if validation is not None else None
+                print(f"Total test samples: {sum(test_sizes)}")
 
             # Check for significant mismatch and raise error if necessary
-            max_mismatch = max(max(train_sizes) - min(train_sizes), max(dev_sizes) - min(dev_sizes))
+            max_mismatch = max(max(train_sizes) - min(train_sizes), max(test_sizes) - min(test_sizes))
             if max_mismatch > world_size:  # Allow for small mismatches due to uneven division
                 raise ValueError(f"{red}Significant mismatch in dataset sizes across ranks. Max difference: {max_mismatch}{reset}")
 
     if save_archive and rank == 0:
-        save_data_archive(X_train, X_dev, y_train, y_dev, X_dev_sent, world_size, device.type, save_dir)
+        save_data_archive(X_train, X_val, X_test, y_train, y_val, y_test, X_test_sent, world_size, device.type, save_dir)
 
     dist.barrier()
     if rank == 0:
-        print(f"X Train shape: {list(np.shape(X_train))}, X Dev shape: {list(np.shape(X_dev))}")
-        print(f"y Train shape: {list(np.shape(y_train))}, y Dev shape: {list(np.shape(y_dev))}")
+        if validation is not None:
+            print(f"X Train shape: {list(np.shape(X_train))}, X Validation shape: {list(np.shape(X_val))}, X Test shape: {list(np.shape(X_test))}")
+            print(f"y Train shape: {list(np.shape(y_train))}, y Validation shape: {list(np.shape(y_val))}, y Test shape: {list(np.shape(y_test))}")
+        else:
+            print(f"X Train shape: {list(np.shape(X_train))}, X Test shape: {list(np.shape(X_test))}")
+            print(f"y Train shape: {list(np.shape(y_train))}, y Test shape: {list(np.shape(y_test))}")
         print(f"Data processed ({format_time(time.time() - data_process_start)})")
     
-    return X_train, X_dev, y_train, y_dev, X_dev_sent
+    return X_train, X_val, X_test, y_train, y_val, y_test, X_test_sent
 
 def process_data_chunks(texts, tokenizer, model, pooling, world_size, device, batch_size, sample_texts, rank, debug, split,
                         num_workers, prefetch, empty_cache, chunk_size=None):
@@ -794,8 +930,8 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
 
     return classifier, start_epoch, model_state_dict, optimizer_state_dict
 
-def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
-                   save_dir, X_dev_sent, wandb_run=None, decimal=2, pos_label=1, threshold=0.5, save_plots=False,
+def evaluate_model(model, bert_tokenizer, X_test, y_test, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
+                   save_dir, X_test_sent, wandb_run=None, decimal=2, pos_label=1, threshold=0.5, save_plots=False,
                    model_name=None, weights_name=None):
     eval_start = time.time()
     print(f"\n{sky_blue}Evaluating model...{reset}") if rank == 0 else None
@@ -803,7 +939,7 @@ def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict
     with torch.no_grad():
         print("Making predictions...") if rank == 0 and debug else None
         if model.finetune_bert:
-            dataset = SentimentDataset(X_dev, [0] * len(X_dev), bert_tokenizer)  # Dummy labels
+            dataset = SentimentDataset(X_test, [0] * len(X_test), bert_tokenizer)  # Dummy labels
             dataloader = DataLoader(dataset, batch_size=model.batch_size, shuffle=False)
             preds = []
             for batch in dataloader:
@@ -813,19 +949,19 @@ def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict
                 preds.append(outputs)
             preds = torch.cat(preds, dim=0)
         else:
-            if not torch.is_tensor(X_dev):
-                X_dev = torch.tensor(X_dev, device=device)
-            preds = model.model(X_dev)
+            if not torch.is_tensor(X_test):
+                X_test = torch.tensor(X_test, device=device)
+            preds = model.model(X_test)
         all_preds = [torch.zeros_like(preds) for _ in range(world_size)]
         dist.all_gather(all_preds, preds)
         if rank == 0:
-            all_preds = torch.cat(all_preds, dim=0)[:len(y_dev)]
-            preds_labels = convert_numeric_to_labels(all_preds.argmax(dim=1).cpu().numpy(), numeric_dict)
-            print(f"Predictions: {len(preds_labels)}, True labels: {len(y_dev)}") if debug else None
+            all_preds = torch.cat(all_preds, dim=0)[:len(y_test)]
+            y_pred = convert_numeric_to_labels(all_preds.argmax(dim=1).cpu().numpy(), numeric_dict)
+            print(f"Predictions: {len(y_pred)}, True labels: {len(y_test)}") if debug else None
 
             # Convert text labels to numeric labels
-            y_dev_numeric = np.array([label_dict[label] for label in y_dev])
-            preds_labels_numeric = np.array([label_dict[label] for label in preds_labels])
+            y_test_numeric = np.array([label_dict[label] for label in y_test])
+            y_pred_numeric = np.array([label_dict[label] for label in y_pred])
 
             # Set model name based on run name
             if model_name is None:
@@ -838,11 +974,11 @@ def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict
             
             # Use the DataWaza eval_model function
             metrics = eval_model(
-                y_test=y_dev_numeric,
-                y_pred=preds_labels_numeric,
+                y_test=y_test_numeric,
+                y_pred=y_pred_numeric,
                 class_map=numeric_dict,
                 estimator=model,
-                x_test=X_dev,
+                x_test=X_test,
                 class_type='multi' if len(numeric_dict) > 2 else 'binary',
                 model_name=model_name,
                 plot=False,
@@ -859,9 +995,9 @@ def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict
             # Save predictions if requested
             if save_preds:
                 df = pd.DataFrame({
-                    'X_dev_sent': X_dev_sent,
-                    'y_dev': y_dev,
-                    'preds_labels': preds_labels
+                    'X_test_sent': X_test_sent,
+                    'y_test': y_test,
+                    'y_pred': y_pred
                 })
                 # Create a save directory if it doesn't exist
                 if not os.path.exists(save_dir):
@@ -875,18 +1011,18 @@ def evaluate_model(model, bert_tokenizer, X_dev, y_dev, label_dict, numeric_dict
                 if wandb_run is not None:
                     wandb_run.log({
                         "eval/predictions": wandb.Table(
-                            data=[[sent, true, pred] for sent, true, pred in zip(X_dev_sent, y_dev, preds_labels)],
-                            columns=["X_dev_sent", "y_dev", "preds_labels"]
+                            data=[[sent, true, pred] for sent, true, pred in zip(X_test_sent, y_test, y_pred)],
+                            columns=["X_test_sent", "y_test", "y_pred"]
                         )
                     })
             #print(f"\n{bright_white}{bold}Classification report:{reset}")
             #print(classification_report(y_dev, preds_labels, digits=3, zero_division=0))
-            class_report = classification_report(y_dev, preds_labels, digits=decimal, zero_division=0, output_dict=True)
+            class_report = classification_report(y_test, y_pred, digits=decimal, zero_division=0, output_dict=True)
 
             # Create a confusion matrix
-            cm = confusion_matrix(y_dev, preds_labels, labels=list(numeric_dict.values()))
+            cm = confusion_matrix(y_test, y_pred, labels=list(numeric_dict.values()))
 
-            macro_f1_score = model.score(X_dev, y_dev, device, debug)
+            macro_f1_score = model.score(X_test, y_test, device, debug)
             print(f"\n{bright_white}{bold}Macro F1 Score:{reset} {bright_cyan}{bold}{macro_f1_score:.2f}{reset}")
 
             # Log evaluation metrics to Weights & Biases
@@ -965,8 +1101,8 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
          use_zero, l2_strength, empty_cache, decimal, scheduler_name, schedular_kwargs, finetune_transformer, finetune_layers,
          target_score, interactive, mem_interval, accumulation_steps, freeze_transformer, dropout_rate, chunk_size,
          show_progress, predict, predict_file, save_final_model, save_pickle, max_grad_norm, port, color_theme,
-         use_wandb, wandb_project, wandb_run_name, val_percent, label_template, pos_label, threshold, save_plots, model_name,
-         advance_epochs, input_queue, pipes, running):
+         use_wandb, wandb_project, wandb_run_name, val_percent, use_val_split, eval_split, label_template, pos_label,
+         threshold, save_plots, model_name, advance_epochs, input_queue, pipes, running):
     try:
         if interactive:
             response_pipe = pipes[rank][1]  # Get the specific pipe for this rank
@@ -1035,6 +1171,8 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
                 "advance_epochs": advance_epochs,
                 "show_progress": show_progress,
                 "threshold": threshold,
+                "use_val_split": use_val_split,
+                "eval_with": eval_split
             })
             print(f"Wand run initialized.") if rank == 0 else None
         else:
@@ -1045,12 +1183,13 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
 
         if data_file is not None and not finetune_transformer:
             # Load previously processed data from an archive file
-            X_train, X_dev, y_train, y_dev, X_dev_sent = load_data_archive(data_file, device, rank, sample_percent)
+            X_train, X_val, X_test, y_train, y_val, y_test, X_test_sent = load_data_archive(data_file, device, rank, sample_percent)
         else:
             # Load, tokenize and encode data
-            train, dev = load_data(dataset, eval_dataset, sample_percent, world_size, rank, debug)
-            X_train, X_dev, y_train, y_dev, X_dev_sent = process_data(tokenizer, transformer_model, pooling, world_size, train,
-                dev, device, batch_size, rank, debug, save_data, save_dir, num_workers, prefetch, empty_cache, finetune_transformer,
+            train, validation, test = load_data(dataset, eval_dataset, sample_percent, eval_split, use_val_split,
+                                                val_percent, world_size, rank, debug)
+            X_train, X_val, X_test, y_train, y_val, y_test, X_test_sent = process_data(tokenizer, transformer_model, pooling, world_size, train,
+                validation, test, device, batch_size, rank, debug, save_data, save_dir, num_workers, prefetch, empty_cache, finetune_transformer,
                 freeze_transformer, chunk_size)
 
         # Initialize and train the transformer classifier
@@ -1063,14 +1202,13 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             freeze_transformer, dropout_rate, show_progress, advance_epochs, wandb_run, val_percent, random_seed, label_dict,
             optimizer_kwargs, schedular_kwargs)
 
-        classifier.fit(X_train, y_train, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
+        classifier.fit(X_train, X_val, y_train, y_val, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
                        num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval, save_final_model, save_pickle,
                        save_dir)
         
-        
         # Evaluate the model
-        evaluate_model(classifier, tokenizer, X_dev, y_dev, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
-                       save_dir, X_dev_sent, wandb_run, decimal, pos_label, threshold, save_plots, model_name, weights_name)
+        evaluate_model(classifier, tokenizer, X_test, y_test, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
+                       save_dir, X_test_sent, wandb_run, decimal, pos_label, threshold, save_plots, model_name, weights_name)
         
         # Make predictions on unlabled test dataset
         if predict:
@@ -1118,9 +1256,10 @@ if __name__ == '__main__':
 
     # Dataset configuration
     dataset_group = parser.add_argument_group('Dataset configuration')
-    dataset_group.add_argument('--dataset', type=str, default='sst_local', help="Training dataset to use: 'sst', 'sst_local', 'dynasent_r1', 'dynasent_r2', 'mteb_tweet' (default: sst_local)")
-    dataset_group.add_argument('--eval_dataset', type=str, default=None, help="(Optional) Different evaluation dataset to use: 'sst', 'sst_local', 'dynasent_r1', 'dynasent_r2', 'mteb_tweet' (default: None)")
-    dataset_group.add_argument('--sample_percent', type=float, default=None, help='Percentage of data to use for training and evaluation (default: None)')
+    dataset_group.add_argument('--dataset', type=str, default='sst_local', help="Training dataset to use: 'sst', 'sst_local', 'dynasent_r1', 'dynasent_r2', 'mteb_tweet', 'merged_local' (default: sst_local)")
+    dataset_group.add_argument('--eval_dataset', type=str, default=None, help="(Optional) Different test dataset to use: 'sst', 'sst_local', 'dynasent_r1', 'dynasent_r2', 'mteb_tweet', 'merged_local' (default: None)")
+    dataset_group.add_argument('--eval_split', type=str, choices=['validation', 'test'], default='validation', help="Specify whether to evaluate with 'validation' or 'test' split (default: validation)")
+    dataset_group.add_argument('--sample_percent', type=float, default=None, help='Percentage of data to use for training, validation and test (default: None)')
     dataset_group.add_argument('--chunk_size', type=int, default=None, help='Number of dataset samples to encode in each chunk (default: None, process all data at once)')
     dataset_group.add_argument('--label_dict', type=parse_dict, default={'negative': 0, 'neutral': 1, 'positive': 2}, help="Text label dictionary, string to numeric (default: {'negative': 0, 'neutral': 1, 'positive': 2})")
     dataset_group.add_argument('--numeric_dict', type=parse_dict, default={0: 'negative', 1: 'neutral', 2: 'positive'}, help="Numeric label dictionary, numeric to string (default: {0: 'negative', 1: 'neutral', 2: 'positive'})")
@@ -1172,6 +1311,7 @@ if __name__ == '__main__':
     early_stopping_group.add_argument('--tol', type=float, default=1e-5, help='Tolerance for early stopping (default: 1e-5)')
     early_stopping_group.add_argument('--target_score', type=float, default=None, help='Target score for early stopping (default: None)')
     early_stopping_group.add_argument('--val_percent', type=float, default=0.1, help='Fraction of training data to use for validation (default: 0.1)')
+    early_stopping_group.add_argument('--use_val_split', action='store_true', default=False, help='Use a validation split instead of a proportion of the train data (default: False)')
 
     # Weights and bias integration
     wandb_group = parser.add_argument_group('Weights and bias integration')
@@ -1183,7 +1323,7 @@ if __name__ == '__main__':
     evaluation_group = parser.add_argument_group('Evaluation options')
     evaluation_group.add_argument('--threshold', type=float, default=0.5, help='Threshold for binary classification evaluation (default: 0.5)')
     evaluation_group.add_argument('--model_name', type=str, default=None, help='Model name for display in evaluation plots (default: None)')
-
+ 
     # Saving options
     saving_group = parser.add_argument_group('Saving options')
     saving_group.add_argument('--save_data', action='store_true', default=False, help="Save processed data to disk as an .npz archive (X_train, X_dev, y_train, y_dev, y_dev_sent)")
@@ -1343,6 +1483,8 @@ if __name__ == '__main__':
                       args.wandb_project,
                       args.wandb_run,
                       args.val_percent,
+                      args.use_val_split,
+                      args.eval_split,
                       args.label_template,
                       args.pos_label,
                       args.threshold,

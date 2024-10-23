@@ -846,7 +846,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                     dataset, num_replicas=self.world_size, rank=self.rank, shuffle=False
                 )
                 dataloader = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler)
-                
+
                 for X_batch, y_batch in dataloader:
                     X_batch = X_batch.to(device)
                     y_batch = y_batch.to(device)
@@ -918,7 +918,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         return avg_val_loss, val_score, val_accuracy
 
 
-    def fit(self, X, y, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None,
+    def fit(self, X, X_val, y, y_val, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None,
             num_workers=0, prefetch=None, empty_cache=False, decimal=6, input_queue=None, mem_interval=10,
             save_final_model=False, save_pickle=False, save_dir='saves'):
 
@@ -926,30 +926,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         if rank == 0:
             print(f"\n{sky_blue}Fitting DDP Neural Classifier on training data...{reset}")
             print(f"Num Workers: {num_workers}, Prefetch: {prefetch}")
-
-        # Build the dataset and dataloader
-        print(f"Building dataset and dataloader...") if rank == 0 else None
-
-        if self.finetune_bert:
-            if self.bert_tokenizer is None:
-                raise ValueError(f"{red}bert_tokenizer is required for fine-tuning BERT{reset}")
-            dataset = SentimentDataset(X, y, self.bert_tokenizer, self.label_dict, device=self.device)
-            self.classes_ = sorted(set(y))
-            self.n_classes_ = len(self.classes_)
-        else:
-            dataset = self.build_dataset(X, y)
-
-        if self.device.type == 'cuda' and world_size > 1:
-            sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
-            dataloader = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler, num_workers=num_workers, prefetch_factor=prefetch)
-        else:
-            dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=num_workers, prefetch_factor=prefetch)
-
-        # Set the classes and label dictionaries
-        if self.label_dict is None:
-            self.label_dict = {label: idx for idx, label in enumerate(self.classes_)}
-        if self.numeric_dict is None:
-            self.numeric_dict = {idx: label for label, idx in self.label_dict.items()}
 
         # Print tolerance as float with as many decimal places as in the tolerance
         tol_str = format_tolerance(self.tol)        
@@ -959,7 +935,13 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             if rank == 0:
                 print(f"Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: {self.validation_fraction}")
                 print(f"Training will stop early if the score does not improve by at least {tol_str} for {self.n_iter_no_change} iterations.")
-                (X_train, y_train), (X_val, y_val) = self._build_validation_split(X, y, validation_fraction=self.validation_fraction, random_seed=self.random_seed)
+                if X_val is None and y_val is None:
+                    print(f"Splitting data into training and validation sets...")
+                    (X_train, y_train), (X_val, y_val) = self._build_validation_split(X, y, validation_fraction=self.validation_fraction, random_seed=self.random_seed)
+                    print(f"Split data into (X:{len(X_train)}, y:{len(y_train)}) Training samples, and (X:{len(X_val)}, y:{len(y_val)}) Validation samples.")
+                else:
+                    print(f"Using provided validation set for early stopping.")
+                    X_train, y_train = X, y
                 data_list = [X_train, y_train, X_val, y_val]
             else:
                 data_list = [None, None, None, None]
@@ -968,8 +950,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 dist.broadcast_object_list(data_list, src=0)
                 # Unpack the broadcasted data
                 X_train, y_train, X_val, y_val = data_list
-            if rank == 0:
-                print(f"Split data into (X:{len(X_train)}, y:{len(y_train)}) Training samples, and (X:{len(X_val)}, y:{len(y_val)}) Validation samples.")
         elif self.early_stopping == 'loss':
             if rank == 0:
                 print(f"Loss-based early stopping enabled. No validation set required, all data used for training.")
@@ -988,6 +968,31 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 self.target_score = None
             else:
                 print(f"Target score set to {self.target_score}. Training will stop if this validation score is reached.") if rank == 0 else None
+
+        # Build the dataset and dataloader
+        print(f"Building dataset and dataloader...") if rank == 0 else None
+
+        if self.finetune_bert:
+            if self.bert_tokenizer is None:
+                raise ValueError(f"{red}bert_tokenizer is required for fine-tuning BERT{reset}")
+            dataset = SentimentDataset(X_train, y_train, self.bert_tokenizer, self.label_dict, device=self.device)
+            self.classes_ = sorted(set(y))
+            self.n_classes_ = len(self.classes_)
+        else:
+            dataset = self.build_dataset(X_train, y_train)
+
+        if self.device.type == 'cuda' and world_size > 1:
+            sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
+            dataloader = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler, num_workers=num_workers, prefetch_factor=prefetch)
+        else:
+            dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=num_workers, prefetch_factor=prefetch)
+
+        # Set the classes and label dictionaries
+        if self.label_dict is None:
+            self.label_dict = {label: idx for idx, label in enumerate(self.classes_)}
+        if self.numeric_dict is None:
+            self.numeric_dict = {idx: label for label, idx in self.label_dict.items()}
+
 
         # Initialize the model, optimizer, and set it in training mode
         print("Initializing model, graph, optimizer...") if rank == 0 else None
