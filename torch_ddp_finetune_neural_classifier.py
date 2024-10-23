@@ -455,6 +455,11 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
     def build_optimizer(self):
         if self.use_zero:
+             # Make parameters contiguous before passing to ZeroRedundancyOptimizer
+            for param in self.model.parameters():
+                if param.requires_grad:
+                    param.data = param.data.contiguous()
+                    
             optimizer = ZeroRedundancyOptimizer(
                 self.model.parameters(),
                 optimizer_class=self.optimizer_class,
