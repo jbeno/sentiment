@@ -242,6 +242,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 advance_epochs=1,
                 wandb_run = None,
                 random_seed=42,
+                lr_decay=1.0,
                 optimizer_kwargs={},
                 scheduler_kwargs={}):
         """
@@ -378,6 +379,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         self.scheduler_kwargs = scheduler_kwargs or {}
         self.wandb_run = wandb_run
         self.random_seed = random_seed
+        self.lr_decay = lr_decay
         
         self.loss = nn.CrossEntropyLoss(reduction="mean")
 
@@ -453,29 +455,74 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
         return model
 
-    def build_optimizer(self):
+    def build_optimizer(self):      
+        # Group parameters by layer depth with different learning rates
+        lr_decay = getattr(self, 'lr_decay', 1.0)  # Default to 1.0 if not set
+        
+        if self.finetune_bert:  # Only do layer-wise decay if we're fine-tuning BERT
+            if hasattr(self.model, 'module'):
+                bert = self.model.module.bert
+            else:
+                bert = self.model.bert
+                
+            # Create parameter groups with decaying learning rates
+            optimizer_grouped_parameters = []
+            
+            # Classifier (highest learning rate)
+            optimizer_grouped_parameters.append({
+                'params': [p for n, p in self.model.named_parameters() if 'classifier' in n],
+                'lr': self.eta,
+                'weight_decay': self.l2_strength
+            })
+            
+            # BERT layers
+            num_layers = len(bert.encoder.layer)
+            for layer_num in range(num_layers):
+                layer = bert.encoder.layer[-(layer_num + 1)]  # Start from last layer
+                layer_lr = self.eta * (lr_decay ** layer_num)
+                optimizer_grouped_parameters.append({
+                    'params': layer.parameters(),
+                    'lr': layer_lr,
+                    'weight_decay': self.l2_strength
+                })
+            
+            # Embeddings (lowest learning rate)
+            embeddings_lr = self.eta * (lr_decay ** num_layers)
+            optimizer_grouped_parameters.append({
+                'params': bert.embeddings.parameters(),
+                'lr': embeddings_lr,
+                'weight_decay': self.l2_strength
+            })
+        else:
+            # Standard parameter groups without layer-wise decay
+            optimizer_grouped_parameters = [{
+                'params': self.model.parameters(),
+                'lr': self.eta,
+                'weight_decay': self.l2_strength
+            }]
+
         if self.use_zero:
-             # Make parameters contiguous before passing to ZeroRedundancyOptimizer
-            for param in self.model.parameters():
-                if param.requires_grad:
-                    param.data = param.data.contiguous()
-                    
+            # Make parameters contiguous
+            for group in optimizer_grouped_parameters:
+                for param in group['params']:
+                    if param.requires_grad:
+                        param.data = param.data.contiguous()
+                        
             optimizer = ZeroRedundancyOptimizer(
-                self.model.parameters(),
+                optimizer_grouped_parameters,
                 optimizer_class=self.optimizer_class,
-                lr=self.eta,
-                weight_decay=self.l2_strength,
                 **self.optimizer_kwargs
             )
         else:
             optimizer = self.optimizer_class(
-                self.model.parameters(),
-                lr=self.eta,
-                weight_decay=self.l2_strength,
+                optimizer_grouped_parameters,
                 **self.optimizer_kwargs
             )
+
         if self.rank == 0:
-            print(f"Using optimizer: {self.optimizer_class.__name__}, Use Zero: {self.use_zero}, Learning Rate: {self.eta}, L2 strength: {self.l2_strength}")
+            print(f"Using optimizer: {self.optimizer_class.__name__}, Use Zero: {self.use_zero}, Base Learning Rate: {self.eta}, L2 strength: {self.l2_strength}")
+            if self.finetune_bert and lr_decay != 1.0:
+                print(f"Layer-wise decay factor: {lr_decay}")
             if self.optimizer_kwargs:
                 print("Optimizer arguments:")
                 for key, value in self.optimizer_kwargs.items():
@@ -488,20 +535,20 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                     self.scheduler_kwargs['T_max'] = self.max_iter
             elif self.scheduler_class == optim.lr_scheduler.CosineAnnealingWarmRestarts:
                 if 'T_0' not in self.scheduler_kwargs:
-                    self.scheduler_kwargs['T_0'] = self.max_iter // 10  # Restart every 1/10th of total epochs
+                    self.scheduler_kwargs['T_0'] = self.max_iter // 10
             elif self.scheduler_class == optim.lr_scheduler.StepLR:
                 if 'step_size' not in self.scheduler_kwargs:
-                    self.scheduler_kwargs['step_size'] = self.max_iter // 3  # Step every 1/3 of total epochs
+                    self.scheduler_kwargs['step_size'] = self.max_iter // 3
             elif self.scheduler_class == optim.lr_scheduler.MultiStepLR:
                 if 'milestones' not in self.scheduler_kwargs:
-                    self.scheduler_kwargs['milestones'] = [self.max_iter // 2, self.max_iter * 3 // 4]  # Steps at 1/2 and 3/4 of total epochs
+                    self.scheduler_kwargs['milestones'] = [self.max_iter // 2, self.max_iter * 3 // 4]
             elif self.scheduler_class == optim.lr_scheduler.CyclicLR:
                 if 'base_lr' not in self.scheduler_kwargs:
                     self.scheduler_kwargs['base_lr'] = self.eta / 10
                 if 'max_lr' not in self.scheduler_kwargs:
                     self.scheduler_kwargs['max_lr'] = self.eta
                 if 'step_size_up' not in self.scheduler_kwargs:
-                    self.scheduler_kwargs['step_size_up'] = self.max_iter // 20  # 1/20th of total epochs
+                    self.scheduler_kwargs['step_size_up'] = self.max_iter // 20
 
             scheduler = self.scheduler_class(optimizer, **self.scheduler_kwargs)
 
@@ -511,7 +558,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                     print("Scheduler arguments:")
                     for key, value in self.scheduler_kwargs.items():
                         print(f"- {key}: {value}")
-            
+                
         else:
             scheduler = None
         

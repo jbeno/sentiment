@@ -855,7 +855,7 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
 
 
 def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_layers, num_layers, hidden_dim, batch_size,
-                          epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
+                          epochs, lr, lr_decay, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
                           checkpoint_dir, checkpoint_interval, resume_from_checkpoint, filename=None, use_saved_params=True,
                           optimizer_name=None, use_zero=True, scheduler_name=None, l2_strength=0.0, pooling='cls',
                           target_score=None, interactive=False, response_pipe=None, accumulation_steps=1, max_grad_norm=None,
@@ -884,6 +884,7 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
         n_iter_no_change=n_iter_no_change,
         tol=tol,
         eta=lr,
+        lr_decay=lr_decay,
         rank=rank,
         world_size=world_size,
         debug=debug,
@@ -1095,7 +1096,7 @@ def make_predictions(classifier, tokenizer, transformer_model, predict_file, num
 
 # Main function for DDP training
 def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_name, hidden_activation, label_dict,
-         numeric_dict, num_layers, hidden_dim, batch_size, epochs, lr, sample_percent, random_seed, early_stop,
+         numeric_dict, num_layers, hidden_dim, batch_size, epochs, lr, lr_decay, sample_percent, random_seed, early_stop,
          n_iter_no_change, tol, pooling, debug, checkpoint_dir, checkpoint_interval, resume_from_checkpoint, save_preds,
          save_dir, model_file, use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, optimizer_kwargs,
          use_zero, l2_strength, empty_cache, decimal, scheduler_name, schedular_kwargs, finetune_transformer, finetune_layers,
@@ -1196,7 +1197,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         classifier, start_epoch, model_state_dict, optimizer_state_dict = initialize_classifier(
             transformer_model if finetune_transformer else None, tokenizer if finetune_transformer else None,
             finetune_transformer, finetune_layers, num_layers, hidden_dim,
-            batch_size, epochs, lr, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
+            batch_size, epochs, lr, lr_decay, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
             checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name, use_zero,
             scheduler_name, l2_strength, pooling, target_score, interactive, response_pipe, accumulation_steps, max_grad_norm,
             freeze_transformer, dropout_rate, show_progress, advance_epochs, wandb_run, val_percent, random_seed, label_dict,
@@ -1287,6 +1288,7 @@ if __name__ == '__main__':
     training_group.add_argument('--accumulation_steps', type=int, default=1, help='Number of steps to accumulate gradients before updating weights (default: 1)')
     training_group.add_argument('--epochs', type=int, default=100, help='Number of epochs to train (default: 100)')
     training_group.add_argument('--lr', type=float, default=0.001, help='Learning rate (default: 0.001)')
+    training_group.add_argument('--lr_decay', type=float, default=1.0, help='Learning rate decay factor, defaults to none, 0.95 is 5% per layer (default: 1.0)')
     training_group.add_argument('--optimizer', type=str, default='adam', help="Optimizer to use: 'adam', 'sgd', 'adagrad', 'rmsprop', 'zero', 'adamw' (default: 'adam')")
     training_group.add_argument('--use_zero', action='store_true', default=False, help='Use Zero Redundancy Optimizer for efficient DDP training, with the optimizer specified in --optimizer (default: False)')
     training_group.add_argument('--l2_strength', type=float, default=0.0, help='L2 regularization strength for optimizer (default: 0.0)')
@@ -1436,6 +1438,7 @@ if __name__ == '__main__':
                       args.batch_size,
                       args.epochs,
                       args.lr,
+                      args.lr_decay,
                       args.sample_percent,
                       args.random_seed,
                       args.early_stop,
