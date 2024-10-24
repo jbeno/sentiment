@@ -856,7 +856,7 @@ def bert_phi(texts, tokenizer, model, pooling, world_size, device, batch_size, s
 
 def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_layers, num_layers, hidden_dim, batch_size,
                           epochs, lr, lr_decay, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
-                          checkpoint_dir, checkpoint_interval, resume_from_checkpoint, filename=None, use_saved_params=True,
+                          checkpoint_dir, checkpoint_interval, resume_from_checkpoint, filename=None, load_classifer_only=False, use_saved_params=True,
                           optimizer_name=None, use_zero=True, scheduler_name=None, l2_strength=0.0, pooling='cls',
                           target_score=None, interactive=False, response_pipe=None, accumulation_steps=1, max_grad_norm=None,
                           freeze_bert=False, dropout_rate=0.0, show_progress=False, advance_epochs=1, wandb_run=None, val_percent=0.1,
@@ -915,10 +915,10 @@ def initialize_classifier(bert_model, bert_tokenizer, finetune_bert, finetune_la
 
     if filename is not None:
         print(f"Loading model from: {checkpoint_dir}/{filename}...") if rank == 0 else None
-        start_epoch, model_state_dict, optimizer_state_dict = classifier.load_model(directory=checkpoint_dir, filename=filename, pattern=None, use_saved_params=use_saved_params, rank=rank, debug=debug)
+        start_epoch, model_state_dict, optimizer_state_dict = classifier.load_model(directory=checkpoint_dir, filename=filename, pattern=None, use_saved_params=use_saved_params, rank=rank, debug=debug, load_classifier_only=load_classifer_only)
     elif resume_from_checkpoint:
         print("Resuming training from the latest checkpoint...") if rank == 0 else None
-        start_epoch, model_state_dict, optimizer_state_dict = classifier.load_model(directory=checkpoint_dir, filename=None, pattern='checkpoint_epoch', use_saved_params=use_saved_params, rank=rank, debug=debug)
+        start_epoch, model_state_dict, optimizer_state_dict = classifier.load_model(directory=checkpoint_dir, filename=None, pattern='checkpoint_epoch', use_saved_params=use_saved_params, rank=rank, debug=debug, load_classifier_only=load_classifer_only)
     else:
         start_epoch = 1
         model_state_dict = None
@@ -1103,7 +1103,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
          target_score, interactive, mem_interval, accumulation_steps, freeze_transformer, dropout_rate, chunk_size,
          show_progress, predict, predict_file, save_final_model, save_pickle, max_grad_norm, port, color_theme,
          use_wandb, wandb_project, wandb_run_name, wandb_alerts, val_percent, use_val_split, eval_split, label_template, pos_label,
-         threshold, save_plots, model_name, advance_epochs, input_queue, pipes, running):
+         threshold, save_plots, model_name, load_classifier_only, advance_epochs, input_queue, pipes, running):
     try:
         if interactive:
             response_pipe = pipes[rank][1]  # Get the specific pipe for this rank
@@ -1198,7 +1198,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             transformer_model if finetune_transformer else None, tokenizer if finetune_transformer else None,
             finetune_transformer, finetune_layers, num_layers, hidden_dim,
             batch_size, epochs, lr, lr_decay, early_stop, hidden_activation, n_iter_no_change, tol, rank, world_size, device, debug,
-            checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, use_saved_params, optimizer_name, use_zero,
+            checkpoint_dir, checkpoint_interval, resume_from_checkpoint, model_file, load_classifier_only, use_saved_params, optimizer_name, use_zero,
             scheduler_name, l2_strength, pooling, target_score, interactive, response_pipe, accumulation_steps, max_grad_norm,
             freeze_transformer, dropout_rate, show_progress, advance_epochs, wandb_run, val_percent, random_seed, label_dict,
             optimizer_kwargs, schedular_kwargs)
@@ -1344,6 +1344,7 @@ if __name__ == '__main__':
     loading_group.add_argument('--data_file', type=str, default=None, help="Filename of the processed data to load as an .npz archive (default: None)")
     loading_group.add_argument('--model_file', type=str, default=None, help="Filename of the classifier model or checkpoint to load (default: None)")
     loading_group.add_argument('--use_saved_params', action='store_true', default=False, help="Use saved parameters for training, if loading a model")
+    loading_group.add_argument('--load_classifier_only', action='store_true', default=False, help="Load only the classifier weights from checkpoint, ignore the BERT model weights (default: False)")
 
     # Prediction options
     prediction_group = parser.add_argument_group('Prediction options')
@@ -1498,6 +1499,7 @@ if __name__ == '__main__':
                       args.threshold,
                       args.save_plots,
                       args.model_name,
+                      args.load_classifier_only,
                       advance_epochs,
                       input_queue,
                       pipes,

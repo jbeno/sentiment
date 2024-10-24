@@ -682,27 +682,69 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             print_state_summary(saveable_params)
     
 
-    def load_model(self, directory='checkpoints', filename=None, pattern='checkpoint_epoch', use_saved_params=True, rank=0, debug=False):
+    def load_model(self, directory='checkpoints', filename=None, pattern='checkpoint_epoch', use_saved_params=True, 
+                rank=0, debug=False, load_classifier_only=False):
+        """
+        Load a model from a checkpoint, with support for selective weight loading.
+        
+        Args:
+            directory (str): Directory containing the checkpoint
+            filename (str, optional): Specific checkpoint file to load
+            pattern (str, optional): Pattern to match when finding latest checkpoint
+            use_saved_params (bool): Whether to update model parameters from checkpoint
+            rank (int): Process rank for distributed training
+            debug (bool): Whether to print debug information
+            load_classifier_only (bool): If True, only load classifier weights, ignoring BERT weights
+        
+        Returns:
+            tuple: (start_epoch, model_state_dict, optimizer_state_dict)
+        """
         if not os.path.exists(directory):
             raise ValueError(f"Directory {directory} does not exist")
 
+        # Find the checkpoint file
         if filename is not None:
-            latest_checkpoint = os.path.join(directory, filename)
+            checkpoint_path = os.path.join(directory, filename)
         else:
-            # Find the latest file if no specific file is given
             matching_files = [os.path.join(directory, d) for d in os.listdir(directory) if pattern in d]
             if not matching_files:
                 raise ValueError(f"No files matching the pattern '{pattern}' found in directory: {directory}")
-            latest_checkpoint = max(matching_files, key=os.path.getctime)
+            checkpoint_path = max(matching_files, key=os.path.getctime)
 
-        checkpoint = torch.load(latest_checkpoint, map_location=self.device)
-        print(f"Loaded checkpoint: {latest_checkpoint}") if rank == 0 else None
+        # Load the checkpoint
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        print(f"Loaded checkpoint: {checkpoint_path}") if rank == 0 else None
 
         # Get the model state dict if it exists
         model_state_dict = checkpoint.get('model_state_dict')
         if model_state_dict:
             # Remove 'module.' prefix if exists
             model_state_dict = {k.replace("module.", ""): v for k, v in model_state_dict.items()}
+
+            if load_classifier_only:
+                # Create a new state dict with only the classifier weights
+                classifier_state_dict = {}
+                for key, value in model_state_dict.items():
+                    # Only copy classifier or layers weights (depending on model type)
+                    if key.startswith('classifier.') or key.startswith('layers.'):
+                        new_key = key
+                        if self.finetune_bert:
+                            # If we're in fine-tuning mode, ensure classifier weights go to the right place
+                            if key.startswith('layers.'):
+                                new_key = f'classifier.{key}'
+                        classifier_state_dict[new_key] = value
+                
+                if debug and rank == 0:
+                    print("\nSelectively loading classifier weights only:")
+                    print("Original state dict keys:", len(model_state_dict))
+                    print("Classifier state dict keys:", len(classifier_state_dict))
+                    if debug:
+                        print("\nClassifier weights to load:")
+                        for key in classifier_state_dict.keys():
+                            print(f"  {key}")
+                
+                model_state_dict = classifier_state_dict
+
             print(f"Retrieved model state dictionary.") if rank == 0 else None
             if debug:
                 print_state_summary(model_state_dict)
@@ -729,6 +771,9 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             # Update the parameters
             for key, value in saved_params.items():
                 if hasattr(self, key):
+                    # Skip updating certain parameters if we're only loading classifier weights
+                    if load_classifier_only and key in ['finetune_bert', 'finetune_layers', 'bert_model', 'bert_tokenizer']:
+                        continue
                     setattr(self, key, value)
             
             if debug and rank == 0:
