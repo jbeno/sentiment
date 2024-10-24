@@ -1102,7 +1102,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
          use_zero, l2_strength, empty_cache, decimal, scheduler_name, schedular_kwargs, finetune_transformer, finetune_layers,
          target_score, interactive, mem_interval, accumulation_steps, freeze_transformer, dropout_rate, chunk_size,
          show_progress, predict, predict_file, save_final_model, save_pickle, max_grad_norm, port, color_theme,
-         use_wandb, wandb_project, wandb_run_name, val_percent, use_val_split, eval_split, label_template, pos_label,
+         use_wandb, wandb_project, wandb_run_name, wandb_alerts, val_percent, use_val_split, eval_split, label_template, pos_label,
          threshold, save_plots, model_name, advance_epochs, input_queue, pipes, running):
     try:
         if interactive:
@@ -1176,6 +1176,8 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
                 "eval_with": eval_split
             })
             print(f"Wand run initialized.") if rank == 0 else None
+            if wandb_alerts:
+                wandb.alerts()
         else:
             wandb_run = None
 
@@ -1235,12 +1237,16 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
         cleanup_and_exit(rank, debug, response_pipe, input_queue)
     except Exception as e:
         print(f"An error occurred during training: {str(e)}")
+        if wandb_alerts:
+            wandb.alert(title="Training Error", text=f"An error occurred during training: {str(e)}")
         traceback.print_exc()
         cleanup_and_exit(rank, debug, response_pipe, input_queue)
     finally:
         if rank == 0:
             with running.get_lock():
                 running.value = False
+        if wandb_alerts:
+            wandb.alert(title="Training Completed", text="Training completed successfully.")
         cleanup_and_exit(rank, debug, response_pipe, input_queue)
     
     return
@@ -1320,7 +1326,7 @@ if __name__ == '__main__':
     wandb_group.add_argument('--wandb', action='store_true', default=False, help='Use Weights and Biases for logging (default: False)')
     wandb_group.add_argument('--wandb_project', type=str, default=None, help="Weights and Biases project name (default: None)")
     wandb_group.add_argument('--wandb_run', type=str, default=None, help="Weights and Biases run name (default: None)")
-
+    wandb_group.add_argument('--wandb_alerts', action='store_true', default=False, help='Enable Weights and Biases alerts (default: False)')
     # Evaluation options
     evaluation_group = parser.add_argument_group('Evaluation options')
     evaluation_group.add_argument('--threshold', type=float, default=0.5, help='Threshold for binary classification evaluation (default: 0.5)')
@@ -1485,6 +1491,7 @@ if __name__ == '__main__':
                       args.wandb,
                       args.wandb_project,
                       args.wandb_run,
+                      args.wandb_alerts,
                       args.val_percent,
                       args.use_val_split,
                       args.eval_split,
