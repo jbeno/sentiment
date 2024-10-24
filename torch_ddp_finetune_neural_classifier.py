@@ -682,79 +682,27 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             print_state_summary(saveable_params)
     
 
-    def load_model(self, directory='checkpoints', filename=None, pattern='checkpoint_epoch', use_saved_params=True, 
-                rank=0, debug=False, load_classifier_only=False):
-        """
-        Load a model from a checkpoint, with support for selective weight loading.
-        """
+    def load_model(self, directory='checkpoints', filename=None, pattern='checkpoint_epoch', use_saved_params=True, rank=0, debug=False):
         if not os.path.exists(directory):
             raise ValueError(f"Directory {directory} does not exist")
 
-        # Find the checkpoint file
         if filename is not None:
-            checkpoint_path = os.path.join(directory, filename)
+            latest_checkpoint = os.path.join(directory, filename)
         else:
+            # Find the latest file if no specific file is given
             matching_files = [os.path.join(directory, d) for d in os.listdir(directory) if pattern in d]
             if not matching_files:
                 raise ValueError(f"No files matching the pattern '{pattern}' found in directory: {directory}")
-            checkpoint_path = max(matching_files, key=os.path.getctime)
+            latest_checkpoint = max(matching_files, key=os.path.getctime)
 
-        # Load the checkpoint
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        print(f"Loaded checkpoint: {checkpoint_path}") if rank == 0 else None
+        checkpoint = torch.load(latest_checkpoint, map_location=self.device)
+        print(f"Loaded checkpoint: {latest_checkpoint}") if rank == 0 else None
 
-        # Get the model state dict
+        # Get the model state dict if it exists
         model_state_dict = checkpoint.get('model_state_dict')
         if model_state_dict:
             # Remove 'module.' prefix if exists
             model_state_dict = {k.replace("module.", ""): v for k, v in model_state_dict.items()}
-
-            if load_classifier_only:
-                # Create a new state dict with only the classifier weights
-                classifier_state_dict = {}
-                for key, value in model_state_dict.items():
-                    # Only copy classifier or layers weights (depending on model type)
-                    if key.startswith('classifier.') or key.startswith('layers.'):
-                        new_key = key
-                        if self.finetune_bert:
-                            # If we're in fine-tuning mode, ensure classifier weights go to the right place
-                            if key.startswith('layers.'):
-                                new_key = f'classifier.{key}'
-                        classifier_state_dict[new_key] = value
-                
-                if debug and rank == 0:
-                    print("\nSelectively loading classifier weights only:")
-                    print("Original state dict keys:", len(model_state_dict))
-                    print("Classifier state dict keys:", len(classifier_state_dict))
-                    print("\nClassifier weights to load:")
-                    for key in classifier_state_dict.keys():
-                        print(f"  {key}")
-                
-                # Load the classifier weights with strict=False to ignore missing BERT weights
-                missing_keys, unexpected_keys = self.model.load_state_dict(classifier_state_dict, strict=False)
-                
-                if debug and rank == 0:
-                    print("\nLoad results:")
-                    print(f"Missing keys (expected for BERT weights): {len(missing_keys)}")
-                    print(f"Unexpected keys: {len(unexpected_keys)}")
-                    if unexpected_keys:
-                        print("Unexpected keys:", unexpected_keys)
-                
-            else:
-                # Try to load the full state dict
-                try:
-                    self.model.load_state_dict(model_state_dict)
-                    if rank == 0:
-                        print("Successfully loaded full model state.")
-                except RuntimeError as e:
-                    if "Missing key(s)" in str(e) and load_classifier_only:
-                        # If we're loading classifier only, this is expected
-                        if rank == 0:
-                            print("Note: Missing BERT weights as expected when loading classifier only.")
-                    else:
-                        # If we're not explicitly loading classifier only, this is an error
-                        raise e
-
             print(f"Retrieved model state dictionary.") if rank == 0 else None
             if debug:
                 print_state_summary(model_state_dict)
@@ -763,13 +711,12 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
         # Get the optimizer state dict if it exists
         optimizer_state_dict = checkpoint.get('optimizer_state_dict')
-        if optimizer_state_dict and not load_classifier_only:  # Don't load optimizer state if loading classifier only
+        if optimizer_state_dict:
             print(f"Retrieved optimizer state dictionary.") if rank == 0 else None
             if debug:
                 print_state_summary(optimizer_state_dict)
         else:
-            optimizer_state_dict = None
-            print(f"No optimizer state dictionary loaded.") if rank == 0 else None
+            print(f"No optimizer state dictionary found in checkpoint.") if rank == 0 else None
 
         # Optionally update model parameters with the saved parameters
         if use_saved_params and 'params' in checkpoint:
@@ -782,9 +729,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             # Update the parameters
             for key, value in saved_params.items():
                 if hasattr(self, key):
-                    # Skip updating certain parameters if we're only loading classifier weights
-                    if load_classifier_only and key in ['finetune_bert', 'finetune_layers', 'bert_model', 'bert_tokenizer']:
-                        continue
                     setattr(self, key, value)
             
             if debug and rank == 0:
