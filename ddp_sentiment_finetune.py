@@ -1176,8 +1176,6 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
                 "eval_with": eval_split
             })
             print(f"Wand run initialized.") if rank == 0 else None
-            if wandb_alerts:
-                wandb.alerts()
         else:
             wandb_run = None
 
@@ -1221,6 +1219,8 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
 
         # Finish the wandb run
         if rank == 0 and use_wandb:
+            if wandb_alerts:
+                wandb.alert(title=f"{wandb_run} Completed", text="Training completed successfully.")
             wandb.finish()
 
         print(f"TOTAL Time: {format_time(time.time() - start_time)}") if rank == 0 else None
@@ -1238,15 +1238,13 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
     except Exception as e:
         print(f"An error occurred during training: {str(e)}")
         if wandb_alerts:
-            wandb.alert(title="Training Error", text=f"An error occurred during training: {str(e)}")
+            wandb.alert(title=f"{wandb_run} Crashed", text=f"An error occurred during training: {str(e)}")
         traceback.print_exc()
         cleanup_and_exit(rank, debug, response_pipe, input_queue)
     finally:
         if rank == 0:
             with running.get_lock():
                 running.value = False
-        if wandb_alerts:
-            wandb.alert(title="Training Completed", text="Training completed successfully.")
         cleanup_and_exit(rank, debug, response_pipe, input_queue)
     
     return
