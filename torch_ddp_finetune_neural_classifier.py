@@ -686,18 +686,6 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 rank=0, debug=False, load_classifier_only=False):
         """
         Load a model from a checkpoint, with support for selective weight loading.
-        
-        Args:
-            directory (str): Directory containing the checkpoint
-            filename (str, optional): Specific checkpoint file to load
-            pattern (str, optional): Pattern to match when finding latest checkpoint
-            use_saved_params (bool): Whether to update model parameters from checkpoint
-            rank (int): Process rank for distributed training
-            debug (bool): Whether to print debug information
-            load_classifier_only (bool): If True, only load classifier weights, ignoring BERT weights
-        
-        Returns:
-            tuple: (start_epoch, model_state_dict, optimizer_state_dict)
         """
         if not os.path.exists(directory):
             raise ValueError(f"Directory {directory} does not exist")
@@ -715,7 +703,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
         print(f"Loaded checkpoint: {checkpoint_path}") if rank == 0 else None
 
-        # Get the model state dict if it exists
+        # Get the model state dict
         model_state_dict = checkpoint.get('model_state_dict')
         if model_state_dict:
             # Remove 'module.' prefix if exists
@@ -738,12 +726,34 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                     print("\nSelectively loading classifier weights only:")
                     print("Original state dict keys:", len(model_state_dict))
                     print("Classifier state dict keys:", len(classifier_state_dict))
-                    if debug:
-                        print("\nClassifier weights to load:")
-                        for key in classifier_state_dict.keys():
-                            print(f"  {key}")
+                    print("\nClassifier weights to load:")
+                    for key in classifier_state_dict.keys():
+                        print(f"  {key}")
                 
-                model_state_dict = classifier_state_dict
+                # Load the classifier weights with strict=False to ignore missing BERT weights
+                missing_keys, unexpected_keys = self.model.load_state_dict(classifier_state_dict, strict=False)
+                
+                if debug and rank == 0:
+                    print("\nLoad results:")
+                    print(f"Missing keys (expected for BERT weights): {len(missing_keys)}")
+                    print(f"Unexpected keys: {len(unexpected_keys)}")
+                    if unexpected_keys:
+                        print("Unexpected keys:", unexpected_keys)
+                
+            else:
+                # Try to load the full state dict
+                try:
+                    self.model.load_state_dict(model_state_dict)
+                    if rank == 0:
+                        print("Successfully loaded full model state.")
+                except RuntimeError as e:
+                    if "Missing key(s)" in str(e) and load_classifier_only:
+                        # If we're loading classifier only, this is expected
+                        if rank == 0:
+                            print("Note: Missing BERT weights as expected when loading classifier only.")
+                    else:
+                        # If we're not explicitly loading classifier only, this is an error
+                        raise e
 
             print(f"Retrieved model state dictionary.") if rank == 0 else None
             if debug:
@@ -753,12 +763,13 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
         # Get the optimizer state dict if it exists
         optimizer_state_dict = checkpoint.get('optimizer_state_dict')
-        if optimizer_state_dict:
+        if optimizer_state_dict and not load_classifier_only:  # Don't load optimizer state if loading classifier only
             print(f"Retrieved optimizer state dictionary.") if rank == 0 else None
             if debug:
                 print_state_summary(optimizer_state_dict)
         else:
-            print(f"No optimizer state dictionary found in checkpoint.") if rank == 0 else None
+            optimizer_state_dict = None
+            print(f"No optimizer state dictionary loaded.") if rank == 0 else None
 
         # Optionally update model parameters with the saved parameters
         if use_saved_params and 'params' in checkpoint:
