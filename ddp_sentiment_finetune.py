@@ -319,6 +319,10 @@ def load_data(dataset, eval_dataset, sample_percent, eval_split, use_val_split, 
             dataset_name = 'Merged DynaSent Round 1, Round 2 and SST: Negative Only'
             dataset_source = 'Local'
             dataset_path = os.path.join('data', 'merged')
+        elif id == 'merged_balanced':
+            dataset_name = 'Merged DynaSent Round 1, Round 2 and SST: Balanced'
+            dataset_source = 'Local'
+            dataset_path = os.path.join('data', 'merged')
         else:
             raise ValueError(f"Unknown dataset: {id}")
         print(f"{purpose} Data: {dataset_name} from {dataset_source}: '{dataset_path}'") if rank == 0 else None
@@ -366,6 +370,13 @@ def load_data(dataset, eval_dataset, sample_percent, eval_split, use_val_split, 
         elif id == 'merged_local':
             if split == 'train':
                 data_split = pd.read_csv(os.path.join(dataset_path, 'train_all.csv'), index_col=None)
+            elif split in ['dev', 'validation']:
+                data_split = pd.read_csv(os.path.join(dataset_path, 'val_all.csv'), index_col=None)
+            elif split == 'test':
+                data_split = pd.read_csv(os.path.join(dataset_path, 'test_all.csv'), index_col=None)
+        elif id == 'merged_balanced':
+            if split == 'train':
+                data_split = pd.read_csv(os.path.join(dataset_path, 'train_balanced.csv'), index_col=None)
             elif split in ['dev', 'validation']:
                 data_split = pd.read_csv(os.path.join(dataset_path, 'val_all.csv'), index_col=None)
             elif split == 'test':
