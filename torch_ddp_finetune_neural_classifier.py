@@ -1599,7 +1599,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                 dist.broadcast(param.data, 0)
         
         # Save the wandb model in onnx format
-        if self.wandb_run and rank == 0:
+        if self.wandb_run and save_final_model and rank == 0:
             print("Saving model in ONNX format...")
             
             # Suppress TracerWarnings
