@@ -1,0 +1,149 @@
+{
+  "experiment_name": "B4-G4O",
+  "start_time": "2024-10-30 05:06:59",
+  "notes": "Baseline 4: Establish GPT-4o baseline with prompt",
+  "model": "gpt-4o-2024-08-06",
+  "instance": "gpt_sentiment",
+  "dataset_shape": [
+    6530,
+    4
+  ],
+  "examples_length": 6530,
+  "results_shape": [
+    6530,
+    5
+  ],
+  "save_directory": "research",
+  "merged_local": {
+    "negative": {
+      "precision": 0.8284686125549781,
+      "recall": 0.8809523809523809,
+      "f1-score": 0.8539048011539254,
+      "support": 2352.0
+    },
+    "neutral": {
+      "precision": 0.6736631684157921,
+      "recall": 0.7370147621651175,
+      "f1-score": 0.7039164490861619,
+      "support": 1829.0
+    },
+    "positive": {
+      "precision": 0.9132149901380671,
+      "recall": 0.7884206045125586,
+      "f1-score": 0.8462417180717386,
+      "support": 2349.0
+    },
+    "accuracy": 0.8073506891271056,
+    "macro avg": {
+      "precision": 0.8051155903696124,
+      "recall": 0.802129249210019,
+      "f1-score": 0.8013543227706087,
+      "support": 6530.0
+    },
+    "weighted avg": {
+      "precision": 0.8155941996318701,
+      "recall": 0.8073506891271056,
+      "f1-score": 0.8091376835288111,
+      "support": 6530.0
+    }
+  },
+  "dynasent_r1": {
+    "negative": {
+      "precision": 0.8627787307032591,
+      "recall": 0.8383333333333334,
+      "f1-score": 0.8503803888419273,
+      "support": 1200.0
+    },
+    "neutral": {
+      "precision": 0.6955941255006676,
+      "recall": 0.8683333333333333,
+      "f1-score": 0.7724240177909563,
+      "support": 1200.0
+    },
+    "positive": {
+      "precision": 0.9252136752136753,
+      "recall": 0.7216666666666667,
+      "f1-score": 0.8108614232209738,
+      "support": 1200.0
+    },
+    "accuracy": 0.8094444444444444,
+    "macro avg": {
+      "precision": 0.8278621771392007,
+      "recall": 0.8094444444444444,
+      "f1-score": 0.8112219432846192,
+      "support": 3600.0
+    },
+    "weighted avg": {
+      "precision": 0.8278621771392007,
+      "recall": 0.8094444444444444,
+      "f1-score": 0.8112219432846192,
+      "support": 3600.0
+    }
+  },
+  "dynasent_r2": {
+    "negative": {
+      "precision": 0.7876712328767124,
+      "recall": 0.9583333333333334,
+      "f1-score": 0.8646616541353384,
+      "support": 240.0
+    },
+    "neutral": {
+      "precision": 0.772093023255814,
+      "recall": 0.6916666666666667,
+      "f1-score": 0.7296703296703296,
+      "support": 240.0
+    },
+    "positive": {
+      "precision": 0.863849765258216,
+      "recall": 0.7666666666666667,
+      "f1-score": 0.8123620309050773,
+      "support": 240.0
+    },
+    "accuracy": 0.8055555555555556,
+    "macro avg": {
+      "precision": 0.8078713404635808,
+      "recall": 0.8055555555555555,
+      "f1-score": 0.8022313382369152,
+      "support": 720.0
+    },
+    "weighted avg": {
+      "precision": 0.8078713404635808,
+      "recall": 0.8055555555555556,
+      "f1-score": 0.8022313382369152,
+      "support": 720.0
+    }
+  },
+  "sst_local": {
+    "negative": {
+      "precision": 0.8015340364333653,
+      "recall": 0.9166666666666666,
+      "f1-score": 0.8552429667519181,
+      "support": 912.0
+    },
+    "neutral": {
+      "precision": 0.4861111111111111,
+      "recall": 0.35989717223650386,
+      "f1-score": 0.413589364844904,
+      "support": 389.0
+    },
+    "positive": {
+      "precision": 0.9124004550625711,
+      "recall": 0.8822882288228823,
+      "f1-score": 0.8970917225950783,
+      "support": 909.0
+    },
+    "accuracy": 0.8045248868778281,
+    "macro avg": {
+      "precision": 0.733348534202349,
+      "recall": 0.7196173559086843,
+      "f1-score": 0.7219746847306334,
+      "support": 2210.0
+    },
+    "weighted avg": {
+      "precision": 0.7916146050232254,
+      "recall": 0.8045248868778281,
+      "f1-score": 0.7947168436386168,
+      "support": 2210.0
+    }
+  }
+}

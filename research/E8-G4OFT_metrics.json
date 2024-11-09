@@ -1,0 +1,149 @@
+{
+  "experiment_name": "E8-G4OFT",
+  "start_time": "2024-10-30 08:02:19",
+  "notes": "Experiment 8: Measure impact of fine-tuning on GPT-4o",
+  "model": "ft:gpt-4o-2024-08-06:personal::AN55MS6K",
+  "instance": "gpt_sentiment",
+  "dataset_shape": [
+    6530,
+    4
+  ],
+  "examples_length": 6530,
+  "results_shape": [
+    6530,
+    5
+  ],
+  "save_directory": "research",
+  "merged_local": {
+    "negative": {
+      "precision": 0.8991525423728813,
+      "recall": 0.9022108843537415,
+      "f1-score": 0.900679117147708,
+      "support": 2352.0
+    },
+    "neutral": {
+      "precision": 0.7967032967032966,
+      "recall": 0.7927829414980864,
+      "f1-score": 0.7947382844614963,
+      "support": 1829.0
+    },
+    "positive": {
+      "precision": 0.9093617021276595,
+      "recall": 0.9097488292890592,
+      "f1-score": 0.9095552245158545,
+      "support": 2349.0
+    },
+    "accuracy": 0.8742725880551302,
+    "macro avg": {
+      "precision": 0.8684058470679458,
+      "recall": 0.8682475517136291,
+      "f1-score": 0.8683242087083528,
+      "support": 6530.0
+    },
+    "weighted avg": {
+      "precision": 0.8741298235266797,
+      "recall": 0.8742725880551302,
+      "f1-score": 0.8741989017150427,
+      "support": 6530.0
+    }
+  },
+  "dynasent_r1": {
+    "negative": {
+      "precision": 0.9520851818988465,
+      "recall": 0.8941666666666667,
+      "f1-score": 0.9222174473571122,
+      "support": 1200.0
+    },
+    "neutral": {
+      "precision": 0.8282163742690059,
+      "recall": 0.9441666666666667,
+      "f1-score": 0.882398753894081,
+      "support": 1200.0
+    },
+    "positive": {
+      "precision": 0.9475113122171945,
+      "recall": 0.8725,
+      "f1-score": 0.9084598698481562,
+      "support": 1200.0
+    },
+    "accuracy": 0.9036111111111111,
+    "macro avg": {
+      "precision": 0.9092709561283489,
+      "recall": 0.9036111111111111,
+      "f1-score": 0.9043586903664499,
+      "support": 3600.0
+    },
+    "weighted avg": {
+      "precision": 0.909270956128349,
+      "recall": 0.9036111111111111,
+      "f1-score": 0.9043586903664497,
+      "support": 3600.0
+    }
+  },
+  "dynasent_r2": {
+    "negative": {
+      "precision": 0.892,
+      "recall": 0.9291666666666667,
+      "f1-score": 0.9102040816326531,
+      "support": 240.0
+    },
+    "neutral": {
+      "precision": 0.912621359223301,
+      "recall": 0.7833333333333333,
+      "f1-score": 0.8430493273542601,
+      "support": 240.0
+    },
+    "positive": {
+      "precision": 0.8560606060606061,
+      "recall": 0.9416666666666667,
+      "f1-score": 0.8968253968253969,
+      "support": 240.0
+    },
+    "accuracy": 0.8847222222222222,
+    "macro avg": {
+      "precision": 0.886893988427969,
+      "recall": 0.8847222222222223,
+      "f1-score": 0.8833596019374367,
+      "support": 720.0
+    },
+    "weighted avg": {
+      "precision": 0.8868939884279692,
+      "recall": 0.8847222222222222,
+      "f1-score": 0.8833596019374366,
+      "support": 720.0
+    }
+  },
+  "sst_local": {
+    "negative": {
+      "precision": 0.8402848423194303,
+      "recall": 0.9057017543859649,
+      "f1-score": 0.8717678100263853,
+      "support": 912.0
+    },
+    "neutral": {
+      "precision": 0.524390243902439,
+      "recall": 0.33161953727506427,
+      "f1-score": 0.4062992125984252,
+      "support": 389.0
+    },
+    "positive": {
+      "precision": 0.8807339449541285,
+      "recall": 0.9504950495049505,
+      "f1-score": 0.9142857142857143,
+      "support": 909.0
+    },
+    "accuracy": 0.823076923076923,
+    "macro avg": {
+      "precision": 0.748469677058666,
+      "recall": 0.7292721137219932,
+      "f1-score": 0.7307842456368415,
+      "support": 2210.0
+    },
+    "weighted avg": {
+      "precision": 0.8013188855369557,
+      "recall": 0.823076923076923,
+      "f1-score": 0.8073250455794413,
+      "support": 2210.0
+    }
+  }
+}

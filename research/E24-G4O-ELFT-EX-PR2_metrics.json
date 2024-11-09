@@ -1,0 +1,149 @@
+{
+  "experiment_name": "E24-G4O-ELFT-EX-PR2",
+  "start_time": "2024-11-04 01:53:46",
+  "notes": "Experiment 24: Evaluate prompt-based model collaboration with prediction, probabilities, and similar examples",
+  "model": "gpt-4o-2024-08-06",
+  "instance": "electra_large_gpt_sentiment_pred_probs_examples",
+  "dataset_shape": [
+    6530,
+    4
+  ],
+  "examples_length": 6530,
+  "results_shape": [
+    6530,
+    6
+  ],
+  "save_directory": "research",
+  "merged_local": {
+    "negative": {
+      "precision": 0.8617571059431525,
+      "recall": 0.8507653061224489,
+      "f1-score": 0.8562259306803595,
+      "support": 2352.0
+    },
+    "neutral": {
+      "precision": 0.7441860465116279,
+      "recall": 0.7523236741388737,
+      "f1-score": 0.7482327351821643,
+      "support": 1829.0
+    },
+    "positive": {
+      "precision": 0.8757948283170836,
+      "recall": 0.8795232013622818,
+      "f1-score": 0.8776550552251486,
+      "support": 2349.0
+    },
+    "accuracy": 0.8335375191424196,
+    "macro avg": {
+      "precision": 0.8272459935906212,
+      "recall": 0.8275373938745348,
+      "f1-score": 0.8273712403625574,
+      "support": 6530.0
+    },
+    "weighted avg": {
+      "precision": 0.833876116993092,
+      "recall": 0.8335375191424196,
+      "f1-score": 0.8336864910156597,
+      "support": 6530.0
+    }
+  },
+  "dynasent_r1": {
+    "negative": {
+      "precision": 0.9140767824497258,
+      "recall": 0.8333333333333334,
+      "f1-score": 0.8718395815170009,
+      "support": 1200.0
+    },
+    "neutral": {
+      "precision": 0.7769936485532816,
+      "recall": 0.9175,
+      "f1-score": 0.8414214749713412,
+      "support": 1200.0
+    },
+    "positive": {
+      "precision": 0.921028466483012,
+      "recall": 0.8358333333333333,
+      "f1-score": 0.8763652249890782,
+      "support": 1200.0
+    },
+    "accuracy": 0.8622222222222222,
+    "macro avg": {
+      "precision": 0.8706996324953398,
+      "recall": 0.8622222222222223,
+      "f1-score": 0.8632087604924735,
+      "support": 3600.0
+    },
+    "weighted avg": {
+      "precision": 0.8706996324953399,
+      "recall": 0.8622222222222222,
+      "f1-score": 0.8632087604924734,
+      "support": 3600.0
+    }
+  },
+  "dynasent_r2": {
+    "negative": {
+      "precision": 0.7843137254901961,
+      "recall": 0.8333333333333334,
+      "f1-score": 0.8080808080808081,
+      "support": 240.0
+    },
+    "neutral": {
+      "precision": 0.8157894736842105,
+      "recall": 0.6458333333333334,
+      "f1-score": 0.7209302325581395,
+      "support": 240.0
+    },
+    "positive": {
+      "precision": 0.7527272727272727,
+      "recall": 0.8625,
+      "f1-score": 0.8038834951456311,
+      "support": 240.0
+    },
+    "accuracy": 0.7805555555555556,
+    "macro avg": {
+      "precision": 0.7842768239672265,
+      "recall": 0.7805555555555556,
+      "f1-score": 0.7776315119281928,
+      "support": 720.0
+    },
+    "weighted avg": {
+      "precision": 0.7842768239672264,
+      "recall": 0.7805555555555556,
+      "f1-score": 0.7776315119281929,
+      "support": 720.0
+    }
+  },
+  "sst_local": {
+    "negative": {
+      "precision": 0.8232271325796505,
+      "recall": 0.8782894736842105,
+      "f1-score": 0.849867374005305,
+      "support": 912.0
+    },
+    "neutral": {
+      "precision": 0.49586776859504134,
+      "recall": 0.30848329048843187,
+      "f1-score": 0.3803486529318542,
+      "support": 389.0
+    },
+    "positive": {
+      "precision": 0.8603015075376884,
+      "recall": 0.9416941694169417,
+      "f1-score": 0.8991596638655462,
+      "support": 909.0
+    },
+    "accuracy": 0.8040723981900453,
+    "macro avg": {
+      "precision": 0.7264654695707935,
+      "recall": 0.7094889778631948,
+      "f1-score": 0.7097918969342351,
+      "support": 2210.0
+    },
+    "weighted avg": {
+      "precision": 0.7808551028270909,
+      "recall": 0.8040723981900453,
+      "f1-score": 0.7874981020529913,
+      "support": 2210.0
+    }
+  }
+}

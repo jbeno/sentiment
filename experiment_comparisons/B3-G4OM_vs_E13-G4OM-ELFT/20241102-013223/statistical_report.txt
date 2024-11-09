@@ -1,0 +1,18 @@
+Statistical Analysis Results
+
+Performance Comparison:
+E13-G4OM-ELFT significantly outperformed B3-G4OM with an F1 score of 83.49% compared to 79.52%, a difference of 3.97 percentage points.
+
+Statistical Significance:
+This difference was statistically significant according to both McNemar's test (p < 0.001) and bootstrap analysis (p < 0.001). The 95% confidence interval for the difference was [3.06%, 4.89%].
+
+Stability Analysis:
+The results were assessed across multiple bootstrap runs (n=10000), with 
+confidence interval bounds showing minimal variation (SD: 0.000066 to 
+0.000127).
+
+Methodological Details:
+Statistical significance was assessed using McNemar's test for paired nominal data 
+and a bootstrap analysis with 10000 iterations. The stability of the results 
+was verified through multiple runs with different random seeds to ensure 
+reproducibility of the findings.
