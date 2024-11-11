@@ -10,6 +10,8 @@ from torch_model_base import TorchModelBase
 import torch.optim as optim
 from torch.distributed.optim import ZeroRedundancyOptimizer
 from sklearn.model_selection import train_test_split
+from transformers import ElectraConfig, AutoTokenizer
+from transformers import ElectraPreTrainedModel, ElectraModel
 import os
 import time
 import utils
@@ -20,7 +22,8 @@ from multiprocessing import Value
 from colors import *
 from utils import (format_time, print_state_summary, format_tolerance, get_nic_color, get_score_colors,
                    print_rank_memory_summary, convert_labels_to_tensor, convert_numeric_to_labels, tensor_to_numpy,
-                   get_scheduler)
+                   get_scheduler, SwishGLU)
+
 import wandb
 import torch.onnx
 import io
@@ -199,6 +202,44 @@ class PoolingLayer(nn.Module):
             return torch.max(last_hidden_state * attention_mask.unsqueeze(-1), dim=1)[0]
         else:
             raise ValueError(f"Unknown pooling method: {self.pooling_type}")
+
+
+class CustomElectraClassifier(ElectraPreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.electra = ElectraModel(config)
+        
+        # Remove the original pooler if it exists
+        if hasattr(self.electra, 'pooler'):
+            self.electra.pooler = None
+        
+        # Add your custom pooling layer
+        self.pooling = PoolingLayer(pooling_type=config.pooling)
+        
+        # Handle custom activation functions
+        activation_name = config.hidden_activation
+        if activation_name == 'SwishGLU':
+            hidden_activation = SwishGLU(input_dim=config.hidden_dim, output_dim=config.hidden_dim)
+        else:
+            activation_class = getattr(nn, activation_name)
+            hidden_activation = activation_class()
+        
+        self.classifier = Classifier(
+            input_dim=config.hidden_size,
+            hidden_dim=config.hidden_dim,
+            hidden_activation=hidden_activation,
+            num_layers=config.num_layers,
+            n_classes=config.num_labels,
+            dropout_rate=config.dropout_rate
+        )
+        self.init_weights()
+
+    def forward(self, input_ids=None, attention_mask=None, **kwargs):
+        outputs = self.electra(input_ids, attention_mask=attention_mask, **kwargs)
+        pooled_output = self.pooling(outputs.last_hidden_state, attention_mask)
+        logits = self.classifier(pooled_output)
+        return logits
+    
             
 class TorchDDPNeuralClassifier(TorchModelBase):
     def __init__(self,
@@ -652,13 +693,16 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             print(f"Current Loss: {epoch_loss:.6f}, Best Loss: {self.best_error:.6f}, Tolerance {self.tol}, No Improvement Count: {self.no_improvement_count}")
         return epoch_loss
 
-    def save_model(self, directory='saves', epoch=None, optimizer=None, is_final=False, save_pickle=False):
+
+    def save_model(self, directory='saves', epoch=None, optimizer=None, is_final=False, save_pickle=False, save_hf=False, weights_name='bert-base-uncased'):
         if not os.path.exists(directory):
             os.makedirs(directory)
 
+        # Prepare saveable parameters
         saveable_params = {param: getattr(self, param) for param in self.params 
                         if param not in ['rank', 'response_pipe', 'bert_model', 'bert_tokenizer']}
 
+        # Prepare model state dictionary
         state = {
             'epoch': epoch,
             'model_state_dict': self.model.module.state_dict() if hasattr(self.model, 'module') else self.model.state_dict(),
@@ -667,20 +711,65 @@ class TorchDDPNeuralClassifier(TorchModelBase):
         if optimizer:
             state['optimizer_state_dict'] = optimizer.state_dict()
 
+        # Save as a PyTorch checkpoint
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         filename = f'final_model_{timestamp}' if is_final else f'checkpoint_epoch_{epoch}_{timestamp}'
-        torch.save(state, os.path.join(directory, filename+'.pth'))
-        print(f"Saved model state: {os.path.join(directory, filename+'.pth')}")
+        torch.save(state, os.path.join(directory, filename + '.pth'))
+        print(f"Saved model state: {os.path.join(directory, filename + '.pth')}")
 
+        # Optionally save as a pickle file if specified
         if is_final and save_pickle:
-            self.to_pickle(os.path.join(directory, filename+'.pkl'))
-            print(f"Saved model pickle: {os.path.join(directory, filename+'.pkl')}")
+            self.to_pickle(os.path.join(directory, filename + '.pkl'))
+            print(f"Saved model pickle: {os.path.join(directory, filename + '.pkl')}")
             self.model.to(self.device)
 
+        # Optionally save in Hugging Face format
+        if save_hf:
+            hf_save_dir = os.path.join(directory, f"{filename}_huggingface")
+            os.makedirs(hf_save_dir, exist_ok=True)
+            
+            # Create a config object with your custom parameters
+            config = ElectraConfig.from_pretrained(weights_name)
+            config.num_labels = self.n_classes_
+            config.hidden_dim = self.hidden_dim
+            # Adjust config.hidden_activation
+            if isinstance(self.hidden_activation, nn.Module):
+                config.hidden_activation = self.hidden_activation.__class__.__name__
+            else:
+                config.hidden_activation = self.hidden_activation
+            config.num_layers = self.num_layers
+            config.dropout_rate = self.dropout_rate
+            config.pooling = self.pooling  # Ensure pooling_type is included
+
+            # Create an instance of your custom model
+            model = CustomElectraClassifier(config)
+
+            # Adjust the state dict keys
+            adjusted_state_dict = {}
+            for k, v in state['model_state_dict'].items():
+                if k.startswith('bert.'):
+                    new_key = k.replace('bert.', 'electra.')
+                else:
+                    new_key = k
+                adjusted_state_dict[new_key] = v
+
+            # Load the adjusted state dict
+            model.load_state_dict(adjusted_state_dict)
+
+            # Save the model and tokenizer
+            model.save_pretrained(hf_save_dir)
+            model.save_pretrained(hf_save_dir, safe_serialization=False)
+            self.bert_tokenizer.save_pretrained(hf_save_dir)
+            
+            print(f"Model also saved in Hugging Face format to {hf_save_dir}")
+
+        # Debugging information if enabled
         if self.debug and self.rank == 0:
             print("Params saved:")
             print_state_summary(saveable_params)
-    
+
+
+
 
     def load_model(self, directory='checkpoints', filename=None, pattern='checkpoint_epoch', use_saved_params=True, rank=0, debug=False):
         if not os.path.exists(directory):
@@ -982,7 +1071,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
     def fit(self, X, X_val, y, y_val, rank, world_size, debug=False, start_epoch=1, model_state_dict=None, optimizer_state_dict=None,
             num_workers=0, prefetch=None, empty_cache=False, decimal=6, input_queue=None, mem_interval=10,
-            save_final_model=False, save_pickle=False, save_dir='saves'):
+            save_final_model=False, save_pickle=False, save_hf=False, save_dir='saves', weights_name='bert-base-uncased'):
 
         training_start = time.time()
         if rank == 0:
@@ -1247,7 +1336,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
                         break  # Exit the loop and proceed to the next epoch
                     if command == 1:  # Save
                         if rank == 0:
-                            self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False, save_pickle=save_pickle)
+                            self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False, save_pickle=save_pickle, save_hf=save_hf, weights_name=weights_name)
                             print("Model saved.") if debug else None
                         continue  # Stay in the loop to wait for another command
                     elif command == 2:  # Quit
@@ -1575,7 +1664,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
             # Save a checkpoint
             if self.checkpoint_interval and (epoch) % self.checkpoint_interval == 0:
                 if rank == 0:
-                    self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False, save_pickle=False)
+                    self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=False, save_pickle=False, save_hf=save_hf, weights_name=weights_name)
             
             # Decrement the skip_epochs counter
             if skip_epochs > 0:
@@ -1629,7 +1718,7 @@ class TorchDDPNeuralClassifier(TorchModelBase):
 
         # Save the final model
         if rank == 0 and save_final_model:
-            self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=True, save_pickle=save_pickle)
+            self.save_model(directory=self.checkpoint_dir, epoch=epoch, optimizer=self.optimizer, is_final=True, save_pickle=save_pickle, save_hf=save_hf, weights_name=weights_name)
             print(f"Training completed ({format_time(time.time() - training_start)})")
 
         return self

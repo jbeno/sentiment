@@ -1112,7 +1112,7 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
          save_dir, model_file, use_saved_params, save_data, data_file, num_workers, prefetch, optimizer_name, optimizer_kwargs,
          use_zero, l2_strength, empty_cache, decimal, scheduler_name, schedular_kwargs, finetune_transformer, finetune_layers,
          target_score, interactive, mem_interval, accumulation_steps, freeze_transformer, dropout_rate, chunk_size,
-         show_progress, predict, predict_file, save_final_model, save_pickle, max_grad_norm, port, color_theme,
+         show_progress, predict, predict_file, save_final_model, save_pickle, save_hf, max_grad_norm, port, color_theme,
          use_wandb, wandb_project, wandb_run_name, wandb_alerts, val_percent, use_val_split, eval_split, label_template, pos_label,
          threshold, save_plots, model_name, advance_epochs, input_queue, pipes, running):
     try:
@@ -1215,8 +1215,8 @@ def main(rank, world_size, device_type, backend, dataset, eval_dataset, weights_
             optimizer_kwargs, schedular_kwargs)
 
         classifier.fit(X_train, X_val, y_train, y_val, rank, world_size, debug, start_epoch, model_state_dict, optimizer_state_dict,
-                       num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval, save_final_model, save_pickle,
-                       save_dir)
+                       num_workers, prefetch, empty_cache, decimal, input_queue, mem_interval, save_final_model, save_pickle, save_hf,
+                       save_dir, weights_name)
         
         # Evaluate the model
         evaluate_model(classifier, tokenizer, X_test, y_test, label_dict, numeric_dict, world_size, device, rank, debug, save_preds,
@@ -1346,6 +1346,7 @@ if __name__ == '__main__':
     saving_group.add_argument('--save_data', action='store_true', default=False, help="Save processed data to disk as an .npz archive (X_train, X_dev, y_train, y_dev, y_dev_sent)")
     saving_group.add_argument('--save_model', action='store_true', default=False, help="Save the final model state after training in PyTorch .pth format (default: False)")
     saving_group.add_argument('--save_pickle', action='store_true', default=False, help="Save the final model after training in pickle .pkl format (default: False)")
+    saving_group.add_argument('--save_hf', action='store_true', default=False, help="Save the final model after training in Hugging Face format (default: False)")
     saving_group.add_argument('--save_preds', action='store_true', default=False, help="Save predictions to CSV (default: False)")
     saving_group.add_argument('--save_plots', action='store_true', default=False, help="Save evaluation plots (default: False)")
     saving_group.add_argument('--save_dir', type=str, default='saves', help="Directory to save archived data, predictions, plots (default: saves)")
@@ -1494,6 +1495,7 @@ if __name__ == '__main__':
                       args.predict_file,
                       args.save_model,
                       args.save_pickle,
+                      args.save_hf,
                       args.max_grad_norm,
                       args.port,
                       args.color_theme,
