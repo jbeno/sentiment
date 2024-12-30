@@ -28,3 +28,4 @@ tiktoken>=0.7.0
 phoenix-otel>=0.4.0  # For phoenix.otel
 openinference-instrumentation>=0.1.16
 openinference-instrumentation-dspy>=0.1.12
+electra-classifier>=0.1.0

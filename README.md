@@ -1,31 +1,32 @@
 # ELECTRA and GPT-4o: Cost-Effective Partners for Sentiment Analysis
 
-This repository contains the code and datasets for the research paper "ELECTRA and GPT-4o: Cost-Effective Partners for Sentiment Analysis", which explores collaborative approaches between ELECTRA and GPT-4o models for sentiment classification.
+This repository contains the code and datasets for the research paper "ELECTRA and GPT-4o: Cost-Effective Partners for Sentiment Analysis", which explores collaborative approaches between ELECTRA and GPT-4o models for sentiment classification. This research was conducted as the final project for the [XCS224U](https://online.stanford.edu/courses/xcs224u-natural-language-understanding) "Natural Language Understanding" course by [Stanford Engineering CGOE](https://cgoe.stanford.edu).
 
 ## Research Overview
 
-This research investigates collaborative approaches between bidirectional transformers (ELECTRA Base/Large) and Large Language Models (GPT-4o/4o-mini) for three-way sentiment classification. We found that:
+The research investigated collaborative approaches between bidirectional transformers (ELECTRA Base/Large) and Large Language Models (GPT-4o/4o-mini) for three-way sentiment classification of reviews (negative, neutral, positive). We found that:
 
 - Augmenting GPT-4o-mini prompts with ELECTRA predictions significantly improved performance over either model alone
+- However, when GPT models were fine-tuned, including predictions decreased performance
 - Including probabilities or similar examples enhanced performance for GPT-4o on challenging datasets  
 - Fine-tuned GPT-4o-mini achieved nearly equivalent performance to GPT-4o at 76% lower cost
-- Optimal approaches depended on project constraints (cost, privacy, compute resources)
+- The best approach depends on project constraints (budget, privacy concerns, available compute resources)
 
 ## Resources
 
 ### Research
-- [ELECTRA and GPT-4o: Cost-Effective Partners for Sentiment Analysis](research_paper.pdf) - PDF
+- [ELECTRA and GPT-4o: Cost-Effective Partners for Sentiment Analysis](research_paper.pdf) - Research paper (PDF)
 
 ### Models 
-- [ELECTRA Base Classifier](https://huggingface.co/jbeno/electra-base-classifier-sentiment) - Fine-tuned ELECTRA base discriminator
-- [ELECTRA Large Classifier](https://huggingface.co/jbeno/electra-large-classifier-sentiment) - Fine-tuned ELECTRA large discriminator
+- [ELECTRA Base Classifier for Sentiment Analysis](https://huggingface.co/jbeno/electra-base-classifier-sentiment) - Fine-tuned ELECTRA base discriminator (Hugging Face)
+- [ELECTRA Large Classifier for Sentiment Analysis](https://huggingface.co/jbeno/electra-large-classifier-sentiment) - Fine-tuned ELECTRA large discriminator (Hugging Face)
 
 ### Datasets
-- [Sentiment Merged Dataset](https://huggingface.co/datasets/jbeno/sentiment_merged) - Combined SST-3, DynaSent R1/R2
+- [Sentiment Merged Dataset](https://huggingface.co/datasets/jbeno/sentiment_merged) - Combination of DynaSent R1/R2 and SST-3 (Hugging Face)
 
 ### Code
-- [GitHub repo](https://github.com/jbeno/sentiment) - Primary repository for research
-- [electra-classifier](https://pypi.org/project/electra-classifier/) - PyPI package for loading fine-tuned ELECTRA models
+- [jbeno/sentiment](https://github.com/jbeno/sentiment) - Primary research repository (GitHub)
+- [electra-classifier](https://pypi.org/project/electra-classifier/) - Package for loading fine-tuned ELECTRA classifier models (PyPI)
 
 ## Repository Structure
 
@@ -34,16 +35,18 @@ This research investigates collaborative approaches between bidirectional transf
 ├── electra_finetune/                # ELECTRA classifier fine-tuning logs
 ├── results/                         # Experiment predictions and metrics
 ├── statistics/                      # Statistical analysis
-├── classifier.py                    # Classifier model with DDP
+├── classifier.py                    # Neural classifier model with DDP
 ├── colors.py                        # Color display utilities
 ├── data_processing.ipynb            # Creation of Merged dataset
 ├── datawaza_funcs.py                # Subset of Datawaza library with edits 
 ├── finetune.py                      # Interactive classifier fine-tuning program with DDP
 ├── gpt_finetune_experiments.ipynb   # GPT fine-tune, baselines, and experiments with DSPy
 ├── requirements.txt                 # Python dependencies
-├── sst.py                           # Stanford Sentiment Treebank dataset loader
+├── research_paper.pdf               # Research paper in PDF format
+├── sst.py                           # SST dataset loader from CS224U repo
 ├── statistics.ipynb                 # Statistical analysis
-└── utils.py                         # General utilities
+├── torch_model_base.py              # Base neural classiifer model from CS224U repo
+└── utils.py                         # General utilities modified from CS224U repo
 ```
 
 ## Setup and Installation 
@@ -82,7 +85,8 @@ You can use the fine-tuned ELECTRA models that have been published on Hugging Fa
 
 ```python
 # Install the package in a notebook
-!pip install electra-classifier
+import sys
+!{sys.executable} -m pip install electra-classifier
 
 # Import libraries
 import torch
@@ -110,10 +114,15 @@ with torch.no_grad():
 
 ### Fine-tuning ELECTRA
 
-The ELECTRA models can be fine-tuned using `finetune.py`, which has an interactive mode and leverages multiple GPUs through Distributed Data Parallel (DDP). This can be used on BERT or RoBERTa as well, and a variety of datasets. Feel free to modify and extend the source code.
+The ELECTRA models can be fine-tuned using `finetune.py`, which has an interactive mode and leverages multiple GPUs through Distributed Data Parallel (DDP). This can also be used on BERT or RoBERTa, and a variety of datasets.
 
 ```bash
-python ./finetune.py --dataset 'merged_local' --weights_name 'google/electra-base-discriminator' --save_data --save_model --save_pickle --save_preds --lr 0.00001 --epochs 100 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 32 --l2_strength 0.01  --checkpoint_interval 5 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --interactive
+python ./finetune.py --dataset 'merged_local' --weights_name 'google/electra-base-discriminator' --save_data \
+--save_model --save_pickle --save_preds --lr 0.00001 --epochs 100 --pooling 'mean' --dropout_rate 0.3 \
+--num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 32 --l2_strength 0.01 \
+--checkpoint_interval 5 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' \
+--scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split \
+--eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --interactive
 ```
 
 Here is the help for the command-line arguments:
@@ -303,12 +312,12 @@ Debugging and logging:
                         Color theme for console output: 'light', 'dark' (default: 'dark')
 ```
 
-### GPT Experiments
+### GPT Fine-Tuning and Experiments
 
 The GPT-4o experiments can be run through the Jupyter notebook:
 
 ```bash 
-jupyter notebook final_project_openai.ipynb
+jupyter notebook gpt_finetune_experiments.ipynb
 ```
 
 ### Analysis
@@ -316,21 +325,24 @@ jupyter notebook final_project_openai.ipynb
 Statistical analysis and visualization of results:
 
 ```bash
-jupyter notebook final_project_statistics.ipynb
+jupyter notebook statistics.ipynb
 ```
 
-## Datasets
+## Dataset
 
-This research uses:
-- Stanford Sentiment Treebank (SST)
-- DynaSent Round 1  
-- DynaSent Round 2
+The dataset is a merge of Stanford Sentiment Treebank (SST-3) and DynaSent Rounds 1 and 2. The SST-3, DynaSent R1, and DynaSent R2 datasets were randomly mixed to form a new dataset with 102,097 Train examples, 5,421 Validation examples, and 6,530 Test examples. See Table 1 for the distribution of labels within this merged dataset.
 
-The datasets are available through the [Sentiment Merged Dataset](https://huggingface.co/datasets/jbeno/sentiment_merged) on HuggingFace.
+The dataset is available in this repo under `data/merged`, or through the [Sentiment Merged Dataset](https://huggingface.co/datasets/jbeno/sentiment_merged) on Hugging Face.
+
+You can review the data processing to create the merged dataset here:
+
+```bash
+jupyter notebook data_processing.ipynb
+```
 
 ## Citation
 
-If you use this code in your research, please cite:
+If you use this material in your research, please cite:
 
 ```bibtex
 @article{beno2024electra,
@@ -350,6 +362,7 @@ Jim Beno - jim@jimbeno.net
 
 ## Acknowledgments
 
-- The creators of the [ELECTRA model](https://arxiv.org/abs/2003.10555) for their foundational work.
-- The authors of the datasets used: [Stanford Sentiment Treebank](https://huggingface.co/datasets/stanfordnlp/sst), [DynaSent](https://huggingface.co/datasets/dynabench/dynasent).
+- The creators of the [ELECTRA model](https://arxiv.org/abs/2003.10555) for their foundational work
+- The authors of the datasets used: [Stanford Sentiment Treebank](https://huggingface.co/datasets/stanfordnlp/sst), [DynaSent](https://huggingface.co/datasets/dynabench/dynasent)
+- The Stanford CS224U course repo, which provided a starting point for this code: [cgpotts/cs224u](https://github.com/cgpotts/cs224u)
 - [Stanford Engineering CGOE](https://cgoe.stanford.edu), [Chris Potts](https://stanford.edu/~cgpotts/), [Insop Song](https://profiles.stanford.edu/insop), [Petra Parikova](https://profiles.stanford.edu/petra-parikova), and the Course Facilitators of [XCS224U](https://online.stanford.edu/courses/xcs224u-natural-language-understanding)
