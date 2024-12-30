@@ -314,31 +314,17 @@ Debugging and logging:
 
 ### GPT Fine-Tuning and Experiments
 
-The GPT-4o experiments can be run through the Jupyter notebook:
+The GPT-4o/4o-mini models were fine-tuned via OpenAI API. The data processing to produce the requried JSONL files, and the `curl` commands to interact with the API, can be found in [gpt_finetune_experiments.ipynb](gpt_finetune_experiments.ipynb). This also contains all the baselines and experimental runs using various DSPy templates. This is the main notebook for the research.
 
-```bash 
-jupyter notebook gpt_finetune_experiments.ipynb
-```
+### Results and Analysis
 
-### Analysis
-
-Statistical analysis and visualization of results:
-
-```bash
-jupyter notebook statistics.ipynb
-```
+The predictions and evaluation metrics of all experimental runs can be found under [results](results). Statistical tests can be found in [statistics.ipynb](statistics.ipynb) and [statistics](statistics).
 
 ## Dataset
 
-The dataset is a merge of Stanford Sentiment Treebank (SST-3) and DynaSent Rounds 1 and 2. The SST-3, DynaSent R1, and DynaSent R2 datasets were randomly mixed to form a new dataset with 102,097 Train examples, 5,421 Validation examples, and 6,530 Test examples. See Table 1 for the distribution of labels within this merged dataset.
+The dataset is a merge of Stanford Sentiment Treebank (SST-3) and DynaSent Rounds 1 and 2. The SST-3, DynaSent R1, and DynaSent R2 datasets were randomly mixed to form a new dataset with 102,097 Train examples, 5,421 Validation examples, and 6,530 Test examples.
 
-The dataset is available in this repo under `data/merged`, or through the [Sentiment Merged Dataset](https://huggingface.co/datasets/jbeno/sentiment_merged) on Hugging Face.
-
-You can review the data processing to create the merged dataset here:
-
-```bash
-jupyter notebook data_processing.ipynb
-```
+The dataset is available in this repo under [data/merged](data/merged), or through the [Sentiment Merged Dataset](https://huggingface.co/datasets/jbeno/sentiment_merged) on Hugging Face. You can review the data processing to create the merged dataset here in [data_processing.ipynb](data_processing.ipynb).
 
 ## Citation
 
