@@ -19,3 +19,12 @@ dspy-ai==2.3.1
 openai<=0.28.1
 python-dotenv
 wget
+
+# Additional required packages from imports
+tqdm>=4.66.0
+wandb>=0.18.0
+seaborn>=0.13.0
+tiktoken>=0.7.0
+phoenix-otel>=0.4.0  # For phoenix.otel
+openinference-instrumentation>=0.1.16
+openinference-instrumentation-dspy>=0.1.12

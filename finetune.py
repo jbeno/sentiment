@@ -58,7 +58,7 @@ from utils import (
     parse_dict
 )
 from datawaza_funcs import eval_model
-from torch_ddp_finetune_neural_classifier import TorchDDPNeuralClassifier, SentimentDataset
+from classifier import TorchDDPNeuralClassifier, SentimentDataset
 from colors import *
 
 # Suppress Hugging Face library warnings
@@ -1303,7 +1303,7 @@ if __name__ == '__main__':
     training_group.add_argument('--accumulation_steps', type=int, default=1, help='Number of steps to accumulate gradients before updating weights (default: 1)')
     training_group.add_argument('--epochs', type=int, default=100, help='Number of epochs to train (default: 100)')
     training_group.add_argument('--lr', type=float, default=0.001, help='Learning rate (default: 0.001)')
-    training_group.add_argument('--lr_decay', type=float, default=1.0, help='Learning rate decay factor, defaults to none, 0.95 is 5% per layer (default: 1.0)')
+    training_group.add_argument('--lr_decay', type=float, default=1.0, help='Learning rate decay factor, defaults to none, 0.95 is 5%% per layer (default: 1.0)')
     training_group.add_argument('--optimizer', type=str, default='adam', help="Optimizer to use: 'adam', 'sgd', 'adagrad', 'rmsprop', 'zero', 'adamw' (default: 'adam')")
     training_group.add_argument('--use_zero', action='store_true', default=False, help='Use Zero Redundancy Optimizer for efficient DDP training, with the optimizer specified in --optimizer (default: False)')
     training_group.add_argument('--l2_strength', type=float, default=0.0, help='L2 regularization strength for optimizer (default: 0.0)')
