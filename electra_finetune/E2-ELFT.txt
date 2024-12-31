@@ -1,0 +1,2142 @@
+(nlp) ubuntu@138-2-58-218:~/nlp-osaka/sentiment$ python ./ddp_sentiment_finetune.py --dataset 'merged_local' --weights_name 'google/electra-large-discriminator' --save_data --save_model --save_pickle --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 16 --accumulation_steps 2 --finetune_bert --finetune_layers 24 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Large' --wandb_run 'stage_1_merged'
+
+Starting DDP PyTorch Training...
+Device: cuda, Number of GPUs: 8
+Spawning 8 processes...
+Rank 1 - Device: cuda:1
+Rank 4 - Device: cuda:4
+Rank 6 - Device: cuda:6
+Rank 2 - Device: cuda:2
+Rank 5 - Device: cuda:5
+Rank 7 - Device: cuda:7
+Rank 3 - Device: cuda:3
+Rank 0 - Device: cuda:0
+8 process groups initialized with 'nccl' backend on localhost:12355
+NCCL Timeout: 1 hr 0 min. NCCL Blocking Wait: Enabled
+wandb: Using wandb-core as the SDK backend. Please refer to https://wandb.me/wandb-core for more information.
+wandb: Currently logged in as: jbeno (jimbeno). Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.18.5
+wandb: Run data is saved locally in /home/ubuntu/nlp-osaka/sentiment/wandb/run-20241024_164255-nsy5h33f
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run stage_1_merged
+wandb: ⭐️ View project at https://wandb.ai/jimbeno/Electra%20Large
+wandb: 🚀 View run at https://wandb.ai/jimbeno/Electra%20Large/runs/nsy5h33f
+Wand run initialized.
+
+Initializing 'google/electra-large-discriminator' tokenizer and model...
+Checking for local files...
+Found all files in cache, skipping download
+All ranks loading tokenizer from local files...
+All ranks loading model from local files...
+Tokenizer and model initialized (5s)
+
+Loading data...
+Using the same dataset for training and evaluation
+Splits:
+- Train: Using merged_local 'train' split
+- Validation: Using merged_local 'validation' split
+- Evaluation: Using merged_local 'test' split
+Train Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Validation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Evaluation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Train size: 102097
+Validation size: 5421
+Evaluation size: 5421
+Train label distribution:
+	      Negative: 21910
+	       Neutral: 49148
+	      Positive: 31039
+Validation label distribution:
+	      Negative: 1868
+	       Neutral: 1669
+	      Positive: 1884
+Evaluation label distribution:
+	      Negative: 1868
+	       Neutral: 1669
+	      Positive: 1884
+Data loaded (703ms)
+
+Processing data...
+(Batch size: 16, Pooling: Mean, Fine Tune BERT: True, Chunk size: None)...
+Extracting sentences and labels...
+
+Data saved to: saves/data_8_gpu_20241024-164303.npz
+X Train shape: [102097], X Validation shape: [5421], X Test shape: [5421]
+y Train shape: [102097], y Validation shape: [5421], y Test shape: [5421]
+Data processed (847ms)
+
+Initializing DDP Neural Classifier...
+Layers: 2, Hidden Dim: 1024, Hidden Act: SwishGLU, Dropout: 0.3, Optimizer: AdamW, L2 Strength: 0.01, Pooling: MEAN, Accumulation Steps: 2, Max Grad Norm: None
+Batch Size: 16, Max Epochs: 50, LR: 1e-05, Early Stop: score, Fine-tune BERT: True, Fine-tune Layers: 24, Freeze BERT: False, Target Score: None, Interactive: False
+Classifier initialized (28ms)
+
+Fitting DDP Neural Classifier on training data...
+Num Workers: 0, Prefetch: None
+Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: 0.1
+Training will stop early if the score does not improve by at least 0.00001 for 10 iterations.
+Using provided validation set for early stopping.
+Building dataset and dataloader...
+Initializing model, graph, optimizer...
+BERT's original pooler removed. Using custom pooling type: mean
+BERT has 334,092,288 trainable parameters and 0 non-trainable parameters
+Number of BERT layers requiring gradients: 24 out of 24
+Fine-tuning the last 24 out of 24 BERT layers
+
+Model Architecture Summary:
+BERTClassifier(
+  (bert): ElectraModel(
+    (embeddings): ElectraEmbeddings(
+      (word_embeddings): Embedding(30522, 1024, padding_idx=0)
+      (position_embeddings): Embedding(512, 1024)
+      (token_type_embeddings): Embedding(2, 1024)
+      (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): ElectraEncoder(
+      (layer): ModuleList(
+        (0-23): 24 x ElectraLayer(
+          (attention): ElectraAttention(
+            (self): ElectraSelfAttention(
+              (query): Linear(in_features=1024, out_features=1024, bias=True)
+              (key): Linear(in_features=1024, out_features=1024, bias=True)
+              (value): Linear(in_features=1024, out_features=1024, bias=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+            (output): ElectraSelfOutput(
+              (dense): Linear(in_features=1024, out_features=1024, bias=True)
+              (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+          )
+          (intermediate): ElectraIntermediate(
+            (dense): Linear(in_features=1024, out_features=4096, bias=True)
+            (intermediate_act_fn): GELUActivation()
+          )
+          (output): ElectraOutput(
+            (dense): Linear(in_features=4096, out_features=1024, bias=True)
+            (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+  )
+  (custom_pooling): PoolingLayer()
+  (classifier): Classifier(
+    (layers): Sequential(
+      (0): Linear(in_features=1024, out_features=1024, bias=True)
+      (1): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (2): Dropout(p=0.3, inplace=False)
+      (3): Linear(in_features=1024, out_features=1024, bias=True)
+      (4): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (5): Dropout(p=0.3, inplace=False)
+      (6): Linear(in_features=1024, out_features=3, bias=True)
+    )
+  )
+)
+
+Model Parameters:
+  bert.embeddings.word_embeddings: 31,254,528 (trainable)
+  bert.embeddings.position_embeddings: 524,288 (trainable)
+  bert.embeddings.token_type_embeddings: 2,048 (trainable)
+  bert.embeddings.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.0.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.0.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.0.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.0.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.1.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.1.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.1.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.1.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.2.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.2.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.2.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.2.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.3.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.3.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.3.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.3.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.4.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.4.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.4.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.4.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.5.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.5.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.5.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.5.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.6.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.6.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.6.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.6.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.7.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.7.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.7.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.7.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.8.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.8.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.8.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.8.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.9.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.9.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.9.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.9.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.10.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.10.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.10.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.10.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.11.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.11.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.11.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.11.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.12.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.12.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.12.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.12.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.13.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.13.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.13.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.13.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.14.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.14.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.14.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.14.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.15.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.15.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.15.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.15.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.16.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.16.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.16.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.16.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.17.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.17.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.17.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.17.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.18.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.18.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.18.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.18.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.19.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.19.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.19.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.19.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.20.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.20.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.20.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.20.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.21.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.21.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.21.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.21.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.22.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.22.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.22.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.22.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.23.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.23.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.23.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.23.output.LayerNorm: 2,048 (trainable)
+  classifier.layers.0: 1,049,600 (trainable)
+  classifier.layers.1.projection: 2,099,200 (trainable)
+  classifier.layers.3: 1,049,600 (trainable)
+  classifier.layers.6: 3,075 (trainable)
+
+Total layers: 200
+Trainable layers: 200
+Total parameters: 338,293,763
+Trainable parameters: 338,293,763
+Percentage of trainable parameters: 100.00%
+Using optimizer: AdamW, Use Zero: True, Base Learning Rate: 1e-05, L2 strength: 0.01
+Layer-wise decay factor: 0.95
+Using scheduler: CosineAnnealingWarmRestarts
+Scheduler arguments:
+- T_0: 5
+- T_mult: 1
+- eta_min: 1e-07
+
+Starting training loop...
+Start epoch: 1, Max Iterations: 50, Early Stop: score, Tolerance: 0.00001, Number Iterations No Change: 10
+Epoch 1/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [23:56<00:00,  1.80s/it, loss=1.8021, lr=9.06e-06, grad=M:0.1559, status=Epoch complete]
+█ Epoch  1: Loss T 1.802063 V 0.977394 | F1 T 0.438215 V 0.387110 B 0.387110 SC 0/10 | Acc T 0.617831 V 0.477323 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 1.019622 M 0.155868 | 23m 56s
+Saved model state: checkpoints/checkpoint_epoch_1_20241024-170701.pth
+Epoch 2/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [23:49<00:00,  1.79s/it, loss=1.6227, lr=6.59e-06, grad=M:0.3681, status=Epoch complete]
+█ Epoch  2: Loss T 1.622710 V 1.001343 | F1 T 0.280226 V 0.230577 B 0.387110 SC 1/10 | Acc T 0.479403 V 0.317294 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 6.276710 M 0.368088 | 23m 49s
+Saved model state: checkpoints/checkpoint_epoch_2_20241024-173101.pth
+Epoch 3/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [23:46<00:00,  1.79s/it, loss=1.3071, lr=3.53e-06, grad=M:0.2323, status=Epoch complete]
+█ Epoch  3: Loss T 1.307086 V 0.747763 | F1 T 0.814584 V 0.785051 B 0.785051 SC 0/10 | Acc T 0.823905 V 0.785951 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 1.717918 M 0.232323 | 23m 46s
+Saved model state: checkpoints/checkpoint_epoch_3_20241024-175458.pth
+Epoch 4/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [23:46<00:00,  1.79s/it, loss=1.0096, lr=1.05e-06, grad=M:0.3289, status=Epoch complete]
+█ Epoch  4: Loss T 1.009605 V 0.511187 | F1 T 0.837251 V 0.818891 B 0.818891 SC 0/10 | Acc T 0.841123 V 0.821165 | LR 1.05e-06 | Grad ↓ 0.000000 ↑ 1.896666 M 0.328932 | 23m 46s
+Saved model state: checkpoints/checkpoint_epoch_4_20241024-181854.pth
+Epoch 5/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [23:48<00:00,  1.79s/it, loss=0.9193, lr=1.00e-07, grad=M:0.1702, status=Epoch complete]
+█ Epoch  5: Loss T 0.919257 V 0.506435 | F1 T 0.840524 V 0.818892 B 0.818891 SC 1/10 | Acc T 0.844531 V 0.820796 | LR 1.00e-07 | Grad ↓ 0.000000 ↑ 1.223533 M 0.170223 | 23m 48s
+Saved model state: checkpoints/checkpoint_epoch_5_20241024-184253.pth
+Epoch 6/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [23:48<00:00,  1.79s/it, loss=0.9793, lr=9.06e-06, grad=M:0.2460, status=Epoch complete]
+█ Epoch  6: Loss T 0.979336 V 0.531252 | F1 T 0.848298 V 0.808993 B 0.818891 SC 2/10 | Acc T 0.854139 V 0.809366 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 1.462248 M 0.245967 | 23m 48s
+Saved model state: checkpoints/checkpoint_epoch_6_20241024-190651.pth
+Epoch 7/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [23:50<00:00,  1.79s/it, loss=1.0215, lr=6.59e-06, grad=M:0.8825, status=Epoch complete]
+█ Epoch  7: Loss T 1.021522 V 0.522849 | F1 T 0.845441 V 0.805660 B 0.818891 SC 3/10 | Acc T 0.849359 V 0.806785 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 7.864930 M 0.882471 | 23m 50s
+Saved model state: checkpoints/checkpoint_epoch_7_20241024-193052.pth
+Epoch 8/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [23:47<00:00,  1.79s/it, loss=0.8553, lr=3.53e-06, grad=M:0.6014, status=Epoch complete]
+█ Epoch  8: Loss T 0.855313 V 0.486726 | F1 T 0.860747 V 0.820141 B 0.820141 SC 0/10 | Acc T 0.862953 V 0.822271 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 4.323188 M 0.601362 | 23m 47s
+Saved model state: checkpoints/checkpoint_epoch_8_20241024-195450.pth
+Epoch 9/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [23:47<00:00,  1.79s/it, loss=0.7728, lr=1.05e-06, grad=M:0.1716, status=Epoch complete]
+█ Epoch  9: Loss T 0.772813 V 0.489708 | F1 T 0.869819 V 0.822752 B 0.822752 SC 0/10 | Acc T 0.872042 V 0.824484 | LR 1.05e-06 | Grad ↓ 0.000000 ↑ 1.088907 M 0.171570 | 23m 47s
+Saved model state: checkpoints/checkpoint_epoch_9_20241024-201847.pth
+Epoch 10/50: 100%|████████████████████████████████████████████████████████████████████| 798/798 [23:46<00:00,  1.79s/it, loss=0.7459, lr=1.00e-07, grad=M:0.9090, status=Epoch complete]
+█ Epoch 10: Loss T 0.745933 V 0.488204 | F1 T 0.870207 V 0.825287 B 0.825287 SC 0/10 | Acc T 0.872307 V 0.827065 | LR 1.00e-07 | Grad ↓ 0.000000 ↑ 8.420140 M 0.909050 | 23m 46s
+Memory: Rank 0: 34.87 GB | Rank 1: 35.46 GB | Rank 2: 35.66 GB | Rank 3: 35.46 GB | Rank 4: 35.46 GB | Rank 5: 35.46 GB | Rank 6: 35.46 GB | Rank 7: 35.31 GB (Max: 42.29 GB, Total: 338.28 GB)
+Saved model state: checkpoints/checkpoint_epoch_10_20241024-204300.pth
+Epoch 11/50: 100%|████████████████████████████████████████████████████████████████████| 798/798 [23:46<00:00,  1.79s/it, loss=0.7654, lr=9.06e-06, grad=M:0.4943, status=Epoch complete]
+█ Epoch 11: Loss T 0.765393 V 0.491115 | F1 T 0.874726 V 0.820362 B 0.825287 SC 1/10 | Acc T 0.876861 V 0.821718 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 3.753560 M 0.494250 | 23m 46s
+Saved model state: checkpoints/checkpoint_epoch_11_20241024-210656.pth
+Epoch 12/50: 100%|████████████████████████████████████████████████████████████████████| 798/798 [23:46<00:00,  1.79s/it, loss=0.7184, lr=6.59e-06, grad=M:0.2340, status=Epoch complete]
+█ Epoch 12: Loss T 0.718415 V 0.482274 | F1 T 0.877408 V 0.821888 B 0.825287 SC 2/10 | Acc T 0.878232 V 0.824115 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 1.631634 M 0.233999 | 23m 46s
+Saved model state: checkpoints/checkpoint_epoch_12_20241024-213053.pth
+Epoch 13/50: 100%|████████████████████████████████████████████████████████████████████| 798/798 [23:48<00:00,  1.79s/it, loss=0.6810, lr=3.53e-06, grad=M:0.2726, status=Epoch complete]
+█ Epoch 13: Loss T 0.680988 V 0.493630 | F1 T 0.889732 V 0.825522 B 0.825522 SC 0/10 | Acc T 0.891229 V 0.827249 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 1.849575 M 0.272574 | 23m 48s
+Saved model state: checkpoints/checkpoint_epoch_13_20241024-215451.pth
+Epoch 14/50: 100%|████████████████████████████████████████████████████████████████████| 798/798 [23:46<00:00,  1.79s/it, loss=0.6413, lr=1.05e-06, grad=M:0.2569, status=Epoch complete]
+█ Epoch 14: Loss T 0.641319 V 0.507582 | F1 T 0.893861 V 0.824809 B 0.825522 SC 1/10 | Acc T 0.895313 V 0.826512 | LR 1.05e-06 | Grad ↓ 0.000000 ↑ 1.808147 M 0.256895 | 23m 46s
+Saved model state: checkpoints/checkpoint_epoch_14_20241024-221848.pth
+Epoch 15/50: 100%|████████████████████████████████████████████████████████████████████| 798/798 [23:48<00:00,  1.79s/it, loss=0.6187, lr=1.00e-07, grad=M:0.2937, status=Epoch complete]
+█ Epoch 15: Loss T 0.618691 V 0.521020 | F1 T 0.894342 V 0.825079 B 0.825522 SC 2/10 | Acc T 0.895557 V 0.826881 | LR 1.00e-07 | Grad ↓ 0.000000 ↑ 2.199311 M 0.293728 | 23m 48s
+Saved model state: checkpoints/checkpoint_epoch_15_20241024-224246.pth
+Epoch 16/50: 100%|████████████████████████████████████████████████████████████████████| 798/798 [23:47<00:00,  1.79s/it, loss=0.6677, lr=9.06e-06, grad=M:0.2807, status=Epoch complete]
+█ Epoch 16: Loss T 0.667721 V 0.499441 | F1 T 0.893125 V 0.822157 B 0.825522 SC 3/10 | Acc T 0.894989 V 0.823378 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 1.930216 M 0.280720 | 23m 47s
+Saved model state: checkpoints/checkpoint_epoch_16_20241024-230644.pth
+Epoch 17/50: 100%|███████████████████████████████████████████████████████████████████| 798/798 [23:48<00:00,  1.79s/it, loss=0.6476, lr=6.59e-06, grad=M:0.9207, status=Epoch complete]
+█ Epoch 17: Loss T 0.647598 V 0.532852 | F1 T 0.894336 V 0.819470 B 0.825522 SC 4/10 | Acc T 0.897271 V 0.820428 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 8.989134 M 0.920716 | 23m 48s
+Saved model state: checkpoints/checkpoint_epoch_17_20241024-233042.pth
+Epoch 18/50: 100%|███████████████████████████████████████████████████████████████████| 798/798 [23:47<00:00,  1.79s/it, loss=0.6523, lr=3.53e-06, grad=M:0.3800, status=Epoch complete]
+█ Epoch 18: Loss T 0.652302 V 0.559312 | F1 T 0.896993 V 0.817042 B 0.825522 SC 5/10 | Acc T 0.899495 V 0.818215 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 2.847815 M 0.380043 | 23m 47s
+Saved model state: checkpoints/checkpoint_epoch_18_20241024-235440.pth
+Epoch 19/50: 100%|███████████████████████████████████████████████████████████████████| 798/798 [23:47<00:00,  1.79s/it, loss=0.6443, lr=1.05e-06, grad=M:0.3552, status=Epoch complete]
+█ Epoch 19: Loss T 0.644347 V 0.571050 | F1 T 0.906185 V 0.822284 B 0.825522 SC 6/10 | Acc T 0.908299 V 0.823193 | LR 1.05e-06 | Grad ↓ 0.000000 ↑ 2.844336 M 0.355170 | 23m 47s
+Saved model state: checkpoints/checkpoint_epoch_19_20241025-001838.pth
+Epoch 20/50: 100%|███████████████████████████████████████████████████████████████████| 798/798 [23:47<00:00,  1.79s/it, loss=0.6038, lr=1.00e-07, grad=M:0.2729, status=Epoch complete]
+█ Epoch 20: Loss T 0.603752 V 0.573312 | F1 T 0.905990 V 0.821727 B 0.825522 SC 7/10 | Acc T 0.907780 V 0.823009 | LR 1.00e-07 | Grad ↓ 0.000000 ↑ 2.055032 M 0.272916 | 23m 47s
+Memory: Rank 0: 34.87 GB | Rank 1: 35.46 GB | Rank 2: 35.66 GB | Rank 3: 35.46 GB | Rank 4: 35.46 GB | Rank 5: 35.46 GB | Rank 6: 35.46 GB | Rank 7: 35.31 GB (Max: 42.29 GB, Total: 338.28 GB)
+Saved model state: checkpoints/checkpoint_epoch_20_20241025-004237.pth
+Epoch 21/50: 100%|███████████████████████████████████████████████████████████████████| 798/798 [23:46<00:00,  1.79s/it, loss=0.6599, lr=9.06e-06, grad=M:0.1962, status=Epoch complete]
+█ Epoch 21: Loss T 0.659929 V 0.558746 | F1 T 0.901943 V 0.813221 B 0.825522 SC 8/10 | Acc T 0.903344 V 0.813975 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 1.257383 M 0.196187 | 23m 46s
+Saved model state: checkpoints/checkpoint_epoch_21_20241025-010634.pth
+Epoch 22/50: 100%|███████████████████████████████████████████████████████████████████| 798/798 [23:47<00:00,  1.79s/it, loss=0.6831, lr=6.59e-06, grad=M:0.2957, status=Epoch complete]
+█ Epoch 22: Loss T 0.683077 V 0.644542 | F1 T 0.894880 V 0.811446 B 0.825522 SC 9/10 | Acc T 0.895734 V 0.812684 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 2.253749 M 0.295662 | 23m 47s
+Saved model state: checkpoints/checkpoint_epoch_22_20241025-013031.pth
+Epoch 23/50: 100%|███████████████████████████████████████████████████████████████████| 798/798 [23:49<00:00,  1.79s/it, loss=0.6454, lr=3.53e-06, grad=M:0.2559, status=Epoch complete]
+█ Epoch 23: Loss T 0.645443 V 0.565451 | F1 T 0.900551 V 0.819405 B 0.825522 SC 10/10 | Acc T 0.901698 V 0.820428 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 1.984049 M 0.255918 | 23m 49s
+Stopping early after 23 epochs due to no improvement in validation score in last 10 iterations.
+Saved model state: checkpoints/checkpoint_epoch_23_20241025-015430.pth
+Saving model in ONNX format...
+Model saved in ONNX format to saves/model_20241025-015811.onnx and uploaded to Weights & Biases.
+Saved model state: checkpoints/final_model_20241025-015825.pth
+Saved model pickle: checkpoints/final_model_20241025-015825.pkl
+Training completed (9h 15m 37s)
+
+Evaluating model...
+
+stage_1_merged Multi-Class Classification Report
+
+              precision    recall  f1-score   support
+
+    negative   0.861386  0.838330  0.849702      1868
+     neutral   0.750420  0.803475  0.776042      1669
+    positive   0.862885  0.831741  0.847027      1884
+
+    accuracy                       0.825309      5421
+   macro avg   0.824897  0.824515  0.824257      5421
+weighted avg   0.827743  0.825309  0.826094      5421
+
+ROC AUC: 0.942585
+
+Predicted  negative  neutral  positive
+Actual                                
+negative       1566      220        82
+neutral         161     1341       167
+positive         91      226      1567
+
+Saved predictions: saves/predictions_20241025-020244.csv
+
+Macro F1 Score: 0.82
+
+Evaluation completed (6m 4s)
+wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb:            eval/macro_f1_score ▁
+wandb:             gradients/max_norm ▁▆▂▂▁▁▇▄▁█▃▂▂▂▂▂█▃▃▂▁▂▂
+wandb:            gradients/mean_norm ▁▃▂▃▁▂█▅▁█▄▂▂▂▂▂█▃▃▂▁▂▂
+wandb:             gradients/min_norm ▂▁▄▆▅▅▅▄▃▆▅▃▃▃▃▄▃▄█▄▃▅▄
+wandb:                    other/epoch ▁▁▂▂▂▃▃▃▄▄▄▅▅▅▅▆▆▆▇▇▇██
+wandb:            other/learning_rate █▆▄▂▁█▆▄▂▁█▆▄▂▁█▆▄▂▁█▆▄
+wandb:               other/stop_limit ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:                 train/accuracy ▃▁▇▇▇▇▇▇▇▇▇████████████
+wandb:                     train/loss █▇▅▃▃▃▃▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁
+wandb:           train/macro_f1_score ▃▁▇▇▇▇▇▇███████████████
+wandb:               train/stop_count ▁▂▁▁▂▂▃▁▁▁▂▂▁▂▂▃▄▅▅▆▇▇█
+wandb:            validation/accuracy ▃▁▇████████████████████
+wandb: validation/best_macro_f1_score ▁▁▇████████████████████
+wandb:                validation/loss ██▅▁▁▂▂▁▁▁▁▁▁▁▂▁▂▂▂▂▂▃▂
+wandb:      validation/macro_f1_score ▃▁█████████████████████
+wandb: 
+wandb: Run summary:
+wandb:            eval/macro_f1_score 0.82426
+wandb:             gradients/max_norm 1.98405
+wandb:            gradients/mean_norm 0.25592
+wandb:             gradients/min_norm 0.0
+wandb:                    other/epoch 23
+wandb:            other/learning_rate 0.0
+wandb:               other/stop_limit 10
+wandb:                 train/accuracy 0.9017
+wandb:                     train/loss 0.64544
+wandb:           train/macro_f1_score 0.90055
+wandb:               train/stop_count 10
+wandb:            validation/accuracy 0.82043
+wandb: validation/best_macro_f1_score 0.82552
+wandb:                validation/loss 0.56545
+wandb:      validation/macro_f1_score 0.81941
+wandb: 
+wandb: 🚀 View run stage_1_merged at: https://wandb.ai/jimbeno/Electra%20Large/runs/nsy5h33f
+wandb: ⭐️ View project at: https://wandb.ai/jimbeno/Electra%20Large
+wandb: Synced 5 W&B file(s), 0 media file(s), 4 artifact file(s) and 2 other file(s)
+wandb: Find logs at: ./wandb/run-20241024_164255-nsy5h33f/logs
+TOTAL Time: 9h 23m 29s
+
+
+
+(nlp) ubuntu@217-142-254-229:~/nlp-osaka/sentiment$ python ./ddp_sentiment_finetune.py --dataset 'merged_local' --weights_name 'google/electra-large-discriminator' --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 512 --accumulation_steps 2 --finetune_bert --finetune_layers 24 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Large' --wandb_run 'E2-ELFT-Merged' --model_file 'checkpoint_epoch_13_20241024-215451.pth' --interactive
+
+Starting DDP PyTorch Training...
+Device: cuda, Number of GPUs: 8
+Spawning 8 processes...
+Rank 1 - Device: cuda:1
+Rank 3 - Device: cuda:3
+Rank 6 - Device: cuda:6
+Rank 5 - Device: cuda:5
+Rank 4 - Device: cuda:4
+Rank 7 - Device: cuda:7
+Rank 2 - Device: cuda:2
+Rank 0 - Device: cuda:0
+8 process groups initialized with 'nccl' backend on localhost:12355
+NCCL Timeout: 1 hr 0 min. NCCL Blocking Wait: Enabled
+wandb: Using wandb-core as the SDK backend. Please refer to https://wandb.me/wandb-core for more information.
+wandb: Currently logged in as: jbeno (jimbeno). Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.18.5
+wandb: Run data is saved locally in /home/ubuntu/nlp-osaka/sentiment/wandb/run-20241029_070609-ej1zrudl
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run E2-ELFT-Merged
+wandb: ⭐️ View project at https://wandb.ai/jimbeno/Electra%20Large
+wandb: 🚀 View run at https://wandb.ai/jimbeno/Electra%20Large/runs/ej1zrudl
+Wand run initialized.
+
+Initializing 'google/electra-large-discriminator' tokenizer and model...
+Checking for local files...
+Found all files in cache, skipping download
+All ranks loading tokenizer from local files...
+All ranks loading model from local files...
+Tokenizer and model initialized (8s)
+
+Loading data...
+Using the same dataset for training and evaluation
+Splits:
+- Train: Using merged_local 'train' split
+- Validation: Using merged_local 'validation' split
+- Evaluation: Using merged_local 'test' split
+Train Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Validation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Evaluation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Train size: 102097
+Validation size: 5421
+Evaluation size: 6530
+Train label distribution:
+	      Negative: 21910
+	       Neutral: 49148
+	      Positive: 31039
+Validation label distribution:
+	      Negative: 1868
+	       Neutral: 1669
+	      Positive: 1884
+Evaluation label distribution:
+	      Negative: 2352
+	       Neutral: 1829
+	      Positive: 2349
+Data loaded (2s)
+
+Processing data...
+(Batch size: 512, Pooling: Mean, Fine Tune BERT: True, Chunk size: None)...
+Extracting sentences and labels...
+X Train shape: [102097], X Validation shape: [5421], X Test shape: [6530]
+y Train shape: [102097], y Validation shape: [5421], y Test shape: [6530]
+Data processed (4ms)
+
+Initializing DDP Neural Classifier...
+Layers: 2, Hidden Dim: 1024, Hidden Act: SwishGLU, Dropout: 0.3, Optimizer: AdamW, L2 Strength: 0.01, Pooling: MEAN, Accumulation Steps: 2, Max Grad Norm: None
+Batch Size: 512, Max Epochs: 50, LR: 1e-05, Early Stop: score, Fine-tune BERT: True, Fine-tune Layers: 24, Freeze BERT: False, Target Score: None, Interactive: True
+Loading model from: checkpoints/checkpoint_epoch_13_20241024-215451.pth...
+Loaded checkpoint: checkpoints/checkpoint_epoch_13_20241024-215451.pth
+Retrieved model state dictionary.
+Retrieved optimizer state dictionary.
+Classifier initialized (36s)
+
+Fitting DDP Neural Classifier on training data...
+Num Workers: 0, Prefetch: None
+Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: 0.1
+Training will stop early if the score does not improve by at least 0.00001 for 10 iterations.
+Using provided validation set for early stopping.
+Building dataset and dataloader...
+Initializing model, graph, optimizer...
+BERT's original pooler removed. Using custom pooling type: mean
+BERT has 334,092,288 trainable parameters and 0 non-trainable parameters
+Number of BERT layers requiring gradients: 24 out of 24
+Fine-tuning the last 24 out of 24 BERT layers
+
+Model Architecture Summary:
+BERTClassifier(
+  (bert): ElectraModel(
+    (embeddings): ElectraEmbeddings(
+      (word_embeddings): Embedding(30522, 1024, padding_idx=0)
+      (position_embeddings): Embedding(512, 1024)
+      (token_type_embeddings): Embedding(2, 1024)
+      (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): ElectraEncoder(
+      (layer): ModuleList(
+        (0-23): 24 x ElectraLayer(
+          (attention): ElectraAttention(
+            (self): ElectraSelfAttention(
+              (query): Linear(in_features=1024, out_features=1024, bias=True)
+              (key): Linear(in_features=1024, out_features=1024, bias=True)
+              (value): Linear(in_features=1024, out_features=1024, bias=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+            (output): ElectraSelfOutput(
+              (dense): Linear(in_features=1024, out_features=1024, bias=True)
+              (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+          )
+          (intermediate): ElectraIntermediate(
+            (dense): Linear(in_features=1024, out_features=4096, bias=True)
+            (intermediate_act_fn): GELUActivation()
+          )
+          (output): ElectraOutput(
+            (dense): Linear(in_features=4096, out_features=1024, bias=True)
+            (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+  )
+  (custom_pooling): PoolingLayer()
+  (classifier): Classifier(
+    (layers): Sequential(
+      (0): Linear(in_features=1024, out_features=1024, bias=True)
+      (1): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (2): Dropout(p=0.3, inplace=False)
+      (3): Linear(in_features=1024, out_features=1024, bias=True)
+      (4): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (5): Dropout(p=0.3, inplace=False)
+      (6): Linear(in_features=1024, out_features=3, bias=True)
+    )
+  )
+)
+
+Model Parameters:
+  bert.embeddings.word_embeddings: 31,254,528 (trainable)
+  bert.embeddings.position_embeddings: 524,288 (trainable)
+  bert.embeddings.token_type_embeddings: 2,048 (trainable)
+  bert.embeddings.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.0.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.0.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.0.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.0.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.1.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.1.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.1.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.1.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.2.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.2.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.2.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.2.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.3.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.3.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.3.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.3.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.4.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.4.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.4.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.4.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.5.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.5.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.5.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.5.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.6.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.6.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.6.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.6.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.7.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.7.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.7.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.7.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.8.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.8.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.8.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.8.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.9.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.9.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.9.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.9.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.10.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.10.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.10.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.10.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.11.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.11.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.11.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.11.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.12.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.12.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.12.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.12.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.13.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.13.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.13.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.13.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.14.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.14.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.14.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.14.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.15.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.15.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.15.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.15.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.16.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.16.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.16.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.16.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.17.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.17.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.17.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.17.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.18.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.18.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.18.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.18.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.19.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.19.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.19.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.19.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.20.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.20.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.20.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.20.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.21.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.21.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.21.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.21.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.22.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.22.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.22.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.22.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.23.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.23.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.23.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.23.output.LayerNorm: 2,048 (trainable)
+  classifier.layers.0: 1,049,600 (trainable)
+  classifier.layers.1.projection: 2,099,200 (trainable)
+  classifier.layers.3: 1,049,600 (trainable)
+  classifier.layers.6: 3,075 (trainable)
+
+Total layers: 200
+Trainable layers: 200
+Total parameters: 338,293,763
+Trainable parameters: 338,293,763
+Percentage of trainable parameters: 100.00%
+Using optimizer: AdamW, Use Zero: True, Base Learning Rate: 1e-05, L2 strength: 0.01
+Layer-wise decay factor: 0.95
+Using scheduler: CosineAnnealingWarmRestarts
+Scheduler arguments:
+- T_0: 5
+- T_mult: 1
+- eta_min: 1e-07
+
+Starting training loop...
+Start epoch: 14, Max Iterations: 50, Early Stop: score, Tolerance: 0.00001, Number Iterations No Change: 10
+
+[Enter] to continue for 1 epoch, [Q]uit, [S]ave, [H]elp: q
+Quitting training...
+
+Evaluating model...
+
+E2-ELFT-Merged Multi-Class Classification Report
+
+              precision    recall  f1-score   support
+
+    negative   0.858503  0.843537  0.850954      2352
+     neutral   0.747684  0.750137  0.748908      1829
+    positive   0.864513  0.877395  0.870906      2349
+
+    accuracy                       0.829556      6530
+   macro avg   0.823567  0.823690  0.823590      6530
+weighted avg   0.829626  0.829556  0.829549      6530
+
+ROC AUC: 0.947247
+
+Predicted  negative  neutral  positive
+Actual                                
+negative       1984      256       112
+neutral         246     1372       211
+positive         81      207      2061
+
+Saved predictions: saves/predictions_20241029-071518.csv
+
+Macro F1 Score: 0.82
+
+Evaluation completed (6m 59s)
+wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb: eval/macro_f1_score ▁
+wandb: 
+wandb: Run summary:
+wandb: eval/macro_f1_score 0.82359
+wandb: 
+wandb: 🚀 View run E2-ELFT-Merged at: https://wandb.ai/jimbeno/Electra%20Large/runs/ej1zrudl
+wandb: ⭐️ View project at: https://wandb.ai/jimbeno/Electra%20Large
+wandb: Synced 4
+
+(nlp) ubuntu@217-142-254-229:~/nlp-osaka/sentiment$ python ./ddp_sentiment_finetune.py --dataset 'merged_local' --eval_dataset 'dynasent_r1' --weights_name 'google/electra-large-discriminator' --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 512 --accumulation_steps 2 --finetune_bert --finetune_layers 24 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Large' --wandb_run 'E2-ELFT-DYN-R1' --model_file 'checkpoint_epoch_13_20241024-215451.pth' --interactive
+
+Starting DDP PyTorch Training...
+Device: cuda, Number of GPUs: 8
+Spawning 8 processes...
+Rank 5 - Device: cuda:5
+Rank 6 - Device: cuda:6
+Rank 7 - Device: cuda:7
+Rank 3 - Device: cuda:3
+Rank 4 - Device: cuda:4
+Rank 2 - Device: cuda:2
+Rank 1 - Device: cuda:1
+Rank 0 - Device: cuda:0
+8 process groups initialized with 'nccl' backend on localhost:12355
+NCCL Timeout: 1 hr 0 min. NCCL Blocking Wait: Enabled
+wandb: Using wandb-core as the SDK backend. Please refer to https://wandb.me/wandb-core for more information.
+wandb: Currently logged in as: jbeno (jimbeno). Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.18.5
+wandb: Run data is saved locally in /home/ubuntu/nlp-osaka/sentiment/wandb/run-20241029_072320-3s564j8g
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run E2-ELFT-DYN-R1
+wandb: ⭐️ View project at https://wandb.ai/jimbeno/Electra%20Large
+wandb: 🚀 View run at https://wandb.ai/jimbeno/Electra%20Large/runs/3s564j8g
+Wand run initialized.
+
+Initializing 'google/electra-large-discriminator' tokenizer and model...
+Checking for local files...
+Found all files in cache, skipping download
+All ranks loading tokenizer from local files...
+All ranks loading model from local files...
+Tokenizer and model initialized (6s)
+
+Loading data...
+Using different datasets for training and evaluation
+Splits:
+- Train: Using merged_local 'train' split
+- Validation: Using merged_local 'validation' split
+- Evaluation: Using dynasent_r1 'test' split
+Train Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Validation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Evaluation Data: DynaSent Round 1 from Hugging Face: 'dynabench/dynasent'
+Downloading builder script: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 16.5k/16.5k [00:00<00:00, 42.6MB/s]
+Downloading metadata: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 6.97k/6.97k [00:00<00:00, 29.0MB/s]
+Downloading readme: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 13.7k/13.7k [00:00<00:00, 38.4MB/s]
+Downloading data: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 17.1M/17.1M [00:00<00:00, 88.3MB/s]
+Generating train split: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 80488/80488 [00:17<00:00, 4472.99 examples/s]
+Generating validation split: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 3600/3600 [00:00<00:00, 5037.99 examples/s]
+Generating test split: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████| 3600/3600 [00:00<00:00, 4992.61 examples/s]
+Train size: 102097
+Validation size: 5421
+Evaluation size: 3600
+Train label distribution:
+	      Negative: 21910
+	       Neutral: 49148
+	      Positive: 31039
+Validation label distribution:
+	      Negative: 1868
+	       Neutral: 1669
+	      Positive: 1884
+Evaluation label distribution:
+	      Negative: 1200
+	       Neutral: 1200
+	      Positive: 1200
+Data loaded (28s)
+
+Processing data...
+(Batch size: 512, Pooling: Mean, Fine Tune BERT: True, Chunk size: None)...
+Extracting sentences and labels...
+X Train shape: [102097], X Validation shape: [5421], X Test shape: [3600]
+y Train shape: [102097], y Validation shape: [5421], y Test shape: [3600]
+Data processed (3ms)
+
+Initializing DDP Neural Classifier...
+Layers: 2, Hidden Dim: 1024, Hidden Act: SwishGLU, Dropout: 0.3, Optimizer: AdamW, L2 Strength: 0.01, Pooling: MEAN, Accumulation Steps: 2, Max Grad Norm: None
+Batch Size: 512, Max Epochs: 50, LR: 1e-05, Early Stop: score, Fine-tune BERT: True, Fine-tune Layers: 24, Freeze BERT: False, Target Score: None, Interactive: True
+Loading model from: checkpoints/checkpoint_epoch_13_20241024-215451.pth...
+Loaded checkpoint: checkpoints/checkpoint_epoch_13_20241024-215451.pth
+Retrieved model state dictionary.
+Retrieved optimizer state dictionary.
+Classifier initialized (35s)
+
+Fitting DDP Neural Classifier on training data...
+Num Workers: 0, Prefetch: None
+Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: 0.1
+Training will stop early if the score does not improve by at least 0.00001 for 10 iterations.
+Using provided validation set for early stopping.
+Building dataset and dataloader...
+Initializing model, graph, optimizer...
+BERT's original pooler removed. Using custom pooling type: mean
+BERT has 334,092,288 trainable parameters and 0 non-trainable parameters
+Number of BERT layers requiring gradients: 24 out of 24
+Fine-tuning the last 24 out of 24 BERT layers
+
+Model Architecture Summary:
+BERTClassifier(
+  (bert): ElectraModel(
+    (embeddings): ElectraEmbeddings(
+      (word_embeddings): Embedding(30522, 1024, padding_idx=0)
+      (position_embeddings): Embedding(512, 1024)
+      (token_type_embeddings): Embedding(2, 1024)
+      (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): ElectraEncoder(
+      (layer): ModuleList(
+        (0-23): 24 x ElectraLayer(
+          (attention): ElectraAttention(
+            (self): ElectraSelfAttention(
+              (query): Linear(in_features=1024, out_features=1024, bias=True)
+              (key): Linear(in_features=1024, out_features=1024, bias=True)
+              (value): Linear(in_features=1024, out_features=1024, bias=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+            (output): ElectraSelfOutput(
+              (dense): Linear(in_features=1024, out_features=1024, bias=True)
+              (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+          )
+          (intermediate): ElectraIntermediate(
+            (dense): Linear(in_features=1024, out_features=4096, bias=True)
+            (intermediate_act_fn): GELUActivation()
+          )
+          (output): ElectraOutput(
+            (dense): Linear(in_features=4096, out_features=1024, bias=True)
+            (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+  )
+  (custom_pooling): PoolingLayer()
+  (classifier): Classifier(
+    (layers): Sequential(
+      (0): Linear(in_features=1024, out_features=1024, bias=True)
+      (1): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (2): Dropout(p=0.3, inplace=False)
+      (3): Linear(in_features=1024, out_features=1024, bias=True)
+      (4): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (5): Dropout(p=0.3, inplace=False)
+      (6): Linear(in_features=1024, out_features=3, bias=True)
+    )
+  )
+)
+
+Model Parameters:
+  bert.embeddings.word_embeddings: 31,254,528 (trainable)
+  bert.embeddings.position_embeddings: 524,288 (trainable)
+  bert.embeddings.token_type_embeddings: 2,048 (trainable)
+  bert.embeddings.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.0.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.0.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.0.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.0.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.1.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.1.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.1.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.1.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.2.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.2.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.2.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.2.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.3.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.3.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.3.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.3.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.4.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.4.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.4.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.4.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.5.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.5.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.5.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.5.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.6.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.6.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.6.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.6.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.7.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.7.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.7.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.7.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.8.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.8.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.8.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.8.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.9.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.9.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.9.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.9.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.10.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.10.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.10.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.10.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.11.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.11.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.11.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.11.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.12.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.12.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.12.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.12.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.13.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.13.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.13.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.13.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.14.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.14.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.14.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.14.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.15.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.15.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.15.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.15.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.16.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.16.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.16.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.16.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.17.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.17.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.17.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.17.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.18.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.18.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.18.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.18.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.19.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.19.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.19.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.19.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.20.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.20.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.20.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.20.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.21.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.21.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.21.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.21.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.22.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.22.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.22.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.22.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.23.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.23.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.23.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.23.output.LayerNorm: 2,048 (trainable)
+  classifier.layers.0: 1,049,600 (trainable)
+  classifier.layers.1.projection: 2,099,200 (trainable)
+  classifier.layers.3: 1,049,600 (trainable)
+  classifier.layers.6: 3,075 (trainable)
+
+Total layers: 200
+Trainable layers: 200
+Total parameters: 338,293,763
+Trainable parameters: 338,293,763
+Percentage of trainable parameters: 100.00%
+Using optimizer: AdamW, Use Zero: True, Base Learning Rate: 1e-05, L2 strength: 0.01
+Layer-wise decay factor: 0.95
+Using scheduler: CosineAnnealingWarmRestarts
+Scheduler arguments:
+- T_0: 5
+- T_mult: 1
+- eta_min: 1e-07
+
+Starting training loop...
+Start epoch: 14, Max Iterations: 50, Early Stop: score, Tolerance: 0.00001, Number Iterations No Change: 10
+
+[Enter] to continue for 1 epoch, [Q]uit, [S]ave, [H]elp: q
+Quitting training...
+
+Evaluating model...
+
+E2-ELFT-DYN-R1 Multi-Class Classification Report
+
+              precision    recall  f1-score   support
+
+    negative   0.913204  0.824167  0.866404      1200
+     neutral   0.779433  0.915833  0.842146      1200
+    positive   0.905149  0.835000  0.868661      1200
+
+    accuracy                       0.858333      3600
+   macro avg   0.865929  0.858333  0.859070      3600
+weighted avg   0.865929  0.858333  0.859070      3600
+
+ROC AUC: 0.963133
+
+Predicted  negative  neutral  positive
+Actual                                
+negative        989      156        55
+neutral          51     1099        50
+positive         43      155      1002
+
+Saved predictions: saves/predictions_20241029-073051.csv
+
+Macro F1 Score: 0.86
+
+Evaluation completed (3m 52s)
+wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb: eval/macro_f1_score ▁
+wandb: 
+wandb: Run summary:
+wandb: eval/macro_f1_score 0.85907
+wandb: 
+wandb: 🚀 View run E2-ELFT-DYN-R1 at: https://wandb.ai/jimbeno/Electra%20Large/runs/3s564j8g
+wandb: ⭐️ View project at: https://wandb.ai/jimbeno/Electra%20Large
+wandb: Synced 5 W&B file(s), 0 media file(s), 4 artifact file(s) and 1 other file(s)
+wandb: Find logs at: ./wandb/run-20241029_072320-3s564j8g/logs
+TOTAL Time: 9m 51s
+(nlp) ubuntu@217-142-254-229:~/nlp-osaka/sentiment$ python ./ddp_sentiment_finetune.py --dataset 'merged_local' --eval_dataset 'dynasent_r2' --weights_name 'google/electra-large-discriminator' --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 512 --accumulation_steps 2 --finetune_bert --finetune_layers 24 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Large' --wandb_run 'E2-ELFT-DYN-R2' --model_file 'checkpoint_epoch_13_20241024-215451.pth' --interactive
+
+Starting DDP PyTorch Training...
+Device: cuda, Number of GPUs: 8
+Spawning 8 processes...
+Rank 7 - Device: cuda:7
+Rank 3 - Device: cuda:3
+Rank 1 - Device: cuda:1
+Rank 6 - Device: cuda:6
+Rank 4 - Device: cuda:4
+Rank 2 - Device: cuda:2
+Rank 5 - Device: cuda:5
+Rank 0 - Device: cuda:0
+8 process groups initialized with 'nccl' backend on localhost:12355
+NCCL Timeout: 1 hr 0 min. NCCL Blocking Wait: Enabled
+wandb: Using wandb-core as the SDK backend. Please refer to https://wandb.me/wandb-core for more information.
+wandb: Currently logged in as: jbeno (jimbeno). Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.18.5
+wandb: Run data is saved locally in /home/ubuntu/nlp-osaka/sentiment/wandb/run-20241029_073358-a4e9fqxg
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run E2-ELFT-DYN-R2
+wandb: ⭐️ View project at https://wandb.ai/jimbeno/Electra%20Large
+wandb: 🚀 View run at https://wandb.ai/jimbeno/Electra%20Large/runs/a4e9fqxg
+Wand run initialized.
+
+Initializing 'google/electra-large-discriminator' tokenizer and model...
+Checking for local files...
+Found all files in cache, skipping download
+All ranks loading tokenizer from local files...
+All ranks loading model from local files...
+Tokenizer and model initialized (6s)
+
+Loading data...
+Using different datasets for training and evaluation
+Splits:
+- Train: Using merged_local 'train' split
+- Validation: Using merged_local 'validation' split
+- Evaluation: Using dynasent_r2 'test' split
+Train Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Validation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Evaluation Data: DynaSent Round 2 from Hugging Face: 'dynabench/dynasent'
+Generating train split: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 13065/13065 [00:03<00:00, 4022.94 examples/s]
+Generating validation split: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████| 720/720 [00:00<00:00, 4395.04 examples/s]
+Generating test split: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 720/720 [00:00<00:00, 4186.29 examples/s]
+Train size: 102097
+Validation size: 5421
+Evaluation size: 720
+Train label distribution:
+	      Negative: 21910
+	       Neutral: 49148
+	      Positive: 31039
+Validation label distribution:
+	      Negative: 1868
+	       Neutral: 1669
+	      Positive: 1884
+Evaluation label distribution:
+	      Negative: 240
+	       Neutral: 240
+	      Positive: 240
+Data loaded (6s)
+
+Processing data...
+(Batch size: 512, Pooling: Mean, Fine Tune BERT: True, Chunk size: None)...
+Extracting sentences and labels...
+X Train shape: [102097], X Validation shape: [5421], X Test shape: [720]
+y Train shape: [102097], y Validation shape: [5421], y Test shape: [720]
+Data processed (3ms)
+
+Initializing DDP Neural Classifier...
+Layers: 2, Hidden Dim: 1024, Hidden Act: SwishGLU, Dropout: 0.3, Optimizer: AdamW, L2 Strength: 0.01, Pooling: MEAN, Accumulation Steps: 2, Max Grad Norm: None
+Batch Size: 512, Max Epochs: 50, LR: 1e-05, Early Stop: score, Fine-tune BERT: True, Fine-tune Layers: 24, Freeze BERT: False, Target Score: None, Interactive: True
+Loading model from: checkpoints/checkpoint_epoch_13_20241024-215451.pth...
+Loaded checkpoint: checkpoints/checkpoint_epoch_13_20241024-215451.pth
+Retrieved model state dictionary.
+Retrieved optimizer state dictionary.
+Classifier initialized (35s)
+
+Fitting DDP Neural Classifier on training data...
+Num Workers: 0, Prefetch: None
+Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: 0.1
+Training will stop early if the score does not improve by at least 0.00001 for 10 iterations.
+Using provided validation set for early stopping.
+Building dataset and dataloader...
+Initializing model, graph, optimizer...
+BERT's original pooler removed. Using custom pooling type: mean
+BERT has 334,092,288 trainable parameters and 0 non-trainable parameters
+Number of BERT layers requiring gradients: 24 out of 24
+Fine-tuning the last 24 out of 24 BERT layers
+
+Model Architecture Summary:
+BERTClassifier(
+  (bert): ElectraModel(
+    (embeddings): ElectraEmbeddings(
+      (word_embeddings): Embedding(30522, 1024, padding_idx=0)
+      (position_embeddings): Embedding(512, 1024)
+      (token_type_embeddings): Embedding(2, 1024)
+      (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): ElectraEncoder(
+      (layer): ModuleList(
+        (0-23): 24 x ElectraLayer(
+          (attention): ElectraAttention(
+            (self): ElectraSelfAttention(
+              (query): Linear(in_features=1024, out_features=1024, bias=True)
+              (key): Linear(in_features=1024, out_features=1024, bias=True)
+              (value): Linear(in_features=1024, out_features=1024, bias=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+            (output): ElectraSelfOutput(
+              (dense): Linear(in_features=1024, out_features=1024, bias=True)
+              (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+          )
+          (intermediate): ElectraIntermediate(
+            (dense): Linear(in_features=1024, out_features=4096, bias=True)
+            (intermediate_act_fn): GELUActivation()
+          )
+          (output): ElectraOutput(
+            (dense): Linear(in_features=4096, out_features=1024, bias=True)
+            (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+  )
+  (custom_pooling): PoolingLayer()
+  (classifier): Classifier(
+    (layers): Sequential(
+      (0): Linear(in_features=1024, out_features=1024, bias=True)
+      (1): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (2): Dropout(p=0.3, inplace=False)
+      (3): Linear(in_features=1024, out_features=1024, bias=True)
+      (4): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (5): Dropout(p=0.3, inplace=False)
+      (6): Linear(in_features=1024, out_features=3, bias=True)
+    )
+  )
+)
+
+Model Parameters:
+  bert.embeddings.word_embeddings: 31,254,528 (trainable)
+  bert.embeddings.position_embeddings: 524,288 (trainable)
+  bert.embeddings.token_type_embeddings: 2,048 (trainable)
+  bert.embeddings.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.0.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.0.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.0.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.0.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.1.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.1.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.1.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.1.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.2.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.2.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.2.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.2.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.3.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.3.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.3.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.3.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.4.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.4.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.4.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.4.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.5.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.5.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.5.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.5.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.6.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.6.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.6.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.6.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.7.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.7.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.7.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.7.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.8.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.8.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.8.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.8.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.9.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.9.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.9.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.9.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.10.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.10.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.10.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.10.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.11.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.11.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.11.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.11.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.12.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.12.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.12.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.12.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.13.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.13.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.13.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.13.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.14.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.14.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.14.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.14.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.15.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.15.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.15.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.15.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.16.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.16.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.16.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.16.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.17.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.17.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.17.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.17.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.18.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.18.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.18.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.18.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.19.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.19.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.19.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.19.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.20.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.20.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.20.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.20.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.21.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.21.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.21.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.21.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.22.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.22.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.22.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.22.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.23.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.23.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.23.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.23.output.LayerNorm: 2,048 (trainable)
+  classifier.layers.0: 1,049,600 (trainable)
+  classifier.layers.1.projection: 2,099,200 (trainable)
+  classifier.layers.3: 1,049,600 (trainable)
+  classifier.layers.6: 3,075 (trainable)
+
+Total layers: 200
+Trainable layers: 200
+Total parameters: 338,293,763
+Trainable parameters: 338,293,763
+Percentage of trainable parameters: 100.00%
+Using optimizer: AdamW, Use Zero: True, Base Learning Rate: 1e-05, L2 strength: 0.01
+Layer-wise decay factor: 0.95
+Using scheduler: CosineAnnealingWarmRestarts
+Scheduler arguments:
+- T_0: 5
+- T_mult: 1
+- eta_min: 1e-07
+
+Starting training loop...
+Start epoch: 14, Max Iterations: 50, Early Stop: score, Tolerance: 0.00001, Number Iterations No Change: 10
+
+[Enter] to continue for 1 epoch, [Q]uit, [S]ave, [H]elp: q
+Quitting training...
+
+Evaluating model...
+
+E2-ELFT-DYN-R2 Multi-Class Classification Report
+
+              precision    recall  f1-score   support
+
+    negative   0.764706  0.812500  0.787879       240
+     neutral   0.814815  0.641667  0.717949       240
+    positive   0.731884  0.841667  0.782946       240
+
+    accuracy                       0.765278       720
+   macro avg   0.770468  0.765278  0.762924       720
+weighted avg   0.770468  0.765278  0.762924       720
+
+ROC AUC: 0.927688
+
+Predicted  negative  neutral  positive
+Actual                                
+negative        195       19        26
+neutral          38      154        48
+positive         22       16       202
+
+Saved predictions: saves/predictions_20241029-073900.csv
+
+Macro F1 Score: 0.76
+
+Evaluation completed (49s)
+wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb: eval/macro_f1_score ▁
+wandb: 
+wandb: Run summary:
+wandb: eval/macro_f1_score 0.76292
+wandb: 
+wandb: 🚀 View run E2-ELFT-DYN-R2 at: https://wandb.ai/jimbeno/Electra%20Large/runs/a4e9fqxg
+wandb: ⭐️ View project at: https://wandb.ai/jimbeno/Electra%20Large
+wandb: Synced 5 W&B file(s), 0 media file(s), 2 artifact file(s) and 1 other file(s)
+wandb: Find logs at: ./wandb/run-20241029_073358-a4e9fqxg/logs
+TOTAL Time: 6m 17s
+(nlp) ubuntu@217-142-254-229:~/nlp-osaka/sentiment$ python ./ddp_sentiment_finetune.py --dataset 'merged_local' --eval_dataset 'sst_local' --weights_name 'google/electra-large-discriminator' --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 512 --accumulation_steps 2 --finetune_bert --finetune_layers 24 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Large' --wandb_run 'E2-ELFT-SST' --model_file 'checkpoint_epoch_13_20241024-215451.pth' --interactive
+
+Starting DDP PyTorch Training...
+Device: cuda, Number of GPUs: 8
+Spawning 8 processes...
+Rank 7 - Device: cuda:7
+Rank 2 - Device: cuda:2
+Rank 3 - Device: cuda:3
+Rank 6 - Device: cuda:6
+Rank 5 - Device: cuda:5
+Rank 1 - Device: cuda:1
+Rank 4 - Device: cuda:4
+Rank 0 - Device: cuda:0
+8 process groups initialized with 'nccl' backend on localhost:12355
+NCCL Timeout: 1 hr 0 min. NCCL Blocking Wait: Enabled
+wandb: Using wandb-core as the SDK backend. Please refer to https://wandb.me/wandb-core for more information.
+wandb: Currently logged in as: jbeno (jimbeno). Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.18.5
+wandb: Run data is saved locally in /home/ubuntu/nlp-osaka/sentiment/wandb/run-20241029_074103-6y0cqpqk
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run E2-ELFT-SST
+wandb: ⭐️ View project at https://wandb.ai/jimbeno/Electra%20Large
+wandb: 🚀 View run at https://wandb.ai/jimbeno/Electra%20Large/runs/6y0cqpqk
+Wand run initialized.
+
+Initializing 'google/electra-large-discriminator' tokenizer and model...
+Checking for local files...
+Found all files in cache, skipping download
+All ranks loading tokenizer from local files...
+All ranks loading model from local files...
+Tokenizer and model initialized (5s)
+
+Loading data...
+Using different datasets for training and evaluation
+Splits:
+- Train: Using merged_local 'train' split
+- Validation: Using merged_local 'validation' split
+- Evaluation: Using sst_local 'test' split
+Train Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Validation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Evaluation Data: Stanford Sentiment Treebank (SST) from Local: 'data/sentiment'
+Train size: 102097
+Validation size: 5421
+Evaluation size: 2210
+Train label distribution:
+	      Negative: 21910
+	       Neutral: 49148
+	      Positive: 31039
+Validation label distribution:
+	      Negative: 1868
+	       Neutral: 1669
+	      Positive: 1884
+Evaluation label distribution:
+	      Negative: 912
+	       Neutral: 389
+	      Positive: 909
+Data loaded (2s)
+
+Processing data...
+(Batch size: 512, Pooling: Mean, Fine Tune BERT: True, Chunk size: None)...
+Extracting sentences and labels...
+X Train shape: [102097], X Validation shape: [5421], X Test shape: [2210]
+y Train shape: [102097], y Validation shape: [5421], y Test shape: [2210]
+Data processed (3ms)
+
+Initializing DDP Neural Classifier...
+Layers: 2, Hidden Dim: 1024, Hidden Act: SwishGLU, Dropout: 0.3, Optimizer: AdamW, L2 Strength: 0.01, Pooling: MEAN, Accumulation Steps: 2, Max Grad Norm: None
+Batch Size: 512, Max Epochs: 50, LR: 1e-05, Early Stop: score, Fine-tune BERT: True, Fine-tune Layers: 24, Freeze BERT: False, Target Score: None, Interactive: True
+Loading model from: checkpoints/checkpoint_epoch_13_20241024-215451.pth...
+Loaded checkpoint: checkpoints/checkpoint_epoch_13_20241024-215451.pth
+Retrieved model state dictionary.
+Retrieved optimizer state dictionary.
+Classifier initialized (36s)
+
+Fitting DDP Neural Classifier on training data...
+Num Workers: 0, Prefetch: None
+Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: 0.1
+Training will stop early if the score does not improve by at least 0.00001 for 10 iterations.
+Using provided validation set for early stopping.
+Building dataset and dataloader...
+Initializing model, graph, optimizer...
+BERT's original pooler removed. Using custom pooling type: mean
+BERT has 334,092,288 trainable parameters and 0 non-trainable parameters
+Number of BERT layers requiring gradients: 24 out of 24
+Fine-tuning the last 24 out of 24 BERT layers
+
+Model Architecture Summary:
+BERTClassifier(
+  (bert): ElectraModel(
+    (embeddings): ElectraEmbeddings(
+      (word_embeddings): Embedding(30522, 1024, padding_idx=0)
+      (position_embeddings): Embedding(512, 1024)
+      (token_type_embeddings): Embedding(2, 1024)
+      (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): ElectraEncoder(
+      (layer): ModuleList(
+        (0-23): 24 x ElectraLayer(
+          (attention): ElectraAttention(
+            (self): ElectraSelfAttention(
+              (query): Linear(in_features=1024, out_features=1024, bias=True)
+              (key): Linear(in_features=1024, out_features=1024, bias=True)
+              (value): Linear(in_features=1024, out_features=1024, bias=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+            (output): ElectraSelfOutput(
+              (dense): Linear(in_features=1024, out_features=1024, bias=True)
+              (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+          )
+          (intermediate): ElectraIntermediate(
+            (dense): Linear(in_features=1024, out_features=4096, bias=True)
+            (intermediate_act_fn): GELUActivation()
+          )
+          (output): ElectraOutput(
+            (dense): Linear(in_features=4096, out_features=1024, bias=True)
+            (LayerNorm): LayerNorm((1024,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+  )
+  (custom_pooling): PoolingLayer()
+  (classifier): Classifier(
+    (layers): Sequential(
+      (0): Linear(in_features=1024, out_features=1024, bias=True)
+      (1): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (2): Dropout(p=0.3, inplace=False)
+      (3): Linear(in_features=1024, out_features=1024, bias=True)
+      (4): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (5): Dropout(p=0.3, inplace=False)
+      (6): Linear(in_features=1024, out_features=3, bias=True)
+    )
+  )
+)
+
+Model Parameters:
+  bert.embeddings.word_embeddings: 31,254,528 (trainable)
+  bert.embeddings.position_embeddings: 524,288 (trainable)
+  bert.embeddings.token_type_embeddings: 2,048 (trainable)
+  bert.embeddings.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.0.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.0.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.0.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.0.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.0.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.1.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.1.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.1.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.1.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.1.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.2.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.2.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.2.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.2.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.2.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.3.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.3.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.3.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.3.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.3.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.4.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.4.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.4.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.4.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.4.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.5.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.5.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.5.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.5.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.5.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.6.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.6.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.6.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.6.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.6.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.7.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.7.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.7.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.7.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.7.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.8.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.8.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.8.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.8.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.8.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.9.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.9.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.9.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.9.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.9.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.10.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.10.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.10.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.10.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.10.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.11.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.11.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.11.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.11.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.11.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.12.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.12.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.12.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.12.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.12.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.13.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.13.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.13.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.13.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.13.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.14.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.14.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.14.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.14.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.14.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.15.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.15.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.15.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.15.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.15.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.16.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.16.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.16.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.16.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.16.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.17.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.17.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.17.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.17.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.17.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.18.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.18.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.18.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.18.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.18.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.19.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.19.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.19.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.19.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.19.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.20.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.20.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.20.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.20.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.20.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.21.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.21.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.21.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.21.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.21.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.22.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.22.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.22.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.22.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.22.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.23.attention.self.query: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.self.key: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.self.value: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.output.dense: 1,049,600 (trainable)
+  bert.encoder.layer.23.attention.output.LayerNorm: 2,048 (trainable)
+  bert.encoder.layer.23.intermediate.dense: 4,198,400 (trainable)
+  bert.encoder.layer.23.output.dense: 4,195,328 (trainable)
+  bert.encoder.layer.23.output.LayerNorm: 2,048 (trainable)
+  classifier.layers.0: 1,049,600 (trainable)
+  classifier.layers.1.projection: 2,099,200 (trainable)
+  classifier.layers.3: 1,049,600 (trainable)
+  classifier.layers.6: 3,075 (trainable)
+
+Total layers: 200
+Trainable layers: 200
+Total parameters: 338,293,763
+Trainable parameters: 338,293,763
+Percentage of trainable parameters: 100.00%
+Using optimizer: AdamW, Use Zero: True, Base Learning Rate: 1e-05, L2 strength: 0.01
+Layer-wise decay factor: 0.95
+Using scheduler: CosineAnnealingWarmRestarts
+Scheduler arguments:
+- T_0: 5
+- T_mult: 1
+- eta_min: 1e-07
+
+Starting training loop...
+Start epoch: 14, Max Iterations: 50, Early Stop: score, Tolerance: 0.00001, Number Iterations No Change: 10
+
+[Enter] to continue for 1 epoch, [Q]uit, [S]ave, [H]elp: q
+Quitting training...
+
+Evaluating model...
+
+E2-ELFT-SST Multi-Class Classification Report
+
+              precision    recall  f1-score   support
+
+    negative   0.822199  0.877193  0.848806       912
+     neutral   0.504237  0.305913  0.380800       389
+    positive   0.856144  0.942794  0.897382       909
+
+    accuracy                       0.803620      2210
+   macro avg   0.727527  0.708633  0.708996      2210
+weighted avg   0.780194  0.803620  0.786409      2210
+
+ROC AUC: 0.904787
+
+Predicted  negative  neutral  positive
+Actual                                
+negative        800       81        31
+neutral         157      119       113
+positive         16       36       857
+
+Saved predictions: saves/predictions_20241029-074704.csv
+
+Macro F1 Score: 0.71
+
+Evaluation completed (2m 24s)
+wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb: eval/macro_f1_score ▁
+wandb: 
+wandb: Run summary:
+wandb: eval/macro_f1_score 0.709
+wandb: 
+wandb: 🚀 View run E2-ELFT-SST at: https://wandb.ai/jimbeno/Electra%20Large/runs/6y0cqpqk
+wandb: ⭐️ View project at: https://wandb.ai/jimbeno/Electra%20Large
+wandb: Synced 5 W&B file(s), 0 media file(s), 2 artifact file(s) and 1 other file(s)
+wandb: Find logs at: ./wandb/run-20241029_074103-6y0cqpqk/logs
+TOTAL Time: 7m 46s
