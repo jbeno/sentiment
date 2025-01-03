@@ -326,6 +326,10 @@ The dataset is a merge of Stanford Sentiment Treebank (SST-3) and DynaSent Round
 
 The dataset is available in this repo under [data/merged](data/merged), or through the [Sentiment Merged Dataset](https://huggingface.co/datasets/jbeno/sentiment_merged) on Hugging Face. You can review the data processing to create the merged dataset here in [data_processing.ipynb](data_processing.ipynb).
 
+## Tools and Technologies
+
+Code was created in VSCode with auto-complete assistance from GitHub CoPilot with GPT-4o. Research paper copy editing, LaTeX formatting, and some code suggestions were provided by Claude 3.5 Sonnet.
+
 ## Citation
 
 If you use this material in your research, please cite:
