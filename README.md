@@ -16,6 +16,7 @@ The research investigated collaborative approaches between bidirectional transfo
 
 ### Research
 - [ELECTRA and GPT-4o: Cost-Effective Partners for Sentiment Analysis](research_paper.pdf) - Research paper (PDF)
+- [arXiv preprint](http://arxiv.org/abs/2501.00062) - published Dec 29, 2024 in cs.CL, cross-posted to cs.AI (arXiv:2501.00062)
 
 ### Models 
 - [ELECTRA Base Classifier for Sentiment Analysis](https://huggingface.co/jbeno/electra-base-classifier-sentiment) - Fine-tuned ELECTRA base discriminator (Hugging Face)
@@ -335,10 +336,14 @@ Code was created in VSCode with auto-complete assistance from GitHub CoPilot wit
 If you use this material in your research, please cite:
 
 ```bibtex
-@article{beno2024electra,
-  title={ELECTRA and GPT-4o: Cost-Effective Partners for Sentiment Analysis},
-  author={Beno, James P.},
-  year={2024}
+@misc{beno2024electragpt4ocosteffectivepartners,
+      title={ELECTRA and GPT-4o: Cost-Effective Partners for Sentiment Analysis}, 
+      author={James P. Beno},
+      year={2024},
+      eprint={2501.00062},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2501.00062}, 
 }
 ```
 
