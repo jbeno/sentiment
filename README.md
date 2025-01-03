@@ -323,7 +323,7 @@ The predictions and evaluation metrics of all experimental runs can be found und
 
 ## Dataset
 
-The dataset is a merge of Stanford Sentiment Treebank (SST-3) and DynaSent Rounds 1 and 2. The SST-3, DynaSent R1, and DynaSent R2 datasets were randomly mixed to form a new dataset with 102,097 Train examples, 5,421 Validation examples, and 6,530 Test examples.
+The dataset is a merge of [Stanford Sentiment Treebank](https://nlp.stanford.edu/sentiment/) (SST-3) and [DynaSent](https://github.com/cgpotts/dynasent) Rounds 1 and 2, licensed under Apache 2.0 and Creative Commons Attribution 4.0 respectively. The SST-3, DynaSent R1, and DynaSent R2 datasets were randomly mixed to form a new dataset with 102,097 Train examples, 5,421 Validation examples, and 6,530 Test examples.
 
 The dataset is available in this repo under [data/merged](data/merged), or through the [Sentiment Merged Dataset](https://huggingface.co/datasets/jbeno/sentiment_merged) on Hugging Face. You can review the data processing to create the merged dataset here in [data_processing.ipynb](data_processing.ipynb).
 
@@ -336,9 +336,10 @@ Code was created in VSCode with auto-complete assistance from GitHub CoPilot wit
 If you use this material in your research, please cite:
 
 ```bibtex
-@misc{beno2024electragpt4ocosteffectivepartners,
+@article{beno-2024-electragpt,
       title={ELECTRA and GPT-4o: Cost-Effective Partners for Sentiment Analysis}, 
       author={James P. Beno},
+      journal={arXiv preprint arXiv:2501.00062},
       year={2024},
       eprint={2501.00062},
       archivePrefix={arXiv},
