@@ -1,0 +1,151 @@
+{
+  "experiment_name": "E18-G4OM-ELFT-EX-PR2",
+  "start_time": "2025-03-27 05:42:54",
+  "notes": "Experiment 18: Evaluate prompt-based model collaboration with prediction, probabilities, and similar examples",
+  "model": "gpt-4o-mini-2024-07-18",
+  "instance": "electra_large_gpt_sentiment_pred_probs_examples",
+  "dataset_shape": [
+    6530,
+    4
+  ],
+  "examples_length": 6530,
+  "results_shape": [
+    6530,
+    6
+  ],
+  "save_directory": "results_round2_take2",
+  "temperature": 0.1,
+  "random_seed": 123,
+  "merged_local": {
+    "negative": {
+      "precision": 0.8638853771597135,
+      "recall": 0.8715986394557823,
+      "f1-score": 0.8677248677248677,
+      "support": 2352.0
+    },
+    "neutral": {
+      "precision": 0.7422081352350766,
+      "recall": 0.7681793329688354,
+      "f1-score": 0.7549704459967759,
+      "support": 1829.0
+    },
+    "positive": {
+      "precision": 0.8975265017667845,
+      "recall": 0.86504895700298,
+      "f1-score": 0.8809885107305441,
+      "support": 2349.0
+    },
+    "accuracy": 0.8402756508422664,
+    "macro avg": {
+      "precision": 0.8345400047205249,
+      "recall": 0.8349423098091991,
+      "f1-score": 0.8345612748173958,
+      "support": 6530.0
+    },
+    "weighted avg": {
+      "precision": 0.8419061009302875,
+      "recall": 0.8402756508422664,
+      "f1-score": 0.8409145247049066,
+      "support": 6530.0
+    }
+  },
+  "dynasent_r1": {
+    "negative": {
+      "precision": 0.921832884097035,
+      "recall": 0.855,
+      "f1-score": 0.8871595330739299,
+      "support": 1200.0
+    },
+    "neutral": {
+      "precision": 0.7810734463276836,
+      "recall": 0.9216666666666666,
+      "f1-score": 0.845565749235474,
+      "support": 1200.0
+    },
+    "positive": {
+      "precision": 0.9299719887955182,
+      "recall": 0.83,
+      "f1-score": 0.8771466314398944,
+      "support": 1200.0
+    },
+    "accuracy": 0.8688888888888889,
+    "macro avg": {
+      "precision": 0.8776261064067455,
+      "recall": 0.8688888888888888,
+      "f1-score": 0.8699573045830995,
+      "support": 3600.0
+    },
+    "weighted avg": {
+      "precision": 0.8776261064067457,
+      "recall": 0.8688888888888889,
+      "f1-score": 0.8699573045830994,
+      "support": 3600.0
+    }
+  },
+  "dynasent_r2": {
+    "negative": {
+      "precision": 0.7676056338028169,
+      "recall": 0.9083333333333333,
+      "f1-score": 0.8320610687022901,
+      "support": 240.0
+    },
+    "neutral": {
+      "precision": 0.8247422680412371,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.7373271889400922,
+      "support": 240.0
+    },
+    "positive": {
+      "precision": 0.8057851239669421,
+      "recall": 0.8125,
+      "f1-score": 0.8091286307053942,
+      "support": 240.0
+    },
+    "accuracy": 0.7958333333333333,
+    "macro avg": {
+      "precision": 0.799377675270332,
+      "recall": 0.7958333333333334,
+      "f1-score": 0.7928389627825921,
+      "support": 720.0
+    },
+    "weighted avg": {
+      "precision": 0.7993776752703321,
+      "recall": 0.7958333333333333,
+      "f1-score": 0.792838962782592,
+      "support": 720.0
+    }
+  },
+  "sst_local": {
+    "negative": {
+      "precision": 0.8258196721311475,
+      "recall": 0.8837719298245614,
+      "f1-score": 0.8538135593220338,
+      "support": 912.0
+    },
+    "neutral": {
+      "precision": 0.4911660777385159,
+      "recall": 0.35732647814910024,
+      "f1-score": 0.41369047619047616,
+      "support": 389.0
+    },
+    "positive": {
+      "precision": 0.8843322818086226,
+      "recall": 0.9251925192519251,
+      "f1-score": 0.9043010752688172,
+      "support": 909.0
+    },
+    "accuracy": 0.8081447963800905,
+    "macro avg": {
+      "precision": 0.7337726772260953,
+      "recall": 0.7220969757418622,
+      "f1-score": 0.723935036927109,
+      "support": 2210.0
+    },
+    "weighted avg": {
+      "precision": 0.7909815336596955,
+      "recall": 0.8081447963800905,
+      "f1-score": 0.7971100627869434,
+      "support": 2210.0
+    }
+  }
+}

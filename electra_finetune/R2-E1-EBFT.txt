@@ -1,0 +1,1803 @@
+
+
+python ./finetune.py --dataset 'merged_local' --weights_name 'google/electra-base-discriminator' --save_data --save_model --save_pickle --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 16 --accumulation_steps 2 --finetune_bert --finetune_layers 12 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Base' --wandb_run 'R2-E1-EBFT-Merged' --random_seed 123
+
+
+
+
+
+
+(nlp) ubuntu@104-171-203-46:~/nlp-test/sentiment$ python ./finetune.py --dataset 'merged_local' --weights_name 'google/electra-base-discriminator' --save_data --save_model --save_pickle --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 16 --accumulation_steps 2 --finetune_bert --finetune_layers 12 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Base' --wandb_run 'R2-E1-EBFT-Merged' --random_seed 123
+
+Starting DDP PyTorch Training...
+Device: cuda, Number of GPUs: 8
+Spawning 8 processes...
+Rank 7 - Device: cuda:7
+Rank 3 - Device: cuda:3
+Rank 5 - Device: cuda:5
+Rank 6 - Device: cuda:6
+Rank 2 - Device: cuda:2
+Rank 1 - Device: cuda:1
+Rank 4 - Device: cuda:4
+Rank 0 - Device: cuda:0
+8 process groups initialized with 'nccl' backend on localhost:12355
+NCCL Timeout: 1 hr 0 min. NCCL Blocking Wait: Enabled
+wandb: Using wandb-core as the SDK backend.  Please refer to https://wandb.me/wandb-core for more information.
+wandb: Currently logged in as: jbeno (jimbeno) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.19.8
+wandb: Run data is saved locally in /home/ubuntu/nlp-test/sentiment/wandb/run-20250322_183231-e0fsoxbd
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run R2-E1-EBFT-Merged
+wandb: ⭐️ View project at https://wandb.ai/jimbeno/Electra%20Base
+wandb: 🚀 View run at https://wandb.ai/jimbeno/Electra%20Base/runs/e0fsoxbd
+Wand run initialized.
+
+Initializing 'google/electra-base-discriminator' tokenizer and model...
+Checking for local files...
+Found all files in cache, skipping download
+All ranks loading tokenizer from local files...
+All ranks loading model from local files...
+Tokenizer and model initialized (2s)
+
+Loading data...
+Using the same dataset for training and evaluation
+Splits:
+- Train: Using merged_local 'train' split
+- Validation: Using merged_local 'validation' split
+- Evaluation: Using merged_local 'test' split
+Train Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Validation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Evaluation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Train size: 102097
+Validation size: 5421
+Evaluation size: 6530
+Train label distribution:
+	      Negative: 21910
+	       Neutral: 49148
+	      Positive: 31039
+Validation label distribution:
+	      Negative: 1868
+	       Neutral: 1669
+	      Positive: 1884
+Evaluation label distribution:
+	      Negative: 2352
+	       Neutral: 1829
+	      Positive: 2349
+Data loaded (291ms)
+
+Processing data...
+(Batch size: 16, Pooling: Mean, Fine Tune BERT: True, Chunk size: None)...
+Extracting sentences and labels...
+
+Data saved to: saves/data_8_gpu_20250322-183236.npz
+X Train shape: [102097], X Validation shape: [5421], X Test shape: [6530]
+y Train shape: [102097], y Validation shape: [5421], y Test shape: [6530]
+Data processed (749ms)
+
+Initializing DDP Neural Classifier...
+Layers: 2, Hidden Dim: 1024, Hidden Act: SwishGLU, Dropout: 0.3, Optimizer: AdamW, L2 Strength: 0.01, Pooling: MEAN, Accumulation Steps: 2, Max Grad Norm: None
+Batch Size: 16, Max Epochs: 50, LR: 1e-05, Early Stop: score, Fine-tune BERT: True, Fine-tune Layers: 12, Freeze BERT: False, Target Score: None, Interactive: False
+Classifier initialized (12ms)
+
+Fitting DDP Neural Classifier on training data...
+Num Workers: 0, Prefetch: None
+Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: 0.1
+Training will stop early if the score does not improve by at least 0.00001 for 10 iterations.
+Using provided validation set for early stopping.
+Building dataset and dataloader...
+Initializing model, graph, optimizer...
+BERT's original pooler removed. Using custom pooling type: mean
+BERT has 108,891,648 trainable parameters and 0 non-trainable parameters
+Number of BERT layers requiring gradients: 12 out of 12
+Fine-tuning the last 12 out of 12 BERT layers
+
+Model Architecture Summary:
+BERTClassifier(
+  (bert): ElectraModel(
+    (embeddings): ElectraEmbeddings(
+      (word_embeddings): Embedding(30522, 768, padding_idx=0)
+      (position_embeddings): Embedding(512, 768)
+      (token_type_embeddings): Embedding(2, 768)
+      (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): ElectraEncoder(
+      (layer): ModuleList(
+        (0-11): 12 x ElectraLayer(
+          (attention): ElectraAttention(
+            (self): ElectraSelfAttention(
+              (query): Linear(in_features=768, out_features=768, bias=True)
+              (key): Linear(in_features=768, out_features=768, bias=True)
+              (value): Linear(in_features=768, out_features=768, bias=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+            (output): ElectraSelfOutput(
+              (dense): Linear(in_features=768, out_features=768, bias=True)
+              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+          )
+          (intermediate): ElectraIntermediate(
+            (dense): Linear(in_features=768, out_features=3072, bias=True)
+            (intermediate_act_fn): GELUActivation()
+          )
+          (output): ElectraOutput(
+            (dense): Linear(in_features=3072, out_features=768, bias=True)
+            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+  )
+  (custom_pooling): PoolingLayer()
+  (classifier): Classifier(
+    (layers): Sequential(
+      (0): Linear(in_features=768, out_features=1024, bias=True)
+      (1): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (2): Dropout(p=0.3, inplace=False)
+      (3): Linear(in_features=1024, out_features=1024, bias=True)
+      (4): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (5): Dropout(p=0.3, inplace=False)
+      (6): Linear(in_features=1024, out_features=3, bias=True)
+    )
+  )
+)
+
+Model Parameters:
+  bert.embeddings.word_embeddings: 23,440,896 (trainable)
+  bert.embeddings.position_embeddings: 393,216 (trainable)
+  bert.embeddings.token_type_embeddings: 1,536 (trainable)
+  bert.embeddings.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.0.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.0.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.0.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.0.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.0.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.0.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.0.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.0.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.1.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.1.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.1.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.1.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.1.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.1.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.1.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.1.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.2.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.2.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.2.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.2.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.2.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.2.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.2.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.2.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.3.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.3.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.3.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.3.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.3.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.3.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.3.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.3.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.4.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.4.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.4.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.4.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.4.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.4.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.4.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.4.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.5.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.5.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.5.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.5.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.5.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.5.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.5.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.5.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.6.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.6.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.6.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.6.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.6.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.6.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.6.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.6.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.7.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.7.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.7.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.7.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.7.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.7.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.7.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.7.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.8.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.8.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.8.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.8.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.8.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.8.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.8.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.8.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.9.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.9.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.9.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.9.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.9.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.9.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.9.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.9.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.10.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.10.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.10.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.10.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.10.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.10.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.10.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.10.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.11.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.11.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.11.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.11.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.11.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.11.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.11.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.11.output.LayerNorm: 1,536 (trainable)
+  classifier.layers.0: 787,456 (trainable)
+  classifier.layers.1.projection: 2,099,200 (trainable)
+  classifier.layers.3: 1,049,600 (trainable)
+  classifier.layers.6: 3,075 (trainable)
+
+Total layers: 104
+Trainable layers: 104
+Total parameters: 112,830,979
+Trainable parameters: 112,830,979
+Percentage of trainable parameters: 100.00%
+Using optimizer: AdamW, Use Zero: True, Base Learning Rate: 1e-05, L2 strength: 0.01
+Layer-wise decay factor: 0.95
+Using scheduler: CosineAnnealingWarmRestarts
+Scheduler arguments:
+- T_0: 5
+- T_mult: 1
+- eta_min: 1e-07
+
+Starting training loop...
+Start epoch: 1, Max Iterations: 50, Early Stop: score, Tolerance: 0.00001, Number Iterations No Change: 10
+Epoch 1/50: 100%|██████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=1.7936, lr=9.06e-06, grad=M:0.1272, status=Epoch complete]
+█ Epoch  1: Loss T 1.793648 V 1.018050 | F1 T 0.442330 V 0.385261 B 0.385261 SC 0/10 | Acc T 0.623218 V 0.479167 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 0.784137 M 0.127177 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_1_20250322-184202.pth
+Epoch 2/50: 100%|██████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=1.6367, lr=6.59e-06, grad=M:0.1393, status=Epoch complete]
+█ Epoch  2: Loss T 1.636717 V 1.016698 | F1 T 0.453013 V 0.398703 B 0.398703 SC 0/10 | Acc T 0.632747 V 0.492257 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 0.885581 M 0.139299 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_2_20250322-185131.pth
+Epoch 3/50: 100%|██████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=1.5984, lr=3.53e-06, grad=M:0.1444, status=Epoch complete]
+█ Epoch  3: Loss T 1.598357 V 0.998357 | F1 T 0.461232 V 0.410644 B 0.410644 SC 0/10 | Acc T 0.640474 V 0.504794 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 0.983636 M 0.144379 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_3_20250322-190100.pth
+Epoch 4/50: 100%|██████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=1.5720, lr=1.05e-06, grad=M:0.2635, status=Epoch complete]
+█ Epoch  4: Loss T 1.572006 V 0.979405 | F1 T 0.472872 V 0.420153 B 0.420153 SC 0/10 | Acc T 0.648163 V 0.511062 | LR 1.05e-06 | Grad ↓ 0.000000 ↑ 1.836573 M 0.263496 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_4_20250322-191029.pth
+Epoch 5/50: 100%|██████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=1.4810, lr=1.00e-07, grad=M:0.1319, status=Epoch complete]
+█ Epoch  5: Loss T 1.480956 V 0.910588 | F1 T 0.715812 V 0.649070 B 0.649070 SC 0/10 | Acc T 0.750039 V 0.654867 | LR 1.00e-07 | Grad ↓ 0.000000 ↑ 0.685653 M 0.131904 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_5_20250322-191957.pth
+Epoch 6/50: 100%|██████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=1.1121, lr=9.06e-06, grad=M:0.2915, status=Epoch complete]
+█ Epoch  6: Loss T 1.112064 V 0.714727 | F1 T 0.811707 V 0.743890 B 0.743890 SC 0/10 | Acc T 0.822377 V 0.744653 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 2.195488 M 0.291536 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_6_20250322-192927.pth
+Epoch 7/50: 100%|██████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.9591, lr=6.59e-06, grad=M:0.2414, status=Epoch complete]
+█ Epoch  7: Loss T 0.959113 V 0.662673 | F1 T 0.830539 V 0.756988 B 0.756988 SC 0/10 | Acc T 0.838645 V 0.757928 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 1.747095 M 0.241447 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_7_20250322-193856.pth
+Epoch 8/50: 100%|██████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.8852, lr=3.53e-06, grad=M:0.2266, status=Epoch complete]
+█ Epoch  8: Loss T 0.885203 V 0.630332 | F1 T 0.842266 V 0.763621 B 0.763621 SC 0/10 | Acc T 0.848566 V 0.764749 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 1.543139 M 0.226582 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_8_20250322-194826.pth
+Epoch 9/50: 100%|██████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.8392, lr=1.05e-06, grad=M:0.2316, status=Epoch complete]
+█ Epoch  9: Loss T 0.839232 V 0.644291 | F1 T 0.848154 V 0.765060 B 0.765060 SC 0/10 | Acc T 0.854315 V 0.766040 | LR 1.05e-06 | Grad ↓ 0.000000 ↑ 1.247932 M 0.231596 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_9_20250322-195755.pth
+Epoch 10/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.8183, lr=1.00e-07, grad=M:0.3933, status=Epoch complete]
+█ Epoch 10: Loss T 0.818256 V 0.652716 | F1 T 0.848850 V 0.764444 B 0.765060 SC 1/10 | Acc T 0.854834 V 0.765487 | LR 1.00e-07 | Grad ↓ 0.000000 ↑ 2.721002 M 0.393259 | 9m 24s
+Memory: Rank 0: 13.69 GB | Rank 1: 14.04 GB | Rank 2: 13.94 GB | Rank 3: 13.95 GB | Rank 4: 14.02 GB | Rank 5: 14.04 GB | Rank 6: 13.99 GB | Rank 7: 13.91 GB (Max: 16.93 GB, Total: 135.43 GB)
+Saved model state: checkpoints/checkpoint_epoch_10_20250322-200726.pth
+Epoch 11/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.8368, lr=9.06e-06, grad=M:0.3368, status=Epoch complete]
+█ Epoch 11: Loss T 0.836769 V 0.671846 | F1 T 0.857836 V 0.770555 B 0.770555 SC 0/10 | Acc T 0.862944 V 0.771571 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 2.279018 M 0.336794 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_11_20250322-201656.pth
+Epoch 12/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.7868, lr=6.59e-06, grad=M:0.2931, status=Epoch complete]
+█ Epoch 12: Loss T 0.786769 V 0.602390 | F1 T 0.870329 V 0.769441 B 0.770555 SC 1/10 | Acc T 0.874187 V 0.770649 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 1.748106 M 0.293116 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_12_20250322-202625.pth
+Epoch 13/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.7304, lr=3.53e-06, grad=M:0.3471, status=Epoch complete]
+█ Epoch 13: Loss T 0.730366 V 0.672612 | F1 T 0.880448 V 0.774522 B 0.774522 SC 0/10 | Acc T 0.884402 V 0.775442 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 2.619238 M 0.347072 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_13_20250322-203555.pth
+Epoch 14/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.6926, lr=1.05e-06, grad=M:0.2861, status=Epoch complete]
+█ Epoch 14: Loss T 0.692621 V 0.688603 | F1 T 0.885627 V 0.773944 B 0.774522 SC 1/10 | Acc T 0.889182 V 0.774889 | LR 1.05e-06 | Grad ↓ 0.000000 ↑ 1.868853 M 0.286098 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_14_20250322-204524.pth
+Epoch 15/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.6717, lr=1.00e-07, grad=M:0.3125, status=Epoch complete]
+█ Epoch 15: Loss T 0.671687 V 0.699924 | F1 T 0.886218 V 0.772676 B 0.774522 SC 2/10 | Acc T 0.889466 V 0.773783 | LR 1.00e-07 | Grad ↓ 0.000000 ↑ 1.957140 M 0.312519 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_15_20250322-205453.pth
+Epoch 16/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.7011, lr=9.06e-06, grad=M:0.2601, status=Epoch complete]
+█ Epoch 16: Loss T 0.701060 V 0.661023 | F1 T 0.895573 V 0.774579 B 0.774579 SC 0/10 | Acc T 0.898388 V 0.775442 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 1.524787 M 0.260086 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_16_20250322-210422.pth
+Epoch 17/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.6538, lr=6.59e-06, grad=M:0.3172, status=Epoch complete]
+█ Epoch 17: Loss T 0.653832 V 0.709845 | F1 T 0.905613 V 0.774095 B 0.774579 SC 1/10 | Acc T 0.908290 V 0.774705 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 2.114363 M 0.317249 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_17_20250322-211352.pth
+Epoch 18/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.6020, lr=3.53e-06, grad=M:0.4369, status=Epoch complete]
+█ Epoch 18: Loss T 0.601988 V 0.691050 | F1 T 0.912662 V 0.776706 B 0.776706 SC 0/10 | Acc T 0.915194 V 0.777471 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 3.134384 M 0.436871 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_18_20250322-212321.pth
+Epoch 19/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.5678, lr=1.05e-06, grad=M:0.3388, status=Epoch complete]
+█ Epoch 19: Loss T 0.567752 V 0.750815 | F1 T 0.917093 V 0.776241 B 0.776706 SC 1/10 | Acc T 0.919161 V 0.776917 | LR 1.05e-06 | Grad ↓ 0.000000 ↑ 2.278836 M 0.338822 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_19_20250322-213250.pth
+Epoch 20/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.5446, lr=1.00e-07, grad=M:0.4443, status=Epoch complete]
+█ Epoch 20: Loss T 0.544647 V 0.790599 | F1 T 0.917352 V 0.773958 B 0.776706 SC 2/10 | Acc T 0.919200 V 0.774889 | LR 1.00e-07 | Grad ↓ 0.000000 ↑ 2.921973 M 0.444279 | 9m 24s
+Memory: Rank 0: 13.69 GB | Rank 1: 14.04 GB | Rank 2: 13.94 GB | Rank 3: 13.95 GB | Rank 4: 14.02 GB | Rank 5: 14.04 GB | Rank 6: 13.99 GB | Rank 7: 13.91 GB (Max: 16.93 GB, Total: 135.43 GB)
+Saved model state: checkpoints/checkpoint_epoch_20_20250322-214219.pth
+Epoch 21/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.5774, lr=9.06e-06, grad=M:0.2499, status=Epoch complete]
+█ Epoch 21: Loss T 0.577370 V 0.711588 | F1 T 0.924003 V 0.776478 B 0.776706 SC 3/10 | Acc T 0.925801 V 0.777286 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 1.699529 M 0.249886 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_21_20250322-215149.pth
+Epoch 22/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.5372, lr=6.59e-06, grad=M:0.3607, status=Epoch complete]
+█ Epoch 22: Loss T 0.537211 V 0.890891 | F1 T 0.928888 V 0.770599 B 0.776706 SC 4/10 | Acc T 0.930199 V 0.771940 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 2.455985 M 0.360690 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_22_20250322-220118.pth
+Epoch 23/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.4912, lr=3.53e-06, grad=M:0.3447, status=Epoch complete]
+█ Epoch 23: Loss T 0.491174 V 0.864652 | F1 T 0.938263 V 0.773390 B 0.776706 SC 5/10 | Acc T 0.939425 V 0.774336 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 2.170632 M 0.344673 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_23_20250322-221047.pth
+Epoch 24/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.4551, lr=1.05e-06, grad=M:0.3646, status=Epoch complete]
+█ Epoch 24: Loss T 0.455148 V 0.889255 | F1 T 0.942034 V 0.776119 B 0.776706 SC 6/10 | Acc T 0.943254 V 0.776917 | LR 1.05e-06 | Grad ↓ 0.000000 ↑ 2.018627 M 0.364552 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_24_20250322-222016.pth
+Epoch 25/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.4383, lr=1.00e-07, grad=M:0.2688, status=Epoch complete]
+█ Epoch 25: Loss T 0.438267 V 0.894595 | F1 T 0.942673 V 0.777917 B 0.777917 SC 0/10 | Acc T 0.943753 V 0.778945 | LR 1.00e-07 | Grad ↓ 0.000000 ↑ 1.539434 M 0.268799 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_25_20250322-222945.pth
+Epoch 26/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.4718, lr=9.06e-06, grad=M:0.4954, status=Epoch complete]
+█ Epoch 26: Loss T 0.471753 V 0.955652 | F1 T 0.945460 V 0.773429 B 0.777917 SC 1/10 | Acc T 0.946535 V 0.774521 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 3.636215 M 0.495448 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_26_20250322-223915.pth
+Epoch 27/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.4367, lr=6.59e-06, grad=M:0.3463, status=Epoch complete]
+█ Epoch 27: Loss T 0.436679 V 0.920491 | F1 T 0.952790 V 0.776513 B 0.777917 SC 2/10 | Acc T 0.953969 V 0.777286 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 2.087061 M 0.346269 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_27_20250322-224844.pth
+Epoch 28/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.3965, lr=3.53e-06, grad=M:0.4295, status=Epoch complete]
+█ Epoch 28: Loss T 0.396477 V 0.976718 | F1 T 0.957140 V 0.775807 B 0.777917 SC 3/10 | Acc T 0.958062 V 0.777102 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 2.958664 M 0.429515 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_28_20250322-225814.pth
+Epoch 29/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.3596, lr=1.05e-06, grad=M:0.7471, status=Epoch complete]
+█ Epoch 29: Loss T 0.359608 V 1.003418 | F1 T 0.958871 V 0.775613 B 0.777917 SC 4/10 | Acc T 0.959610 V 0.776917 | LR 1.05e-06 | Grad ↓ 0.000000 ↑ 4.635497 M 0.747058 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_29_20250322-230743.pth
+Epoch 30/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.3428, lr=1.00e-07, grad=M:0.4633, status=Epoch complete]
+█ Epoch 30: Loss T 0.342821 V 1.049554 | F1 T 0.961928 V 0.775727 B 0.777917 SC 5/10 | Acc T 0.962783 V 0.776733 | LR 1.00e-07 | Grad ↓ 0.000000 ↑ 2.993792 M 0.463340 | 9m 24s
+Memory: Rank 0: 13.69 GB | Rank 1: 14.04 GB | Rank 2: 13.94 GB | Rank 3: 13.95 GB | Rank 4: 14.02 GB | Rank 5: 14.04 GB | Rank 6: 13.99 GB | Rank 7: 13.91 GB (Max: 16.93 GB, Total: 135.43 GB)
+Saved model state: checkpoints/checkpoint_epoch_30_20250322-231712.pth
+Epoch 31/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.3826, lr=9.06e-06, grad=M:0.4292, status=Epoch complete]
+█ Epoch 31: Loss T 0.382560 V 0.950822 | F1 T 0.963446 V 0.778177 B 0.778177 SC 0/10 | Acc T 0.964399 V 0.779314 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 2.659068 M 0.429213 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_31_20250322-232641.pth
+Epoch 32/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:26<00:00,  1.41it/s, loss=0.3467, lr=6.59e-06, grad=M:0.3419, status=Epoch complete]
+█ Epoch 32: Loss T 0.346698 V 0.950788 | F1 T 0.968530 V 0.777641 B 0.778177 SC 1/10 | Acc T 0.969267 V 0.778577 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 2.311477 M 0.341936 | 9m 26s
+Saved model state: checkpoints/checkpoint_epoch_32_20250322-233612.pth
+Epoch 33/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:26<00:00,  1.41it/s, loss=0.3097, lr=3.53e-06, grad=M:0.2953, status=Epoch complete]
+█ Epoch 33: Loss T 0.309691 V 1.063094 | F1 T 0.972541 V 0.777380 B 0.778177 SC 2/10 | Acc T 0.973253 V 0.778208 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 1.814791 M 0.295347 | 9m 26s
+Saved model state: checkpoints/checkpoint_epoch_33_20250322-234542.pth
+Epoch 34/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.2839, lr=1.05e-06, grad=M:0.5065, status=Epoch complete]
+█ Epoch 34: Loss T 0.283931 V 1.193335 | F1 T 0.974417 V 0.777288 B 0.778177 SC 3/10 | Acc T 0.975133 V 0.778024 | LR 1.05e-06 | Grad ↓ 0.000000 ↑ 3.158616 M 0.506546 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_34_20250322-235512.pth
+Epoch 35/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:27<00:00,  1.41it/s, loss=0.2667, lr=1.00e-07, grad=M:0.3540, status=Epoch complete]
+█ Epoch 35: Loss T 0.266702 V 1.211754 | F1 T 0.974970 V 0.777651 B 0.778177 SC 4/10 | Acc T 0.975721 V 0.778577 | LR 1.00e-07 | Grad ↓ 0.000000 ↑ 2.567733 M 0.353982 | 9m 27s
+Saved model state: checkpoints/checkpoint_epoch_35_20250323-000443.pth
+Epoch 36/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:24<00:00,  1.41it/s, loss=0.3037, lr=9.06e-06, grad=M:0.2520, status=Epoch complete]
+█ Epoch 36: Loss T 0.303726 V 1.010403 | F1 T 0.971587 V 0.773332 B 0.778177 SC 5/10 | Acc T 0.972175 V 0.774889 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 1.501312 M 0.252047 | 9m 24s
+Saved model state: checkpoints/checkpoint_epoch_36_20250323-001412.pth
+Epoch 37/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:27<00:00,  1.41it/s, loss=0.2776, lr=6.59e-06, grad=M:0.3788, status=Epoch complete]
+█ Epoch 37: Loss T 0.277618 V 1.392762 | F1 T 0.980222 V 0.770283 B 0.778177 SC 6/10 | Acc T 0.980686 V 0.771018 | LR 6.59e-06 | Grad ↓ 0.000000 ↑ 2.825189 M 0.378795 | 9m 27s
+Saved model state: checkpoints/checkpoint_epoch_37_20250323-002343.pth
+Epoch 38/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:26<00:00,  1.41it/s, loss=0.2480, lr=3.53e-06, grad=M:0.3368, status=Epoch complete]
+█ Epoch 38: Loss T 0.248024 V 1.277143 | F1 T 0.982753 V 0.770247 B 0.778177 SC 7/10 | Acc T 0.983243 V 0.771018 | LR 3.53e-06 | Grad ↓ 0.000000 ↑ 2.222731 M 0.336837 | 9m 26s
+Saved model state: checkpoints/checkpoint_epoch_38_20250323-003314.pth
+Epoch 39/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.2230, lr=1.05e-06, grad=M:0.2167, status=Epoch complete]
+█ Epoch 39: Loss T 0.222993 V 1.308726 | F1 T 0.983850 V 0.776442 B 0.778177 SC 8/10 | Acc T 0.984388 V 0.777286 | LR 1.05e-06 | Grad ↓ 0.000000 ↑ 1.475710 M 0.216738 | 9m 25s
+Saved model state: checkpoints/checkpoint_epoch_39_20250323-004244.pth
+Epoch 40/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.2086, lr=1.00e-07, grad=M:0.3418, status=Epoch complete]
+█ Epoch 40: Loss T 0.208571 V 1.367175 | F1 T 0.983906 V 0.777201 B 0.778177 SC 9/10 | Acc T 0.984477 V 0.778024 | LR 1.00e-07 | Grad ↓ 0.000000 ↑ 1.996464 M 0.341823 | 9m 25s
+Memory: Rank 0: 13.69 GB | Rank 1: 14.04 GB | Rank 2: 13.94 GB | Rank 3: 13.95 GB | Rank 4: 14.02 GB | Rank 5: 14.04 GB | Rank 6: 13.99 GB | Rank 7: 13.91 GB (Max: 16.93 GB, Total: 135.43 GB)
+Saved model state: checkpoints/checkpoint_epoch_40_20250323-005213.pth
+Epoch 41/50: 100%|█████████████████████████████████████████████████████████████████████| 798/798 [09:25<00:00,  1.41it/s, loss=0.2416, lr=9.06e-06, grad=M:0.8271, status=Epoch complete]
+█ Epoch 41: Loss T 0.241568 V 1.313555 | F1 T 0.984144 V 0.770273 B 0.778177 SC 10/10 | Acc T 0.984604 V 0.771202 | LR 9.06e-06 | Grad ↓ 0.000000 ↑ 5.784823 M 0.827110 | 9m 25s
+Stopping early after 41 epochs due to no improvement in validation score in last 10 iterations.
+Saved model state: checkpoints/checkpoint_epoch_41_20250323-010143.pth
+Saving model in ONNX format...
+Model saved in ONNX format to saves/model_20250323-010242.onnx and uploaded to Weights & Biases.
+Saved model state: checkpoints/final_model_20250323-010247.pth
+Saved model pickle: checkpoints/final_model_20250323-010247.pkl
+Training completed (6h 30m 16s)
+
+Evaluating model...
+
+R2-E1-EBFT-Merged Multi-Class Classification Report
+
+              precision    recall  f1-score   support
+
+    negative   0.847795  0.760204  0.801614      2352
+     neutral   0.692700  0.741935  0.716473      1829
+    positive   0.809098  0.848020  0.828102      2349
+
+    accuracy                       0.786677      6530
+   macro avg   0.783198  0.783387  0.782063      6530
+weighted avg   0.790434  0.786677  0.787295      6530
+
+ROC AUC: 0.913308
+
+Predicted  negative  neutral  positive
+Actual                                
+negative       1788      345       219
+neutral         221     1357       251
+positive        100      257      1992
+
+Saved predictions: saves/predictions_20250323-010455.csv
+
+Macro F1 Score: 0.78
+
+Evaluation completed (3m 3s)
+wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb:            eval/macro_f1_score ▁
+wandb:             gradients/max_norm ▁▁▁▃▁▃▂▂▂▄▃▂▄▃▃▂▃▄▃▄▂▃▃▃▂▅▃▄▆▄▄▃▃▄▄▂▄▃▂█
+wandb:            gradients/mean_norm ▁▁▁▂▁▃▂▂▂▄▃▃▃▃▃▂▃▄▃▄▂▃▃▃▂▅▃▄▇▄▄▃▃▅▃▂▄▃▂█
+wandb:             gradients/min_norm ▂▁▁▄▁▅▃▃▆▅▇▄▃▄▃▃▃▃▅▄▂▇▄▆▅▅▅▃█▅▃▅▂▅▃▅▇█▂▆
+wandb:                    other/epoch ▁▁▁▂▂▂▂▂▂▃▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▆▇▇▇▇▇▇██
+wandb:            other/learning_rate █▆▄▂▁█▆▄▂▁█▆▄▂▁█▆▄▂▁█▆▄▂▁█▆▄▂▁█▆▄▂▁█▆▄▂█
+wandb:               other/stop_limit ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:                 train/accuracy ▁▁▁▁▃▅▅▅▅▅▆▆▆▆▆▆▇▇▇▇▇▇▇▇▇▇▇▇████████████
+wandb:                     train/loss █▇▇▇▇▅▄▄▄▄▄▄▃▃▃▃▃▃▃▂▃▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁
+wandb:           train/macro_f1_score ▁▁▁▁▅▆▆▆▆▆▆▇▇▇▇▇▇▇▇▇▇▇▇▇▇███████████████
+wandb:               train/stop_count ▁▁▁▁▁▁▁▁▁▂▁▂▁▂▂▁▂▁▂▂▃▄▅▅▁▂▂▃▄▅▁▂▂▃▄▅▅▆▇█
+wandb:            validation/accuracy ▁▁▂▂▅▇██████████████████████████████████
+wandb: validation/best_macro_f1_score ▁▁▁▂▆▇██████████████████████████████████
+wandb:                validation/loss ▅▅▅▄▄▂▂▁▁▁▂▁▂▂▂▂▂▂▂▃▂▄▃▄▄▄▄▄▅▅▄▄▅▆▆▅█▇▇▇
+wandb:      validation/macro_f1_score ▁▁▁▂▆▇██████████████████████████████████
+wandb: 
+wandb: Run summary:
+wandb:            eval/macro_f1_score 0.78206
+wandb:             gradients/max_norm 5.78482
+wandb:            gradients/mean_norm 0.82711
+wandb:             gradients/min_norm 0.0
+wandb:                    other/epoch 41
+wandb:            other/learning_rate 1e-05
+wandb:               other/stop_limit 10
+wandb:                 train/accuracy 0.9846
+wandb:                     train/loss 0.24157
+wandb:           train/macro_f1_score 0.98414
+wandb:               train/stop_count 10
+wandb:            validation/accuracy 0.7712
+wandb: validation/best_macro_f1_score 0.77818
+wandb:                validation/loss 1.31356
+wandb:      validation/macro_f1_score 0.77027
+wandb: 
+wandb: 🚀 View run R2-E1-EBFT-Merged at: https://wandb.ai/jimbeno/Electra%20Base/runs/e0fsoxbd
+wandb: ⭐️ View project at: https://wandb.ai/jimbeno/Electra%20Base
+wandb: Synced 5 W&B file(s), 1 media file(s), 2 artifact file(s) and 1 other file(s)
+wandb: Find logs at: ./wandb/run-20250322_183231-e0fsoxbd/logs
+TOTAL Time: 6h 33m 39s
+
+
+checkpoint_epoch_14_20250322-204524.pth
+
+
+
+python ./finetune.py --dataset 'merged_local' --weights_name 'google/electra-base-discriminator' --save_data --save_model --save_pickle --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 16 --accumulation_steps 2 --finetune_bert --finetune_layers 12 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Base' --wandb_run 'R2-E1-EBFT-Merged Epoch 14' --random_seed 123 --model_file 'checkpoint_epoch_14_20250322-204524.pth' --interactive
+
+
+
+(nlp) ubuntu@104-171-203-46:~/nlp-test/sentiment$ python ./finetune.py --dataset 'merged_local' --weights_name 'google/electra-base-discriminator' --save_data --save_model --save_pickle --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 16 --accumulation_steps 2 --finetune_bert --finetune_layers 12 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Base' --wandb_run 'R2-E1-EBFT-Merged Epoch 14' --random_seed 123 --model_file 'checkpoint_epoch_14_20250322-204524.pth' --interactive
+
+Starting DDP PyTorch Training...
+Device: cuda, Number of GPUs: 8
+Spawning 8 processes...
+Rank 1 - Device: cuda:1
+Rank 6 - Device: cuda:6
+Rank 3 - Device: cuda:3
+Rank 7 - Device: cuda:7
+Rank 2 - Device: cuda:2
+Rank 4 - Device: cuda:4
+Rank 5 - Device: cuda:5
+Rank 0 - Device: cuda:0
+8 process groups initialized with 'nccl' backend on localhost:12355
+NCCL Timeout: 1 hr 0 min. NCCL Blocking Wait: Enabled
+wandb: Using wandb-core as the SDK backend.  Please refer to https://wandb.me/wandb-core for more information.
+wandb: Currently logged in as: jbeno (jimbeno) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.19.8
+wandb: Run data is saved locally in /home/ubuntu/nlp-test/sentiment/wandb/run-20250323_020515-kjkjf030
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run R2-E1-EBFT-Merged Epoch 14
+wandb: ⭐️ View project at https://wandb.ai/jimbeno/Electra%20Base
+wandb: 🚀 View run at https://wandb.ai/jimbeno/Electra%20Base/runs/kjkjf030
+Wand run initialized.
+
+Initializing 'google/electra-base-discriminator' tokenizer and model...
+Checking for local files...
+Found all files in cache, skipping download
+All ranks loading tokenizer from local files...
+All ranks loading model from local files...
+Tokenizer and model initialized (2s)
+
+Loading data...
+Using the same dataset for training and evaluation
+Splits:
+- Train: Using merged_local 'train' split
+- Validation: Using merged_local 'validation' split
+- Evaluation: Using merged_local 'test' split
+Train Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Validation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Evaluation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Train size: 102097
+Validation size: 5421
+Evaluation size: 6530
+Train label distribution:
+	      Negative: 21910
+	       Neutral: 49148
+	      Positive: 31039
+Validation label distribution:
+	      Negative: 1868
+	       Neutral: 1669
+	      Positive: 1884
+Evaluation label distribution:
+	      Negative: 2352
+	       Neutral: 1829
+	      Positive: 2349
+Data loaded (458ms)
+
+Processing data...
+(Batch size: 16, Pooling: Mean, Fine Tune BERT: True, Chunk size: None)...
+Extracting sentences and labels...
+
+Data saved to: saves/data_8_gpu_20250323-020519.npz
+X Train shape: [102097], X Validation shape: [5421], X Test shape: [6530]
+y Train shape: [102097], y Validation shape: [5421], y Test shape: [6530]
+Data processed (755ms)
+
+Initializing DDP Neural Classifier...
+Layers: 2, Hidden Dim: 1024, Hidden Act: SwishGLU, Dropout: 0.3, Optimizer: AdamW, L2 Strength: 0.01, Pooling: MEAN, Accumulation Steps: 2, Max Grad Norm: None
+Batch Size: 16, Max Epochs: 50, LR: 1e-05, Early Stop: score, Fine-tune BERT: True, Fine-tune Layers: 12, Freeze BERT: False, Target Score: None, Interactive: True
+Loading model from: checkpoints/checkpoint_epoch_14_20250322-204524.pth...
+Loaded checkpoint: checkpoints/checkpoint_epoch_14_20250322-204524.pth
+Retrieved model state dictionary.
+Retrieved optimizer state dictionary.
+Classifier initialized (7s)
+
+Fitting DDP Neural Classifier on training data...
+Num Workers: 0, Prefetch: None
+Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: 0.1
+Training will stop early if the score does not improve by at least 0.00001 for 10 iterations.
+Using provided validation set for early stopping.
+Building dataset and dataloader...
+Initializing model, graph, optimizer...
+BERT's original pooler removed. Using custom pooling type: mean
+BERT has 108,891,648 trainable parameters and 0 non-trainable parameters
+Number of BERT layers requiring gradients: 12 out of 12
+Fine-tuning the last 12 out of 12 BERT layers
+
+Model Architecture Summary:
+BERTClassifier(
+  (bert): ElectraModel(
+    (embeddings): ElectraEmbeddings(
+      (word_embeddings): Embedding(30522, 768, padding_idx=0)
+      (position_embeddings): Embedding(512, 768)
+      (token_type_embeddings): Embedding(2, 768)
+      (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): ElectraEncoder(
+      (layer): ModuleList(
+        (0-11): 12 x ElectraLayer(
+          (attention): ElectraAttention(
+            (self): ElectraSelfAttention(
+              (query): Linear(in_features=768, out_features=768, bias=True)
+              (key): Linear(in_features=768, out_features=768, bias=True)
+              (value): Linear(in_features=768, out_features=768, bias=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+            (output): ElectraSelfOutput(
+              (dense): Linear(in_features=768, out_features=768, bias=True)
+              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+          )
+          (intermediate): ElectraIntermediate(
+            (dense): Linear(in_features=768, out_features=3072, bias=True)
+            (intermediate_act_fn): GELUActivation()
+          )
+          (output): ElectraOutput(
+            (dense): Linear(in_features=3072, out_features=768, bias=True)
+            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+  )
+  (custom_pooling): PoolingLayer()
+  (classifier): Classifier(
+    (layers): Sequential(
+      (0): Linear(in_features=768, out_features=1024, bias=True)
+      (1): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (2): Dropout(p=0.3, inplace=False)
+      (3): Linear(in_features=1024, out_features=1024, bias=True)
+      (4): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (5): Dropout(p=0.3, inplace=False)
+      (6): Linear(in_features=1024, out_features=3, bias=True)
+    )
+  )
+)
+
+Model Parameters:
+  bert.embeddings.word_embeddings: 23,440,896 (trainable)
+  bert.embeddings.position_embeddings: 393,216 (trainable)
+  bert.embeddings.token_type_embeddings: 1,536 (trainable)
+  bert.embeddings.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.0.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.0.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.0.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.0.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.0.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.0.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.0.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.0.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.1.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.1.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.1.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.1.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.1.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.1.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.1.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.1.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.2.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.2.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.2.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.2.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.2.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.2.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.2.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.2.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.3.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.3.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.3.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.3.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.3.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.3.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.3.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.3.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.4.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.4.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.4.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.4.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.4.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.4.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.4.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.4.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.5.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.5.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.5.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.5.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.5.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.5.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.5.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.5.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.6.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.6.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.6.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.6.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.6.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.6.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.6.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.6.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.7.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.7.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.7.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.7.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.7.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.7.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.7.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.7.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.8.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.8.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.8.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.8.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.8.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.8.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.8.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.8.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.9.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.9.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.9.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.9.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.9.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.9.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.9.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.9.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.10.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.10.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.10.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.10.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.10.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.10.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.10.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.10.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.11.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.11.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.11.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.11.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.11.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.11.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.11.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.11.output.LayerNorm: 1,536 (trainable)
+  classifier.layers.0: 787,456 (trainable)
+  classifier.layers.1.projection: 2,099,200 (trainable)
+  classifier.layers.3: 1,049,600 (trainable)
+  classifier.layers.6: 3,075 (trainable)
+
+Total layers: 104
+Trainable layers: 104
+Total parameters: 112,830,979
+Trainable parameters: 112,830,979
+Percentage of trainable parameters: 100.00%
+Using optimizer: AdamW, Use Zero: True, Base Learning Rate: 1e-05, L2 strength: 0.01
+Layer-wise decay factor: 0.95
+Using scheduler: CosineAnnealingWarmRestarts
+Scheduler arguments:
+- T_0: 5
+- T_mult: 1
+- eta_min: 1e-07
+
+Starting training loop...
+Start epoch: 15, Max Iterations: 50, Early Stop: score, Tolerance: 0.00001, Number Iterations No Change: 10
+
+[Enter] to continue for 1 epoch, [Q]uit, [S]ave, [H]elp: q
+Quitting training...
+Saving model in ONNX format...
+Model saved in ONNX format to saves/model_20250323-020911.onnx and uploaded to Weights & Biases.
+Saved model state: checkpoints/final_model_20250323-020916.pth
+Saved model pickle: checkpoints/final_model_20250323-020916.pkl
+Training completed (3m 55s)
+
+Evaluating model...
+
+R2-E1-EBFT-Merged Epoch 14 Multi-Class Classification Report
+
+              precision    recall  f1-score   support
+
+    negative   0.830735  0.792942  0.811399      2352
+     neutral   0.723599  0.734281  0.728901      1829
+    positive   0.815562  0.843338  0.829217      2349
+
+    accuracy                       0.794640      6530
+   macro avg   0.789965  0.790187  0.789839      6530
+weighted avg   0.795269  0.794640  0.794702      6530
+
+ROC AUC: 0.925942
+
+Predicted  negative  neutral  positive
+Actual                                
+negative       1865      276       211
+neutral         249     1343       237
+positive        131      237      1981
+
+Saved predictions: saves/predictions_20250323-021125.csv
+
+Macro F1 Score: 0.79
+
+Evaluation completed (3m 4s)
+wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb: eval/macro_f1_score ▁
+wandb: 
+wandb: Run summary:
+wandb: eval/macro_f1_score 0.78984
+wandb: 
+wandb: 🚀 View run R2-E1-EBFT-Merged Epoch 14 at: https://wandb.ai/jimbeno/Electra%20Base/runs/kjkjf030
+wandb: ⭐️ View project at: https://wandb.ai/jimbeno/Electra%20Base
+wandb: Synced 5 W&B file(s), 1 media file(s), 2 artifact file(s) and 1 other file(s)
+wandb: Find logs at: ./wandb/run-20250323_020515-kjkjf030/logs
+TOTAL Time: 7m 27s
+
+
+
+
+
+python ./finetune.py --dataset 'merged_local' --eval_dataset 'dynasent_r1' --weights_name 'google/electra-base-discriminator' --save_data --save_model --save_pickle --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 16 --accumulation_steps 2 --finetune_bert --finetune_layers 12 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Base' --wandb_run 'R2-E1-EBFT-DYN-R1' --random_seed 123 --model_file 'checkpoint_epoch_14_20250322-204524.pth' --interactive
+
+
+
+(nlp) ubuntu@104-171-203-46:~/nlp-test/sentiment$ python ./finetune.py --dataset 'merged_local' --eval_dataset 'dynasent_r1' --weights_name 'google/electra-base-discriminator' --save_data --save_model --save_pickle --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 16 --accumulation_steps 2 --finetune_bert --finetune_layers 12 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Base' --wandb_run 'R2-E1-EBFT-DYN-R1' --random_seed 123 --model_file 'checkpoint_epoch_14_20250322-204524.pth' --interactive
+
+Starting DDP PyTorch Training...
+Device: cuda, Number of GPUs: 8
+Spawning 8 processes...
+Rank 1 - Device: cuda:1
+Rank 4 - Device: cuda:4
+Rank 3 - Device: cuda:3
+Rank 7 - Device: cuda:7
+Rank 2 - Device: cuda:2
+Rank 6 - Device: cuda:6
+Rank 5 - Device: cuda:5
+Rank 0 - Device: cuda:0
+8 process groups initialized with 'nccl' backend on localhost:12355
+NCCL Timeout: 1 hr 0 min. NCCL Blocking Wait: Enabled
+wandb: Using wandb-core as the SDK backend.  Please refer to https://wandb.me/wandb-core for more information.
+wandb: Currently logged in as: jbeno (jimbeno) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.19.8
+wandb: Run data is saved locally in /home/ubuntu/nlp-test/sentiment/wandb/run-20250323_031140-79umbx2e
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run R2-E1-EBFT-DYN-R1
+wandb: ⭐️ View project at https://wandb.ai/jimbeno/Electra%20Base
+wandb: 🚀 View run at https://wandb.ai/jimbeno/Electra%20Base/runs/79umbx2e
+Wand run initialized.
+
+Initializing 'google/electra-base-discriminator' tokenizer and model...
+Checking for local files...
+Found all files in cache, skipping download
+All ranks loading tokenizer from local files...
+All ranks loading model from local files...
+Tokenizer and model initialized (2s)
+
+Loading data...
+Using different datasets for training and evaluation
+Splits:
+- Train: Using merged_local 'train' split
+- Validation: Using merged_local 'validation' split
+- Evaluation: Using dynasent_r1 'test' split
+Train Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Validation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Evaluation Data: DynaSent Round 1 from Hugging Face: 'dynabench/dynasent'
+Train size: 102097
+Validation size: 5421
+Evaluation size: 3600
+Train label distribution:
+	      Negative: 21910
+	       Neutral: 49148
+	      Positive: 31039
+Validation label distribution:
+	      Negative: 1868
+	       Neutral: 1669
+	      Positive: 1884
+Evaluation label distribution:
+	      Negative: 1200
+	       Neutral: 1200
+	      Positive: 1200
+Data loaded (1s)
+
+Processing data...
+(Batch size: 16, Pooling: Mean, Fine Tune BERT: True, Chunk size: None)...
+Extracting sentences and labels...
+
+Data saved to: saves/data_8_gpu_20250323-031146.npz
+X Train shape: [102097], X Validation shape: [5421], X Test shape: [3600]
+y Train shape: [102097], y Validation shape: [5421], y Test shape: [3600]
+Data processed (711ms)
+
+Initializing DDP Neural Classifier...
+Layers: 2, Hidden Dim: 1024, Hidden Act: SwishGLU, Dropout: 0.3, Optimizer: AdamW, L2 Strength: 0.01, Pooling: MEAN, Accumulation Steps: 2, Max Grad Norm: None
+Batch Size: 16, Max Epochs: 50, LR: 1e-05, Early Stop: score, Fine-tune BERT: True, Fine-tune Layers: 12, Freeze BERT: False, Target Score: None, Interactive: True
+Loading model from: checkpoints/checkpoint_epoch_14_20250322-204524.pth...
+Loaded checkpoint: checkpoints/checkpoint_epoch_14_20250322-204524.pth
+Retrieved model state dictionary.
+Retrieved optimizer state dictionary.
+Classifier initialized (3s)
+
+Fitting DDP Neural Classifier on training data...
+Num Workers: 0, Prefetch: None
+Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: 0.1
+Training will stop early if the score does not improve by at least 0.00001 for 10 iterations.
+Using provided validation set for early stopping.
+Building dataset and dataloader...
+Initializing model, graph, optimizer...
+BERT's original pooler removed. Using custom pooling type: mean
+BERT has 108,891,648 trainable parameters and 0 non-trainable parameters
+Number of BERT layers requiring gradients: 12 out of 12
+Fine-tuning the last 12 out of 12 BERT layers
+
+Model Architecture Summary:
+BERTClassifier(
+  (bert): ElectraModel(
+    (embeddings): ElectraEmbeddings(
+      (word_embeddings): Embedding(30522, 768, padding_idx=0)
+      (position_embeddings): Embedding(512, 768)
+      (token_type_embeddings): Embedding(2, 768)
+      (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): ElectraEncoder(
+      (layer): ModuleList(
+        (0-11): 12 x ElectraLayer(
+          (attention): ElectraAttention(
+            (self): ElectraSelfAttention(
+              (query): Linear(in_features=768, out_features=768, bias=True)
+              (key): Linear(in_features=768, out_features=768, bias=True)
+              (value): Linear(in_features=768, out_features=768, bias=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+            (output): ElectraSelfOutput(
+              (dense): Linear(in_features=768, out_features=768, bias=True)
+              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+          )
+          (intermediate): ElectraIntermediate(
+            (dense): Linear(in_features=768, out_features=3072, bias=True)
+            (intermediate_act_fn): GELUActivation()
+          )
+          (output): ElectraOutput(
+            (dense): Linear(in_features=3072, out_features=768, bias=True)
+            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+  )
+  (custom_pooling): PoolingLayer()
+  (classifier): Classifier(
+    (layers): Sequential(
+      (0): Linear(in_features=768, out_features=1024, bias=True)
+      (1): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (2): Dropout(p=0.3, inplace=False)
+      (3): Linear(in_features=1024, out_features=1024, bias=True)
+      (4): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (5): Dropout(p=0.3, inplace=False)
+      (6): Linear(in_features=1024, out_features=3, bias=True)
+    )
+  )
+)
+
+Model Parameters:
+  bert.embeddings.word_embeddings: 23,440,896 (trainable)
+  bert.embeddings.position_embeddings: 393,216 (trainable)
+  bert.embeddings.token_type_embeddings: 1,536 (trainable)
+  bert.embeddings.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.0.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.0.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.0.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.0.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.0.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.0.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.0.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.0.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.1.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.1.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.1.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.1.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.1.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.1.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.1.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.1.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.2.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.2.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.2.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.2.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.2.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.2.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.2.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.2.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.3.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.3.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.3.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.3.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.3.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.3.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.3.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.3.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.4.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.4.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.4.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.4.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.4.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.4.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.4.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.4.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.5.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.5.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.5.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.5.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.5.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.5.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.5.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.5.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.6.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.6.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.6.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.6.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.6.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.6.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.6.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.6.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.7.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.7.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.7.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.7.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.7.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.7.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.7.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.7.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.8.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.8.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.8.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.8.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.8.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.8.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.8.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.8.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.9.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.9.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.9.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.9.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.9.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.9.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.9.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.9.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.10.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.10.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.10.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.10.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.10.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.10.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.10.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.10.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.11.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.11.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.11.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.11.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.11.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.11.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.11.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.11.output.LayerNorm: 1,536 (trainable)
+  classifier.layers.0: 787,456 (trainable)
+  classifier.layers.1.projection: 2,099,200 (trainable)
+  classifier.layers.3: 1,049,600 (trainable)
+  classifier.layers.6: 3,075 (trainable)
+
+Total layers: 104
+Trainable layers: 104
+Total parameters: 112,830,979
+Trainable parameters: 112,830,979
+Percentage of trainable parameters: 100.00%
+Using optimizer: AdamW, Use Zero: True, Base Learning Rate: 1e-05, L2 strength: 0.01
+Layer-wise decay factor: 0.95
+Using scheduler: CosineAnnealingWarmRestarts
+Scheduler arguments:
+- T_0: 5
+- T_mult: 1
+- eta_min: 1e-07
+
+Starting training loop...
+Start epoch: 15, Max Iterations: 50, Early Stop: score, Tolerance: 0.00001, Number Iterations No Change: 10
+
+[Enter] to continue for 1 epoch, [Q]uit, [S]ave, [H]elp: q
+Quitting training...
+Saving model in ONNX format...
+Model saved in ONNX format to saves/model_20250323-031249.onnx and uploaded to Weights & Biases.
+Saved model state: checkpoints/final_model_20250323-031254.pth
+Saved model pickle: checkpoints/final_model_20250323-031254.pkl
+Training completed (1m 10s)
+
+Evaluating model...
+
+R2-E1-EBFT-DYN-R1 Multi-Class Classification Report
+
+              precision    recall  f1-score   support
+
+    negative   0.889890  0.740833  0.808549      1200
+     neutral   0.758098  0.916667  0.829876      1200
+    positive   0.843478  0.808333  0.825532      1200
+
+    accuracy                       0.821944      3600
+   macro avg   0.830489  0.821944  0.821319      3600
+weighted avg   0.830489  0.821944  0.821319      3600
+
+ROC AUC: 0.944228
+
+Predicted  negative  neutral  positive
+Actual                                
+negative        889      186       125
+neutral          45     1100        55
+positive         65      165       970
+
+Saved predictions: saves/predictions_20250323-031407.csv
+
+Macro F1 Score: 0.82
+
+Evaluation completed (1m 41s)
+wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb: eval/macro_f1_score ▁
+wandb: 
+wandb: Run summary:
+wandb: eval/macro_f1_score 0.82132
+wandb: 
+wandb: 🚀 View run R2-E1-EBFT-DYN-R1 at: https://wandb.ai/jimbeno/Electra%20Base/runs/79umbx2e
+wandb: ⭐️ View project at: https://wandb.ai/jimbeno/Electra%20Base
+wandb: Synced 5 W&B file(s), 1 media file(s), 2 artifact file(s) and 1 other file(s)
+wandb: Find logs at: ./wandb/run-20250323_031140-79umbx2e/logs
+TOTAL Time: 3m 16s
+
+
+
+
+python ./finetune.py --dataset 'merged_local' --eval_dataset 'dynasent_r2' --weights_name 'google/electra-base-discriminator' --save_data --save_model --save_pickle --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 16 --accumulation_steps 2 --finetune_bert --finetune_layers 12 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Base' --wandb_run 'R2-E1-EBFT-DYN-R2' --random_seed 123 --model_file 'checkpoint_epoch_14_20250322-204524.pth' --interactive
+
+
+(nlp) ubuntu@104-171-203-46:~/nlp-test/sentiment$ python ./finetune.py --dataset 'merged_local' --eval_dataset 'dynasent_r2' --weights_name 'google/electra-base-discriminator' --save_data --save_model --save_pickle --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 16 --accumulation_steps 2 --finetune_bert --finetune_layers 12 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Base' --wandb_run 'R2-E1-EBFT-DYN-R2' --random_seed 123 --model_file 'checkpoint_epoch_14_20250322-204524.pth' --interactive
+
+Starting DDP PyTorch Training...
+Device: cuda, Number of GPUs: 8
+Spawning 8 processes...
+Rank 1 - Device: cuda:1
+Rank 4 - Device: cuda:4
+Rank 3 - Device: cuda:3
+Rank 2 - Device: cuda:2
+Rank 7 - Device: cuda:7
+Rank 6 - Device: cuda:6
+Rank 5 - Device: cuda:5
+Rank 0 - Device: cuda:0
+8 process groups initialized with 'nccl' backend on localhost:12355
+NCCL Timeout: 1 hr 0 min. NCCL Blocking Wait: Enabled
+wandb: Using wandb-core as the SDK backend.  Please refer to https://wandb.me/wandb-core for more information.
+wandb: Currently logged in as: jbeno (jimbeno) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.19.8
+wandb: Run data is saved locally in /home/ubuntu/nlp-test/sentiment/wandb/run-20250323_031650-2lgwg3rm
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run R2-E1-EBFT-DYN-R2
+wandb: ⭐️ View project at https://wandb.ai/jimbeno/Electra%20Base
+wandb: 🚀 View run at https://wandb.ai/jimbeno/Electra%20Base/runs/2lgwg3rm
+Wand run initialized.
+
+Initializing 'google/electra-base-discriminator' tokenizer and model...
+Checking for local files...
+Found all files in cache, skipping download
+All ranks loading tokenizer from local files...
+All ranks loading model from local files...
+Tokenizer and model initialized (2s)
+
+Loading data...
+Using different datasets for training and evaluation
+Splits:
+- Train: Using merged_local 'train' split
+- Validation: Using merged_local 'validation' split
+- Evaluation: Using dynasent_r2 'test' split
+Train Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Validation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Evaluation Data: DynaSent Round 2 from Hugging Face: 'dynabench/dynasent'
+Train size: 102097
+Validation size: 5421
+Evaluation size: 720
+Train label distribution:
+	      Negative: 21910
+	       Neutral: 49148
+	      Positive: 31039
+Validation label distribution:
+	      Negative: 1868
+	       Neutral: 1669
+	      Positive: 1884
+Evaluation label distribution:
+	      Negative: 240
+	       Neutral: 240
+	      Positive: 240
+Data loaded (951ms)
+
+Processing data...
+(Batch size: 16, Pooling: Mean, Fine Tune BERT: True, Chunk size: None)...
+Extracting sentences and labels...
+
+Data saved to: saves/data_8_gpu_20250323-031655.npz
+X Train shape: [102097], X Validation shape: [5421], X Test shape: [720]
+y Train shape: [102097], y Validation shape: [5421], y Test shape: [720]
+Data processed (670ms)
+
+Initializing DDP Neural Classifier...
+Layers: 2, Hidden Dim: 1024, Hidden Act: SwishGLU, Dropout: 0.3, Optimizer: AdamW, L2 Strength: 0.01, Pooling: MEAN, Accumulation Steps: 2, Max Grad Norm: None
+Batch Size: 16, Max Epochs: 50, LR: 1e-05, Early Stop: score, Fine-tune BERT: True, Fine-tune Layers: 12, Freeze BERT: False, Target Score: None, Interactive: True
+Loading model from: checkpoints/checkpoint_epoch_14_20250322-204524.pth...
+Loaded checkpoint: checkpoints/checkpoint_epoch_14_20250322-204524.pth
+Retrieved model state dictionary.
+Retrieved optimizer state dictionary.
+Classifier initialized (3s)
+
+Fitting DDP Neural Classifier on training data...
+Num Workers: 0, Prefetch: None
+Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: 0.1
+Training will stop early if the score does not improve by at least 0.00001 for 10 iterations.
+Using provided validation set for early stopping.
+Building dataset and dataloader...
+Initializing model, graph, optimizer...
+BERT's original pooler removed. Using custom pooling type: mean
+BERT has 108,891,648 trainable parameters and 0 non-trainable parameters
+Number of BERT layers requiring gradients: 12 out of 12
+Fine-tuning the last 12 out of 12 BERT layers
+
+Model Architecture Summary:
+BERTClassifier(
+  (bert): ElectraModel(
+    (embeddings): ElectraEmbeddings(
+      (word_embeddings): Embedding(30522, 768, padding_idx=0)
+      (position_embeddings): Embedding(512, 768)
+      (token_type_embeddings): Embedding(2, 768)
+      (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): ElectraEncoder(
+      (layer): ModuleList(
+        (0-11): 12 x ElectraLayer(
+          (attention): ElectraAttention(
+            (self): ElectraSelfAttention(
+              (query): Linear(in_features=768, out_features=768, bias=True)
+              (key): Linear(in_features=768, out_features=768, bias=True)
+              (value): Linear(in_features=768, out_features=768, bias=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+            (output): ElectraSelfOutput(
+              (dense): Linear(in_features=768, out_features=768, bias=True)
+              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+          )
+          (intermediate): ElectraIntermediate(
+            (dense): Linear(in_features=768, out_features=3072, bias=True)
+            (intermediate_act_fn): GELUActivation()
+          )
+          (output): ElectraOutput(
+            (dense): Linear(in_features=3072, out_features=768, bias=True)
+            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+  )
+  (custom_pooling): PoolingLayer()
+  (classifier): Classifier(
+    (layers): Sequential(
+      (0): Linear(in_features=768, out_features=1024, bias=True)
+      (1): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (2): Dropout(p=0.3, inplace=False)
+      (3): Linear(in_features=1024, out_features=1024, bias=True)
+      (4): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (5): Dropout(p=0.3, inplace=False)
+      (6): Linear(in_features=1024, out_features=3, bias=True)
+    )
+  )
+)
+
+Model Parameters:
+  bert.embeddings.word_embeddings: 23,440,896 (trainable)
+  bert.embeddings.position_embeddings: 393,216 (trainable)
+  bert.embeddings.token_type_embeddings: 1,536 (trainable)
+  bert.embeddings.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.0.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.0.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.0.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.0.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.0.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.0.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.0.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.0.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.1.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.1.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.1.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.1.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.1.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.1.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.1.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.1.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.2.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.2.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.2.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.2.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.2.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.2.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.2.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.2.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.3.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.3.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.3.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.3.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.3.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.3.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.3.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.3.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.4.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.4.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.4.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.4.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.4.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.4.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.4.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.4.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.5.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.5.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.5.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.5.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.5.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.5.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.5.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.5.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.6.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.6.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.6.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.6.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.6.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.6.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.6.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.6.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.7.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.7.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.7.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.7.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.7.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.7.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.7.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.7.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.8.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.8.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.8.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.8.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.8.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.8.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.8.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.8.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.9.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.9.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.9.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.9.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.9.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.9.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.9.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.9.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.10.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.10.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.10.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.10.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.10.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.10.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.10.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.10.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.11.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.11.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.11.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.11.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.11.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.11.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.11.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.11.output.LayerNorm: 1,536 (trainable)
+  classifier.layers.0: 787,456 (trainable)
+  classifier.layers.1.projection: 2,099,200 (trainable)
+  classifier.layers.3: 1,049,600 (trainable)
+  classifier.layers.6: 3,075 (trainable)
+
+Total layers: 104
+Trainable layers: 104
+Total parameters: 112,830,979
+Trainable parameters: 112,830,979
+Percentage of trainable parameters: 100.00%
+Using optimizer: AdamW, Use Zero: True, Base Learning Rate: 1e-05, L2 strength: 0.01
+Layer-wise decay factor: 0.95
+Using scheduler: CosineAnnealingWarmRestarts
+Scheduler arguments:
+- T_0: 5
+- T_mult: 1
+- eta_min: 1e-07
+
+Starting training loop...
+Start epoch: 15, Max Iterations: 50, Early Stop: score, Tolerance: 0.00001, Number Iterations No Change: 10
+
+[Enter] to continue for 1 epoch, [Q]uit, [S]ave, [H]elp: q
+Quitting training...
+Saving model in ONNX format...
+Model saved in ONNX format to saves/model_20250323-031814.onnx and uploaded to Weights & Biases.
+Saved model state: checkpoints/final_model_20250323-031819.pth
+Saved model pickle: checkpoints/final_model_20250323-031819.pkl
+Training completed (1m 26s)
+
+Evaluating model...
+
+R2-E1-EBFT-DYN-R2 Multi-Class Classification Report
+
+              precision    recall  f1-score   support
+
+    negative   0.671642  0.750000  0.708661       240
+     neutral   0.752688  0.583333  0.657277       240
+    positive   0.684211  0.758333  0.719368       240
+
+    accuracy                       0.697222       720
+   macro avg   0.702847  0.697222  0.695102       720
+weighted avg   0.702847  0.697222  0.695102       720
+
+ROC AUC: 0.89105
+
+Predicted  negative  neutral  positive
+Actual                                
+negative        180       27        33
+neutral          49      140        51
+positive         39       19       182
+
+Saved predictions: saves/predictions_20250323-031839.csv
+
+Macro F1 Score: 0.70
+
+Evaluation completed (20s)
+wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb: eval/macro_f1_score ▁
+wandb: 
+wandb: Run summary:
+wandb: eval/macro_f1_score 0.6951
+wandb: 
+wandb: 🚀 View run R2-E1-EBFT-DYN-R2 at: https://wandb.ai/jimbeno/Electra%20Base/runs/2lgwg3rm
+wandb: ⭐️ View project at: https://wandb.ai/jimbeno/Electra%20Base
+wandb: Synced 5 W&B file(s), 1 media file(s), 2 artifact file(s) and 1 other file(s)
+wandb: Find logs at: ./wandb/run-20250323_031650-2lgwg3rm/logs
+TOTAL Time: 2m 8s
+
+
+
+
+
+python ./finetune.py --dataset 'merged_local' --eval_dataset 'sst_local' --weights_name 'google/electra-base-discriminator' --save_data --save_model --save_pickle --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 16 --accumulation_steps 2 --finetune_bert --finetune_layers 12 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Base' --wandb_run 'R2-E1-EBFT-SST' --random_seed 123 --model_file 'checkpoint_epoch_14_20250322-204524.pth' --interactive
+
+
+
+
+
+
+(nlp) ubuntu@104-171-203-46:~/nlp-test/sentiment$ python ./finetune.py --dataset 'merged_local' --eval_dataset 'sst_local' --weights_name 'google/electra-base-discriminator' --save_data --save_model --save_pickle --save_preds --lr 0.00001 --lr_decay 0.95 --epochs 50 --pooling 'mean' --dropout_rate 0.3 --num_layers 2 --hidden_dim 1024 --hidden_activation 'swishglu' --batch_size 16 --accumulation_steps 2 --finetune_bert --finetune_layers 12 --l2_strength 0.01  --checkpoint_interval 1 --use_zero --optimizer 'adamw' --scheduler 'cosine_warmup' --scheduler_kwargs '{"T_0":5, "T_mult":1, "eta_min":1e-7}' --decimal 6 --use_val_split --eval_split 'test' --early_stop 'score' --n_iter_no_change 10 --show_progress --wandb --wandb_project 'Electra Base' --wandb_run 'R2-E1-EBFT-SST' --random_seed 123 --model_file 'checkpoint_epoch_14_20250322-204524.pth' --interactive
+
+Starting DDP PyTorch Training...
+Device: cuda, Number of GPUs: 8
+Spawning 8 processes...
+Rank 3 - Device: cuda:3
+Rank 4 - Device: cuda:4
+Rank 1 - Device: cuda:1
+Rank 5 - Device: cuda:5
+Rank 2 - Device: cuda:2
+Rank 7 - Device: cuda:7
+Rank 6 - Device: cuda:6
+Rank 0 - Device: cuda:0
+8 process groups initialized with 'nccl' backend on localhost:12355
+NCCL Timeout: 1 hr 0 min. NCCL Blocking Wait: Enabled
+wandb: Using wandb-core as the SDK backend.  Please refer to https://wandb.me/wandb-core for more information.
+wandb: Currently logged in as: jbeno (jimbeno) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.19.8
+wandb: Run data is saved locally in /home/ubuntu/nlp-test/sentiment/wandb/run-20250323_032120-kz7ecsx5
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run R2-E1-EBFT-SST
+wandb: ⭐️ View project at https://wandb.ai/jimbeno/Electra%20Base
+wandb: 🚀 View run at https://wandb.ai/jimbeno/Electra%20Base/runs/kz7ecsx5
+Wand run initialized.
+
+Initializing 'google/electra-base-discriminator' tokenizer and model...
+Checking for local files...
+Found all files in cache, skipping download
+All ranks loading tokenizer from local files...
+All ranks loading model from local files...
+Tokenizer and model initialized (2s)
+
+Loading data...
+Using different datasets for training and evaluation
+Splits:
+- Train: Using merged_local 'train' split
+- Validation: Using merged_local 'validation' split
+- Evaluation: Using sst_local 'test' split
+Train Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Validation Data: Merged DynaSent Round 1, Round 2 and SST from Local: 'data/merged'
+Evaluation Data: Stanford Sentiment Treebank (SST) from Local: 'data/sentiment'
+Train size: 102097
+Validation size: 5421
+Evaluation size: 2210
+Train label distribution:
+	      Negative: 21910
+	       Neutral: 49148
+	      Positive: 31039
+Validation label distribution:
+	      Negative: 1868
+	       Neutral: 1669
+	      Positive: 1884
+Evaluation label distribution:
+	      Negative: 912
+	       Neutral: 389
+	      Positive: 909
+Data loaded (285ms)
+
+Processing data...
+(Batch size: 16, Pooling: Mean, Fine Tune BERT: True, Chunk size: None)...
+Extracting sentences and labels...
+
+Data saved to: saves/data_8_gpu_20250323-032124.npz
+X Train shape: [102097], X Validation shape: [5421], X Test shape: [2210]
+y Train shape: [102097], y Validation shape: [5421], y Test shape: [2210]
+Data processed (703ms)
+
+Initializing DDP Neural Classifier...
+Layers: 2, Hidden Dim: 1024, Hidden Act: SwishGLU, Dropout: 0.3, Optimizer: AdamW, L2 Strength: 0.01, Pooling: MEAN, Accumulation Steps: 2, Max Grad Norm: None
+Batch Size: 16, Max Epochs: 50, LR: 1e-05, Early Stop: score, Fine-tune BERT: True, Fine-tune Layers: 12, Freeze BERT: False, Target Score: None, Interactive: True
+Loading model from: checkpoints/checkpoint_epoch_14_20250322-204524.pth...
+Loaded checkpoint: checkpoints/checkpoint_epoch_14_20250322-204524.pth
+Retrieved model state dictionary.
+Retrieved optimizer state dictionary.
+Classifier initialized (2s)
+
+Fitting DDP Neural Classifier on training data...
+Num Workers: 0, Prefetch: None
+Score-based early stopping enabled (macro average F1 score against validation set). Validation fraction: 0.1
+Training will stop early if the score does not improve by at least 0.00001 for 10 iterations.
+Using provided validation set for early stopping.
+Building dataset and dataloader...
+Initializing model, graph, optimizer...
+BERT's original pooler removed. Using custom pooling type: mean
+BERT has 108,891,648 trainable parameters and 0 non-trainable parameters
+Number of BERT layers requiring gradients: 12 out of 12
+Fine-tuning the last 12 out of 12 BERT layers
+
+Model Architecture Summary:
+BERTClassifier(
+  (bert): ElectraModel(
+    (embeddings): ElectraEmbeddings(
+      (word_embeddings): Embedding(30522, 768, padding_idx=0)
+      (position_embeddings): Embedding(512, 768)
+      (token_type_embeddings): Embedding(2, 768)
+      (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): ElectraEncoder(
+      (layer): ModuleList(
+        (0-11): 12 x ElectraLayer(
+          (attention): ElectraAttention(
+            (self): ElectraSelfAttention(
+              (query): Linear(in_features=768, out_features=768, bias=True)
+              (key): Linear(in_features=768, out_features=768, bias=True)
+              (value): Linear(in_features=768, out_features=768, bias=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+            (output): ElectraSelfOutput(
+              (dense): Linear(in_features=768, out_features=768, bias=True)
+              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+          )
+          (intermediate): ElectraIntermediate(
+            (dense): Linear(in_features=768, out_features=3072, bias=True)
+            (intermediate_act_fn): GELUActivation()
+          )
+          (output): ElectraOutput(
+            (dense): Linear(in_features=3072, out_features=768, bias=True)
+            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+  )
+  (custom_pooling): PoolingLayer()
+  (classifier): Classifier(
+    (layers): Sequential(
+      (0): Linear(in_features=768, out_features=1024, bias=True)
+      (1): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (2): Dropout(p=0.3, inplace=False)
+      (3): Linear(in_features=1024, out_features=1024, bias=True)
+      (4): SwishGLU(
+        (projection): Linear(in_features=1024, out_features=2048, bias=True)
+        (activation): SiLU()
+      )
+      (5): Dropout(p=0.3, inplace=False)
+      (6): Linear(in_features=1024, out_features=3, bias=True)
+    )
+  )
+)
+
+Model Parameters:
+  bert.embeddings.word_embeddings: 23,440,896 (trainable)
+  bert.embeddings.position_embeddings: 393,216 (trainable)
+  bert.embeddings.token_type_embeddings: 1,536 (trainable)
+  bert.embeddings.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.0.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.0.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.0.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.0.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.0.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.0.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.0.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.0.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.1.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.1.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.1.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.1.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.1.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.1.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.1.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.1.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.2.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.2.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.2.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.2.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.2.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.2.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.2.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.2.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.3.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.3.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.3.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.3.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.3.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.3.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.3.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.3.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.4.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.4.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.4.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.4.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.4.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.4.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.4.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.4.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.5.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.5.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.5.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.5.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.5.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.5.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.5.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.5.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.6.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.6.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.6.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.6.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.6.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.6.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.6.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.6.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.7.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.7.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.7.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.7.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.7.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.7.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.7.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.7.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.8.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.8.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.8.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.8.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.8.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.8.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.8.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.8.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.9.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.9.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.9.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.9.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.9.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.9.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.9.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.9.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.10.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.10.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.10.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.10.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.10.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.10.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.10.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.10.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.11.attention.self.query: 590,592 (trainable)
+  bert.encoder.layer.11.attention.self.key: 590,592 (trainable)
+  bert.encoder.layer.11.attention.self.value: 590,592 (trainable)
+  bert.encoder.layer.11.attention.output.dense: 590,592 (trainable)
+  bert.encoder.layer.11.attention.output.LayerNorm: 1,536 (trainable)
+  bert.encoder.layer.11.intermediate.dense: 2,362,368 (trainable)
+  bert.encoder.layer.11.output.dense: 2,360,064 (trainable)
+  bert.encoder.layer.11.output.LayerNorm: 1,536 (trainable)
+  classifier.layers.0: 787,456 (trainable)
+  classifier.layers.1.projection: 2,099,200 (trainable)
+  classifier.layers.3: 1,049,600 (trainable)
+  classifier.layers.6: 3,075 (trainable)
+
+Total layers: 104
+Trainable layers: 104
+Total parameters: 112,830,979
+Trainable parameters: 112,830,979
+Percentage of trainable parameters: 100.00%
+Using optimizer: AdamW, Use Zero: True, Base Learning Rate: 1e-05, L2 strength: 0.01
+Layer-wise decay factor: 0.95
+Using scheduler: CosineAnnealingWarmRestarts
+Scheduler arguments:
+- T_0: 5
+- T_mult: 1
+- eta_min: 1e-07
+
+Starting training loop...
+Start epoch: 15, Max Iterations: 50, Early Stop: score, Tolerance: 0.00001, Number Iterations No Change: 10
+
+[Enter] to continue for 1 epoch, [Q]uit, [S]ave, [H]elp: q
+Quitting training...
+Saving model in ONNX format...
+Model saved in ONNX format to saves/model_20250323-032238.onnx and uploaded to Weights & Biases.
+Saved model state: checkpoints/final_model_20250323-032244.pth
+Saved model pickle: checkpoints/final_model_20250323-032244.pkl
+Training completed (1m 22s)
+
+Evaluating model...
+
+R2-E1-EBFT-SST Multi-Class Classification Report
+
+              precision    recall  f1-score   support
+
+    negative   0.813906  0.872807  0.842328       912
+     neutral   0.470320  0.264781  0.338816       389
+    positive   0.818361  0.911991  0.862643       909
+
+    accuracy                       0.781900      2210
+   macro avg   0.700862  0.683193  0.681262      2210
+weighted avg   0.755261  0.781900  0.762057      2210
+
+ROC AUC: 0.881343
+
+Predicted  negative  neutral  positive
+Actual                                
+negative        796       63        53
+neutral         155      103       131
+positive         27       53       829
+
+Saved predictions: saves/predictions_20250323-032331.csv
+
+Macro F1 Score: 0.68
+
+Evaluation completed (1m 2s)
+wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb: eval/macro_f1_score ▁
+wandb: 
+wandb: Run summary:
+wandb: eval/macro_f1_score 0.68126
+wandb: 
+wandb: 🚀 View run R2-E1-EBFT-SST at: https://wandb.ai/jimbeno/Electra%20Base/runs/kz7ecsx5
+wandb: ⭐️ View project at: https://wandb.ai/jimbeno/Electra%20Base
+wandb: Synced 5 W&B file(s), 1 media file(s), 2 artifact file(s) and 1 other file(s)
+wandb: Find logs at: ./wandb/run-20250323_032120-kz7ecsx5/logs
+TOTAL Time: 2m 46s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,15 +1,15 @@
 Statistical Analysis Results
 
 Performance Comparison:
-E7-G4O-ELFT significantly outperformed B4-G4O with an F1 score of 81.57% compared to 80.14%, a difference of 1.44 percentage points.
+E7-G4O-ELFT significantly outperformed B4-G4O with an F1 score of 83.18% compared to 80.14%, a difference of 3.04 percentage points.
 
 Statistical Significance:
-This difference was statistically significant according to both McNemar's test (p = 0.011) and bootstrap analysis (p = 0.003). The 95% confidence interval for the difference was [0.51%, 2.38%].
+This difference was statistically significant according to both McNemar's test (p < 0.001) and bootstrap analysis (p < 0.001). The 95% confidence interval for the difference was [2.15%, 3.96%].
 
 Stability Analysis:
 The results were assessed across multiple bootstrap runs (n=10000), with 
-confidence interval bounds showing minimal variation (SD: 0.000027 to 
-0.000036).
+confidence interval bounds showing minimal variation (SD: 0.000045 to 
+0.000085).
 
 Methodological Details:
 Statistical significance was assessed using McNemar's test for paired nominal data 

@@ -60,7 +60,7 @@ Or email info@Geaughahumain.org.,neutral,neutral,True,neutral,"[0.00082679028855
 Adam Sandler is to Gary Cooper what a gnat is to a racehorse .,negative,negative,True,negative,"[0.950760543346405, 0.04627496749162674, 0.0029645459726452827]",sst_local
 Spielberg is the rare director who does not want to invite viewers to gawk at or applaud his special effects .,neutral,positive,False,positive,"[0.007451949641108513, 0.06492208689451218, 0.9276259541511536]",sst_local
 I keep mine outside.,neutral,neutral,True,neutral,"[0.000868841540068388, 0.9879921078681946, 0.011139078997075558]",dynasent_r1
-"We ate dinner here, ordered a salad and chicken, the chicken came out slightly undercooked, we told Jonathan, our waiter, and he took it back.",negative,neutral,False,positive,"[0.08407469093799591, 0.04156094789505005, 0.8743643760681152]",dynasent_r1
+"We ate dinner here, ordered a salad and chicken, the chicken came out slightly undercooked, we told Jonathan, our waiter, and he took it back.",negative,negative,True,positive,"[0.08407469093799591, 0.04156094789505005, 0.8743643760681152]",dynasent_r1
 Calamari was chewy.,negative,negative,True,negative,"[0.9955213069915771, 0.0022813875693827868, 0.002197285881265998]",dynasent_r1
 I'll start off by saying the atmosphere is not for everyone.,negative,negative,True,negative,"[0.9880691170692444, 0.010755326598882675, 0.0011755389859899879]",dynasent_r1
 "No movement , no yuks , not much of anything .",negative,negative,True,negative,"[0.9922747015953064, 0.006665769498795271, 0.001059501664713025]",sst_local
@@ -92,7 +92,7 @@ The premise is overshadowed by the uberviolence of the Clericks as this becomes 
 "I asked them not to cut my cuticles, and they went ahead and did so because they thought it would please me.",negative,negative,True,negative,"[0.5700554847717285, 0.15647956728935242, 0.27346494793891907]",dynasent_r2
 "Rob is freaky fast to respond to any email. Like, slow doesn't exist in his head.",positive,positive,True,positive,"[0.0035856645554304123, 0.0007562609971500933, 0.9956580400466919]",dynasent_r2
 "The luggage cart took someone's bags to the plane, however that plane was going to a different location.",negative,neutral,False,neutral,"[0.34244412183761597, 0.6488139629364014, 0.008741885423660278]",dynasent_r2
-The cops were awesome and said they get called to Zipps (all locations) a lot over things like this.,positive,positive,True,positive,"[5.916661029914394e-05, 0.00022694229846820235, 0.9997139573097229]",dynasent_r1
+The cops were awesome and said they get called to Zipps (all locations) a lot over things like this.,positive,neutral,False,positive,"[5.916661029914394e-05, 0.00022694229846820235, 0.9997139573097229]",dynasent_r1
 There was this funky smell in it that he eliminated and the car looks better than it did when I got it.,positive,positive,True,positive,"[0.0003560956392902881, 9.468451025895774e-05, 0.9995492100715637]",dynasent_r1
 So we get this plan laid out and start getting moulds like  a year in advance.,neutral,neutral,True,neutral,"[0.0006515682325698435, 0.9799774289131165, 0.0193710308521986]",dynasent_r1
 "Nervy and sensitive , it taps into genuine artistic befuddlement , and at the same time presents a scathing indictment of what drives Hollywood .",positive,positive,True,positive,"[0.0023663435131311417, 0.1696658581495285, 0.8279678225517273]",sst_local
@@ -130,7 +130,7 @@ something the true film buff will enjoy .,positive,positive,True,positive,"[3.35
 Three weeks before traveling to Vegas I followed up and received confirmation and sent one last confirmation email the week of the event.,neutral,neutral,True,neutral,"[0.003509021131321788, 0.9621061086654663, 0.03438485041260719]",dynasent_r1
 we stayed at the trump now more than a month ago (may 22-24).,neutral,neutral,True,neutral,"[0.0002380166988587007, 0.9828739762306213, 0.016887998208403587]",dynasent_r1
 I signaled to the waitress who came over and looked at it also.,neutral,neutral,True,neutral,"[0.0027786865830421448, 0.9866446852684021, 0.01057660486549139]",dynasent_r1
-And the parking lot is huge.,positive,positive,True,positive,"[0.0003530898247845471, 0.010047975927591324, 0.9895989894866943]",dynasent_r1
+And the parking lot is huge.,positive,neutral,False,positive,"[0.0003530898247845471, 0.010047975927591324, 0.9895989894866943]",dynasent_r1
 I was ready to be a SHIELD recruit.,neutral,neutral,True,neutral,"[0.0006656570476479828, 0.9552286863327026, 0.04410567879676819]",dynasent_r1
 TALK ABOUT GERNEROUSITY AND HOSPITALITY.,positive,positive,True,positive,"[0.005478160455822945, 0.02716497704386711, 0.9673568606376648]",dynasent_r1
 Gets crowded during peek hours.,negative,negative,True,negative,"[0.9839848875999451, 0.014491005800664425, 0.0015241309301927686]",dynasent_r1
@@ -178,7 +178,7 @@ There is no shade and you're sweating from.,negative,negative,True,negative,"[0.
 "If you are looking for a date night where you just relax, I wouldn't necessarily say this is your place.",positive,negative,False,negative,"[0.9984933137893677, 0.0007761858287267387, 0.0007304934551939368]",dynasent_r1
 I spent a long time trying to decide what kind of flooring to purchase to replace our old carpet.,neutral,neutral,True,neutral,"[0.00044337462168186903, 0.9870654344558716, 0.01249115914106369]",dynasent_r1
 Lucky for them there is not another sushi place in the area or they would be out of business.,negative,negative,True,positive,"[0.06246554106473923, 0.02677355706691742, 0.9107609391212463]",dynasent_r1
-"I come here once in a while to discuss business or study, and it's generally pleasant.",positive,positive,True,positive,"[4.593146877596155e-05, 0.0003218691854272038, 0.9996322393417358]",dynasent_r1
+"I come here once in a while to discuss business or study, and it's generally pleasant.",positive,neutral,False,positive,"[4.593146877596155e-05, 0.0003218691854272038, 0.9996322393417358]",dynasent_r1
 "Vegas is one of those places that if you wanted to have a $5.99 Steak and Eggs Breakfast, you totally can do that.",positive,positive,True,positive,"[0.006243010051548481, 0.13391080498695374, 0.8598462343215942]",dynasent_r1
 "By the end of No Such Thing the audience , like Beatrice , has a watchful affection for the monster .",positive,positive,True,positive,"[0.002851753495633602, 0.21358387172222137, 0.7835643291473389]",sst_local
 Notorious C.H.O. has oodles of vulgar highlights .,negative,neutral,False,neutral,"[0.1841449737548828, 0.5396147966384888, 0.2762402594089508]",sst_local
@@ -189,7 +189,7 @@ Only one negative comment: the pita is chewy sometimes.,negative,negative,True,n
 An amazing and incendiary movie that dives straight into the rough waters of contradiction .,positive,positive,True,positive,"[0.00020931917242705822, 0.017414169386029243, 0.9823765754699707]",sst_local
 Long busy lineups.,negative,negative,True,negative,"[0.990672767162323, 0.007575654424726963, 0.0017515587387606502]",dynasent_r1
 "All in all , there 's only one thing to root for : expulsion for everyone .",negative,negative,True,negative,"[0.9617378115653992, 0.023932138457894325, 0.014330062083899975]",sst_local
-"Purely propaganda , a work of unabashed hero worship , it is nonetheless -- and likely inadvertently -- a timely and invaluable implicit reminder of the role that U.S. foreign policy has played in the rise of Castro .",neutral,negative,False,positive,"[0.01578701101243496, 0.41707903146743774, 0.5671339631080627]",sst_local
+"Purely propaganda , a work of unabashed hero worship , it is nonetheless -- and likely inadvertently -- a timely and invaluable implicit reminder of the role that U.S. foreign policy has played in the rise of Castro .",neutral,neutral,True,positive,"[0.01578701101243496, 0.41707903146743774, 0.5671339631080627]",sst_local
 Thomas in the front (maybe bellman and taxi?),neutral,neutral,True,neutral,"[0.0020121277775615454, 0.9923388957977295, 0.005648958962410688]",dynasent_r1
 "Shot perhaps ` artistically ' with handheld cameras and apparently no movie lights by Joaquin Baca-Asay , the low-budget production swings annoyingly between vertigo and opacity .",negative,negative,True,negative,"[0.8240886926651001, 0.1647854894399643, 0.011125849559903145]",sst_local
 So she did.,neutral,neutral,True,neutral,"[0.002176497597247362, 0.9770129919052124, 0.020810488611459732]",dynasent_r1
@@ -260,7 +260,7 @@ The girl who was originally preparing my food resumed and completed making the o
 There is minimal shade so I recommend hats and sunscreen.,negative,neutral,False,negative,"[0.6421371698379517, 0.3471689224243164, 0.010693944990634918]",dynasent_r1
 "Good for a few unintentional laughs , `` Extreme Ops '' was obviously made for the `` XXX '' crowd , people who enjoy mindless action without the benefit of decent acting , writing , and direction .",negative,negative,True,negative,"[0.8690482378005981, 0.119542695581913, 0.011409084312617779]",sst_local
 It 's one of the most honest films ever made about Hollywood .,positive,positive,True,positive,"[6.875947292428464e-05, 0.0013511398574337363, 0.9985800981521606]",sst_local
-Dexter just graduated from puppy school today.,neutral,positive,False,neutral,"[0.0003516649012453854, 0.919607400894165, 0.08004091680049896]",dynasent_r1
+Dexter just graduated from puppy school today.,neutral,neutral,True,neutral,"[0.0003516649012453854, 0.919607400894165, 0.08004091680049896]",dynasent_r1
 This is junk food cinema at its greasiest .,negative,negative,True,negative,"[0.8239911198616028, 0.15020979940891266, 0.025799082592129707]",sst_local
 "Previously, I'd had folks tell me I needed a whole new muffler system, and I'm not rich, so the 1200 to 1500 they were quoting me was just too much.",negative,negative,True,negative,"[0.7828487753868103, 0.21235734224319458, 0.00479385768994689]",dynasent_r1
 Any business that is local and community based gets an immediate 1 star bonus.,positive,positive,True,positive,"[0.0067434366792440414, 0.030725447461009026, 0.9625311493873596]",dynasent_r1
@@ -418,8 +418,8 @@ Just maintenance.,neutral,neutral,True,neutral,"[0.0037246402353048325, 0.971374
 "If you are ordering this to be delivered to a work address or other institutional facility, never fear, the driver I had tonight called twice - once when leave the shop and one when he arrived here",positive,positive,True,positive,"[0.0010565236443653703, 0.021768834441900253, 0.9771745800971985]",dynasent_r1
 But some unexpected zigs and zags help .,positive,positive,True,positive,"[0.0006014385726302862, 0.044209375977516174, 0.9551891684532166]",sst_local
 "If you can't do it right the first time, why would I let you try again?",negative,negative,True,negative,"[0.9586148858070374, 0.036648087203502655, 0.004736905451864004]",dynasent_r1
-Nice complex and okay location.,positive,positive,True,positive,"[3.1417421268997714e-05, 0.00022046147205401212, 0.9997480511665344]",dynasent_r1
-I can't want to travel back to Toronto/Port Credit area!,positive,neutral,False,negative,"[0.8673436045646667, 0.02948215790092945, 0.10317426919937134]",dynasent_r1
+Nice complex and okay location.,positive,neutral,False,positive,"[3.1417421268997714e-05, 0.00022046147205401212, 0.9997480511665344]",dynasent_r1
+I can't want to travel back to Toronto/Port Credit area!,positive,negative,False,negative,"[0.8673436045646667, 0.02948215790092945, 0.10317426919937134]",dynasent_r1
 Greatly appreciated.,positive,positive,True,positive,"[0.0008732933201827109, 0.016227446496486664, 0.9828993082046509]",dynasent_r1
 The Gantzes ' interviews tend to let the guys off the hook .,neutral,neutral,True,neutral,"[0.28307148814201355, 0.6794750690460205, 0.03745347261428833]",sst_local
 The egg looked all natural.,positive,positive,True,positive,"[0.0024495692923665047, 0.09000220149755478, 0.9075482487678528]",dynasent_r2
@@ -533,7 +533,7 @@ I will be sending this to corporate hopefully they can use this as a training to
 "He said, you said you needed a locksmith and I am going to keep calling!",neutral,negative,False,negative,"[0.850418746471405, 0.14111767709255219, 0.008463562466204166]",dynasent_r1
 Sushi Rock is overpriced and their sushi is sub-par compared to this place.,negative,negative,True,negative,"[0.9935263395309448, 0.0014595278771594167, 0.005014114081859589]",dynasent_r1
 177.00 for a hot stone massage at the spa inside of south point for an HR.,neutral,neutral,True,neutral,"[0.00024129451776389033, 0.9856333136558533, 0.014125366695225239]",dynasent_r1
-The only (minor) issue we had was not finding enough light-weight balls.,negative,neutral,False,negative,"[0.985443651676178, 0.010399602353572845, 0.004156686365604401]",dynasent_r1
+The only (minor) issue we had was not finding enough light-weight balls.,negative,negative,True,negative,"[0.985443651676178, 0.010399602353572845, 0.004156686365604401]",dynasent_r1
 "My name is Amanda, and I have a problem.",negative,negative,True,negative,"[0.9324325323104858, 0.06383391469717026, 0.0037336142268031836]",dynasent_r1
 "We went during happy hour so all the ""sharing"" portions were 2 for 1 as well as their cocktails.",positive,positive,True,positive,"[0.0003735370119102299, 0.2082800418138504, 0.7913463711738586]",dynasent_r1
 The toilet in the common are was not flushing and filled with bugs.,negative,negative,True,negative,"[0.9981746673583984, 0.0006195100140757859, 0.0012058434076607227]",dynasent_r2
@@ -572,7 +572,7 @@ Obstacles are too easily overcome and there is n't much in the way of character 
 Loved the crostinni they provided with the dip though! It was really good.,positive,positive,True,positive,"[9.134098218055442e-05, 9.268866415368393e-05, 0.9998160004615784]",dynasent_r2
 Diane Lane shines in Unfaithful .,positive,positive,True,positive,"[0.00020282171317376196, 0.021845445036888123, 0.9779517650604248]",sst_local
 I’m supposed to be full off of that?,negative,negative,True,negative,"[0.5800979137420654, 0.3930607736110687, 0.02684137225151062]",dynasent_r2
-The tip we left could've bought two 2-liters bruh!,neutral,neutral,True,positive,"[0.008340622298419476, 0.05968552455306053, 0.9319738149642944]",dynasent_r1
+The tip we left could've bought two 2-liters bruh!,neutral,negative,False,positive,"[0.008340622298419476, 0.05968552455306053, 0.9319738149642944]",dynasent_r1
 The only silly negative I can think of is that they had the tv show Doctors on in the waiting room and that show blows.,negative,negative,True,negative,"[0.9961172342300415, 0.0010706714820116758, 0.002812199993059039]",dynasent_r1
 "The place didn't have that hipster downtown vibe, bonus!",positive,positive,True,positive,"[0.0007508205599151552, 0.0002708007232286036, 0.9989783763885498]",dynasent_r1
 "For starters, the basket of chips/salsa arrives with your intro to the server.",neutral,neutral,True,neutral,"[0.00038766590296290815, 0.7630196213722229, 0.23659272491931915]",dynasent_r1
@@ -612,7 +612,7 @@ I will say that our driver was very kind and friendly.,positive,positive,True,po
 I haven't been there in a while but it is being built.,neutral,neutral,True,neutral,"[0.0005668298108503222, 0.9914570450782776, 0.007976139895617962]",dynasent_r2
 This one does .,neutral,neutral,True,neutral,"[0.004433877766132355, 0.9538155198097229, 0.041750624775886536]",sst_local
 I'll take less pics then.,neutral,neutral,True,neutral,"[0.09623425453901291, 0.8933591246604919, 0.010406618937849998]",dynasent_r2
-Music is not deafening.,positive,neutral,False,positive,"[0.022349847480654716, 0.24648047983646393, 0.7311696410179138]",dynasent_r1
+Music is not deafening.,positive,positive,True,positive,"[0.022349847480654716, 0.24648047983646393, 0.7311696410179138]",dynasent_r1
 "Beers , who , when she 's given the right lines , can charm the paint off the wall ... -LRB- but -RRB- the script goes wrong at several key junctures .",neutral,negative,False,negative,"[0.8982219696044922, 0.0839756578207016, 0.017802389338612556]",sst_local
 Imagine the James Woods character from Videodrome making a home movie of Audrey Rose and showing it to the kid from The Sixth Sense and you 've imagined The Ring .,negative,neutral,False,neutral,"[0.05025077611207962, 0.9026705622673035, 0.047078657895326614]",sst_local
 "The  soda machine was down and she offered to go to the bar, twice and she checked on us to ensure everything was good.",positive,positive,True,positive,"[0.0011653273832052946, 0.0013779193395748734, 0.9974568486213684]",dynasent_r1
@@ -648,7 +648,7 @@ We stopped at 3:10 on Friday and sat outside at the long  detatched high top eas
 "This traces back to the days of the steel workers, who had no easy way of eating/packing the coleslaw and fries, so what easier way to consume it than to stuff it into the sandwich.",neutral,neutral,True,neutral,"[0.003209128277376294, 0.97262042760849, 0.024170437827706337]",dynasent_r1
 "I was shocked when they brought the dish out, as it was something different.",neutral,neutral,True,neutral,"[0.004240420646965504, 0.806013822555542, 0.18974576890468597]",dynasent_r2
 "When I finally take time out for a mani/pedi, I expect to relax, not be tortured or made to feel like an obtrusion!",negative,negative,True,negative,"[0.984575629234314, 0.003431687131524086, 0.011992687359452248]",dynasent_r1
-We were told that our table would be ready after a 50 minute wait and it was ready after a 50 minute rate.,neutral,neutral,True,negative,"[0.9595944881439209, 0.025869717821478844, 0.01453574001789093]",dynasent_r2
+We were told that our table would be ready after a 50 minute wait and it was ready after a 50 minute rate.,neutral,negative,False,negative,"[0.9595944881439209, 0.025869717821478844, 0.01453574001789093]",dynasent_r2
 the bathrooms are huuuge!,positive,positive,True,positive,"[0.00019563372188713402, 0.0004229859623592347, 0.999381422996521]",dynasent_r1
 3-course prix fixe menu sounded great.,positive,positive,True,positive,"[0.0001623840507818386, 0.0011837551137432456, 0.9986538887023926]",dynasent_r1
 "My dog has always been given a bowl of water, on top of that Iv yet to have had bad service.",positive,positive,True,positive,"[0.008032942190766335, 0.0026078014634549618, 0.9893592596054077]",dynasent_r1
@@ -693,7 +693,7 @@ Pray 's film works well and will appeal even to those who are n't too familiar w
 "Sunshine State lacks the kind of dynamic that Limbo offers , and in some ways is a rather indulgent piece .",negative,negative,True,negative,"[0.8694868087768555, 0.12623997032642365, 0.004273189231753349]",sst_local
 New Best Friend should n't have gone straight to video ; it should have gone straight to a Mystery Science Theater 3000 video .,negative,negative,True,negative,"[0.9501206874847412, 0.034643739461898804, 0.015235565602779388]",sst_local
 "Paid nothing as advertised and received 2 drink coupons which was a nice, non-advertised bonus.",positive,positive,True,positive,"[0.00048785045510157943, 0.00011805952817667276, 0.9993940591812134]",dynasent_r1
-Enjoy it for what it is ; you can hate yourself later .,neutral,negative,False,positive,"[0.0995512455701828, 0.2530995011329651, 0.6473492383956909]",sst_local
+Enjoy it for what it is ; you can hate yourself later .,neutral,neutral,True,positive,"[0.0995512455701828, 0.2530995011329651, 0.6473492383956909]",sst_local
 The only issue here is that they use a Wheat batter for pancakes and waffles.,negative,negative,True,negative,"[0.991954505443573, 0.004461188334971666, 0.0035843371879309416]",dynasent_r1
 The front desk people were pleasant and they did push EWC's products but not to the point where I was uncomfortable and put-off.,positive,positive,True,positive,"[0.00048393517499789596, 0.0001743230241117999, 0.9993417859077454]",dynasent_r1
 Then there's the joy of being nickled and dimed for everything.,negative,negative,True,negative,"[0.9834026098251343, 0.007294629700481892, 0.009302777238190174]",dynasent_r1
@@ -701,7 +701,7 @@ I have been to this place few times.,neutral,neutral,True,neutral,"[0.0004501841
 "The 3D images only enhance the film 's otherworldly quality , giving it a strange combo of you-are-there closeness with the disorienting unreality of the seemingly broken-down fourth wall of the movie screen .",positive,positive,True,positive,"[0.012503490783274174, 0.30418357253074646, 0.6833129525184631]",sst_local
 Its characters are thinner than cardboard -- or even comic-book paper .,negative,negative,True,negative,"[0.9829487204551697, 0.015177222900092602, 0.001874143024906516]",sst_local
 The hotel front desk recommended the worst restaurant.,negative,negative,True,negative,"[0.997974693775177, 0.0009898135904222727, 0.0010355416452512145]",dynasent_r2
-No other sushi place in town does that to pick up your own food.,neutral,negative,False,positive,"[0.006465843878686428, 0.12415716797113419, 0.8693769574165344]",dynasent_r1
+No other sushi place in town does that to pick up your own food.,neutral,positive,False,positive,"[0.006465843878686428, 0.12415716797113419, 0.8693769574165344]",dynasent_r1
 "The reason we keep seeing the same movie with roughly the same people every year is because so many of us keep going and then , out of embarrassment or stupidity , not warning anyone .",negative,negative,True,negative,"[0.5365462899208069, 0.4325048625469208, 0.03094881772994995]",sst_local
 Who does that?,neutral,negative,False,negative,"[0.8168240189552307, 0.17502807080745697, 0.00814785622060299]",dynasent_r1
 Finally  20!minuets later seated!,negative,negative,True,negative,"[0.9780628085136414, 0.007465138100087643, 0.01447205152362585]",dynasent_r1
@@ -764,7 +764,7 @@ The breads are good.,positive,positive,True,positive,"[3.881079101120122e-05, 0.
 "First of all, my vest was noticeably lighter in color and had white streaks.",negative,neutral,False,neutral,"[0.054502975195646286, 0.9387733340263367, 0.0067237005569040775]",dynasent_r1
 "I saw Knockaround Guys yesterday , and already the details have faded like photographs from the Spanish-American War ... It 's so unmemorable that it turned my ballpoint notes to invisible ink .",negative,negative,True,negative,"[0.9704656600952148, 0.02639678120613098, 0.0031376315746456385]",sst_local
 This place is a Greek restaurant in the former Licks location in Pickering. you should try it,positive,positive,True,positive,"[7.149165321607143e-05, 9.335196227766573e-05, 0.9998351335525513]",dynasent_r2
-You're fooling yourself if you think you know of some where better.,positive,negative,False,positive,"[0.046353284269571304, 0.031107468530535698, 0.922539234161377]",dynasent_r1
+You're fooling yourself if you think you know of some where better.,positive,positive,True,positive,"[0.046353284269571304, 0.031107468530535698, 0.922539234161377]",dynasent_r1
 "Waiter: "" better late than never"".",positive,neutral,False,neutral,"[0.027132652699947357, 0.7961405515670776, 0.1767267882823944]",dynasent_r1
 I had daily breakdowns wondering if he needed to be regimes and after seeing my old vet he went crazy and was acting completely aggressive due to terror.,negative,negative,True,negative,"[0.8731386661529541, 0.11864522099494934, 0.008216188289225101]",dynasent_r1
 "The vampire thriller Blade II starts off as a wild hoot and then sucks the blood out of its fun -- toward the end , you can feel your veins cringing from the workout .",negative,negative,True,negative,"[0.6805015206336975, 0.28999975323677063, 0.02949877828359604]",sst_local
@@ -796,7 +796,7 @@ I cry for I Spy -- or I would if this latest and laziest imaginable of all vinta
 I stay in Vegas just about every other month and I've never had a worse customer experience and on my birthday weekend!,negative,negative,True,negative,"[0.9687379598617554, 0.006460719741880894, 0.024801338091492653]",dynasent_r1
 "I have n't seen one in so long , no wonder I did n't recognize it at first .",neutral,neutral,True,neutral,"[0.02672288380563259, 0.965366005897522, 0.007911075837910175]",sst_local
 But the best part by far was the duck breast.,positive,positive,True,positive,"[0.0001023316290229559, 8.409682777710259e-05, 0.9998134970664978]",dynasent_r1
-"Whether you 're moved and love it , or bored or frustrated by the film , you 'll still feel something .",positive,positive,True,positive,"[0.0007150583551265299, 0.29333922266960144, 0.7059456706047058]",sst_local
+"Whether you 're moved and love it , or bored or frustrated by the film , you 'll still feel something .",positive,neutral,False,positive,"[0.0007150583551265299, 0.29333922266960144, 0.7059456706047058]",sst_local
 I'm not sure how I can go back to oysters with just cocktail sauce and lemon after this.,positive,positive,True,positive,"[0.002879881765693426, 0.0008359174244105816, 0.9962843060493469]",dynasent_r2
 A benign but forgettable sci-fi diversion .,negative,neutral,False,neutral,"[0.40784716606140137, 0.5700333714485168, 0.02211948297917843]",sst_local
 The issue of faith is not explored very deeply,negative,negative,True,negative,"[0.872096598148346, 0.12373173981904984, 0.004171714186668396]",sst_local
@@ -862,7 +862,7 @@ I would not recommend big groups to eat here cuz it was a little difficult to ge
 You 're better off staying home and watching The X-Files .,negative,negative,True,negative,"[0.977927029132843, 0.020125433802604675, 0.001947580254636705]",sst_local
 "Another big , dumb action movie in the vein of XXX , The Transporter is riddled with plot holes big enough for its titular hero to drive his sleek black BMW through .",negative,negative,True,negative,"[0.9521225094795227, 0.04422791302204132, 0.003649501595646143]",sst_local
 But hard-to-believe plot twists force the movie off track in its final half hour .,negative,negative,True,negative,"[0.7569199800491333, 0.22313900291919708, 0.01994103379547596]",sst_local
-"Tony, the salesman and partial owner, wasn't in our face, trying to push product on us.",positive,positive,True,positive,"[0.00011337309842929244, 0.0009445322211831808, 0.9989420771598816]",dynasent_r1
+"Tony, the salesman and partial owner, wasn't in our face, trying to push product on us.",positive,neutral,False,positive,"[0.00011337309842929244, 0.0009445322211831808, 0.9989420771598816]",dynasent_r1
 "You've got:
 
 VARIETY.",positive,positive,True,positive,"[0.0006682021776214242, 0.1476413607597351, 0.8516904711723328]",dynasent_r1
@@ -873,7 +873,7 @@ Delivery or carry out options are not available because its ambience must be exp
 So how's it all u can but u can't have more of what u want?!?!?,negative,neutral,False,neutral,"[0.17399001121520996, 0.7886432409286499, 0.03736678138375282]",dynasent_r1
 "If your looking for authentic Mexican food, I can't say that it is.",negative,negative,True,negative,"[0.9986233711242676, 0.0007130923331715167, 0.0006636129692196846]",dynasent_r1
 "It 's an old story , but a lively script , sharp acting and partially animated interludes make Just a Kiss seem minty fresh .",positive,positive,True,positive,"[0.00016493836301378906, 0.007790840696543455, 0.99204421043396]",sst_local
-And was very inexpensive...about $3.90 for one rather large sausage. I am sure it was it was leftover meat.,negative,neutral,False,positive,"[0.01351467240601778, 0.004729905631393194, 0.9817553758621216]",dynasent_r2
+And was very inexpensive...about $3.90 for one rather large sausage. I am sure it was it was leftover meat.,negative,positive,False,positive,"[0.01351467240601778, 0.004729905631393194, 0.9817553758621216]",dynasent_r2
 "Do n't plan on the perfect ending , but Sweet Home Alabama hits the mark with critics who escaped from a small town life .",positive,positive,True,positive,"[0.010626441799104214, 0.09339012205600739, 0.8959833979606628]",sst_local
 Men in Black II has sequel-itis something fierce .,negative,negative,True,negative,"[0.7548092007637024, 0.21888527274131775, 0.02630554512143135]",sst_local
 Aaliyah rarely dampens her diva persona enough to spark genuine chemistry with Townsend .,neutral,negative,False,negative,"[0.5684473514556885, 0.40184009075164795, 0.029712604358792305]",sst_local
@@ -913,7 +913,7 @@ Who even knew there was such a thing?,neutral,neutral,True,neutral,"[0.000996473
 I'm assuming the man who I ordered from was the owner.,neutral,neutral,True,neutral,"[0.0002992360678035766, 0.9876533150672913, 0.012047408148646355]",dynasent_r1
 "We were craving Thai/Asian food, and decided to give a local place a chance.",neutral,neutral,True,neutral,"[0.00020459748338907957, 0.9492670893669128, 0.050528332591056824]",dynasent_r1
 The drinks server was a little slow and had to be asked for refills and extra items.,negative,negative,True,negative,"[0.998629093170166, 0.0004998118383809924, 0.0008711962145753205]",dynasent_r1
-"The bucket of beers were cheap, so we got that.",positive,neutral,False,positive,"[0.006682937499135733, 0.19331394135951996, 0.8000032305717468]",dynasent_r1
+"The bucket of beers were cheap, so we got that.",positive,positive,True,positive,"[0.006682937499135733, 0.19331394135951996, 0.8000032305717468]",dynasent_r1
 Every variation has been so good at being bad.,negative,negative,True,negative,"[0.8831048011779785, 0.09601166844367981, 0.020883549004793167]",dynasent_r2
 "While I was waiting for AAA to save my wife and I, we saw this location on yelp.",neutral,neutral,True,neutral,"[0.00464821420609951, 0.9872807860374451, 0.008071040734648705]",dynasent_r1
 never asked if we wanted something else.,negative,negative,True,negative,"[0.9963665008544922, 0.0009820874547585845, 0.002651442773640156]",dynasent_r1
@@ -1006,7 +1006,7 @@ It took a little bit because the dish came out.,neutral,neutral,True,neutral,"[0
 "Johnson has , in his first film , set himself a task he is not nearly up to .",neutral,negative,False,negative,"[0.8758639693260193, 0.11630047857761383, 0.007835553027689457]",sst_local
 "This is a cafeteria style where you get in  line, order, pay, get your own drink and silverware and then someone delivers the food to your table.",neutral,neutral,True,neutral,"[0.00024107655917759985, 0.985069990158081, 0.014688953757286072]",dynasent_r1
 "Also, what grocery store runs out of butter? I wasn't happy.",negative,negative,True,negative,"[0.9983927607536316, 0.0005533482762984931, 0.0010538623901084065]",dynasent_r2
-"My sisters and I walked it in, it smelled stale the decor was beautiful!",positive,neutral,False,positive,"[0.01395529042929411, 0.002909338101744652, 0.9831353425979614]",dynasent_r2
+"My sisters and I walked it in, it smelled stale the decor was beautiful!",positive,positive,True,positive,"[0.01395529042929411, 0.002909338101744652, 0.9831353425979614]",dynasent_r2
 "The film takes too long getting to the good stuff , then takes too long figuring out what to do next .",negative,negative,True,negative,"[0.9760147929191589, 0.022760573774576187, 0.001224583713337779]",sst_local
 Münch 's genuine insight makes the film 's occasional overindulgence forgivable .,positive,positive,True,positive,"[0.00087786465883255, 0.017283353954553604, 0.9818388223648071]",sst_local
 "If you liked such movies as Notting Hill , Four Weddings And A Funeral , Bridget Jones ' Diary or High Fidelity , then you wo n't want to miss About A Boy .",positive,positive,True,positive,"[0.00047213034122250974, 0.010325147770345211, 0.9892026782035828]",sst_local
@@ -1065,7 +1065,7 @@ Chubby guy with beard gave us a smile and looked  at our kids and changed his mi
 I was also having breathing difficulties.,negative,negative,True,negative,"[0.8288245797157288, 0.16488894820213318, 0.006286495830863714]",dynasent_r1
 At only 70K I had to get a new transmission for my 2007 VW Jetta Wolfsburg edition.,negative,negative,True,neutral,"[0.0011621845187619328, 0.9802282452583313, 0.01860962063074112]",dynasent_r1
 "Despite its good nature and some genuinely funny moments , Super Troopers suffers from a bad case of arrested development .",neutral,negative,False,negative,"[0.8191713690757751, 0.16959501802921295, 0.011233601719141006]",sst_local
-"Compelling revenge thriller , though somewhat weakened by a miscast leading lady .",positive,positive,True,positive,"[0.00708013167604804, 0.20370890200138092, 0.7892109751701355]",sst_local
+"Compelling revenge thriller , though somewhat weakened by a miscast leading lady .",positive,neutral,False,positive,"[0.00708013167604804, 0.20370890200138092, 0.7892109751701355]",sst_local
 I forgot what my husband ordered but he was completely statisfied.,positive,positive,True,positive,"[9.188491094391793e-05, 0.00011457585060270503, 0.9997935891151428]",dynasent_r1
 The fillet and chicken that weren't wrapped in bacon were decent.,positive,neutral,False,positive,"[0.0010101954685524106, 0.0004267344484105706, 0.9985631108283997]",dynasent_r2
 "There is three auto part stores on Northsight, I would suggest you give Advanced an opportunity to serve you.",positive,positive,True,positive,"[0.0018266072729602456, 0.004751123487949371, 0.9934223294258118]",dynasent_r1
@@ -1260,7 +1260,7 @@ There 's something fundamental missing from this story : something or someone to
 Every time I have been there I compared prices with several other tire shops and they are always the cheapest.,positive,positive,True,positive,"[4.255898602423258e-05, 0.00015058399003464729, 0.9998069405555725]",dynasent_r1
 The regular items were a bit pricey. WE like cheap.,negative,negative,True,negative,"[0.9827720522880554, 0.0052534532733261585, 0.011974508874118328]",dynasent_r2
 "Thinking they broke something, i went out to check and my window worked fine.",neutral,neutral,True,neutral,"[0.01685335300862789, 0.5607170462608337, 0.4224295914173126]",dynasent_r1
-"I wanted to love this place, but it was just OK in my opinion. It was supposed to be the best vacation ever to my favorite beach.",negative,negative,True,negative,"[0.9775775074958801, 0.00675694365054369, 0.015665631741285324]",dynasent_r2
+"I wanted to love this place, but it was just OK in my opinion. It was supposed to be the best vacation ever to my favorite beach.",negative,neutral,False,negative,"[0.9775775074958801, 0.00675694365054369, 0.015665631741285324]",dynasent_r2
 "As a new patient anywhere it can be tedious filling out paperwork, getting the insurance straightened out and such.",negative,neutral,False,negative,"[0.8678563237190247, 0.1260887086391449, 0.006054996978491545]",dynasent_r1
 "I didn't know it was possible to review a sports team on Yelp, and at nearly dead-last place in the league, the Las Vegas Wranglers should get 1 star from me.",negative,negative,True,negative,"[0.9963546991348267, 0.0024260831996798515, 0.0012191670248284936]",dynasent_r1
 "Morton is a great actress portraying a complex character , but Morvern Callar grows less compelling the farther it meanders from its shocking start .",neutral,neutral,True,neutral,"[0.22534963488578796, 0.688465416431427, 0.08618498593568802]",sst_local
@@ -1309,7 +1309,7 @@ We miss the quirky amazement that used to come along for an integral part of the
 Eventually someone shows up and we get our drink order in.,negative,neutral,False,neutral,"[0.3373922109603882, 0.6336249709129333, 0.02898281440138817]",dynasent_r1
 They are right around the corner from my house so it's very convenient.,positive,positive,True,positive,"[1.0075306818180252e-05, 0.000416451133787632, 0.9995734095573425]",dynasent_r1
 The other Verizon store that lacked Good Customer service is the one on Eastern and St. Rose.,negative,negative,True,negative,"[0.9935431480407715, 0.0020079531241208315, 0.00444891769438982]",dynasent_r1
-"I admired it , particularly that unexpected downer of an ending .",positive,positive,True,positive,"[0.00046971661504358053, 0.0004800698079634458, 0.9990501999855042]",sst_local
+"I admired it , particularly that unexpected downer of an ending .",positive,neutral,False,positive,"[0.00046971661504358053, 0.0004800698079634458, 0.9990501999855042]",sst_local
 One groan-inducing familiarity begets another .,negative,negative,True,negative,"[0.9810518026351929, 0.017025532200932503, 0.0019226194126531482]",sst_local
 Just be sure to come in on an empty stomach.,positive,neutral,False,neutral,"[0.018056288361549377, 0.9524882435798645, 0.02945546992123127]",dynasent_r1
 He want to leave.,neutral,negative,False,negative,"[0.634501576423645, 0.34262949228286743, 0.022868918254971504]",dynasent_r2
@@ -1373,7 +1373,7 @@ I didn't hate or love the veggie quiche.,neutral,neutral,True,neutral,"[0.410758
 "Rather , you 'll have to wrestle disbelief to the ground and then apply the chloroform-soaked handkerchief .",negative,neutral,False,neutral,"[0.31407642364501953, 0.6737465858459473, 0.012176976539194584]",sst_local
 I had a hard time picking which flavor to get!,neutral,positive,False,positive,"[0.0002512740611564368, 0.19714149832725525, 0.8026072978973389]",dynasent_r1
 But I was n't .,negative,neutral,False,neutral,"[0.16466118395328522, 0.8258948922157288, 0.009443932212889194]",sst_local
-Luckily a tall skinny male server came an took it and brought our card.,positive,positive,True,positive,"[0.005518199875950813, 0.22604180872440338, 0.7684400081634521]",dynasent_r1
+Luckily a tall skinny male server came an took it and brought our card.,positive,neutral,False,positive,"[0.005518199875950813, 0.22604180872440338, 0.7684400081634521]",dynasent_r1
 She wanted gel polished nails and I desperately needed my tootsies done.,neutral,neutral,True,neutral,"[0.0006963730556890368, 0.9856685400009155, 0.013635031878948212]",dynasent_r1
 Brilliant ! ',positive,positive,True,positive,"[0.0002163817553082481, 0.003613206557929516, 0.9961704611778259]",sst_local
 "As blunt as it is in depicting child abuse , El Bola is a movie steeped in an ambiguity that lends its conflicts a symbolic resonance .",positive,positive,True,positive,"[0.002537256106734276, 0.36483901739120483, 0.6326236724853516]",sst_local
@@ -1435,7 +1435,7 @@ Price - 6.00 for shoes and 8.00 for boots.,neutral,neutral,True,neutral,"[0.0004
 The size of the drinks here are a little different than a usual place so don't be surprised when you get your coffee from the bar and it's about the size of a little water cooler cup.,negative,negative,True,negative,"[0.9328875541687012, 0.06307508796453476, 0.004037360195070505]",dynasent_r1
 Egg was cooked perfectly.,positive,positive,True,positive,"[5.523363142856397e-05, 0.00015911934315226972, 0.9997857213020325]",dynasent_r1
 "But buying into sham truths and routine `` indie '' filmmaking , Freundlich has made just another safe movie .",negative,negative,True,negative,"[0.8924851417541504, 0.10076285153627396, 0.0067520360462367535]",sst_local
-The saturation bombing of Reggio 's images and Glass ' evocative music ... ultimately leaves viewers with the task of divining meaning .,negative,positive,False,positive,"[0.032452087849378586, 0.4715941846370697, 0.49595367908477783]",sst_local
+The saturation bombing of Reggio 's images and Glass ' evocative music ... ultimately leaves viewers with the task of divining meaning .,negative,neutral,False,positive,"[0.032452087849378586, 0.4715941846370697, 0.49595367908477783]",sst_local
 I feel there is genuine attempt by Management to offer good service.,positive,positive,True,positive,"[5.3293249948183075e-05, 0.0027725379914045334, 0.9971741437911987]",dynasent_r1
 I'm from back east and sadly traveling pet groomers are a rarity and the ones I've tried were awful!,negative,negative,True,negative,"[0.9974310994148254, 0.0009558212477713823, 0.0016130032017827034]",dynasent_r1
 "As far as the resturant - I don't want to sound like my dad, but the live music was a little loud.",negative,negative,True,negative,"[0.9981626868247986, 0.0005671434919349849, 0.0012701740488409996]",dynasent_r1
@@ -1457,7 +1457,7 @@ Also appreciate if anyone knows any good place for dog boarding!,neutral,neutral
 "Definitely the youngest here, the best? Who knows",neutral,neutral,True,neutral,"[0.004444952588528395, 0.8442522883415222, 0.1513027399778366]",dynasent_r2
 I also ask for extra roughage.,neutral,neutral,True,neutral,"[0.0009367925813421607, 0.9684187769889832, 0.03064449317753315]",dynasent_r1
 As a side note go to indeed.com and find out what employees think of them.,neutral,neutral,True,neutral,"[0.0005398629582487047, 0.9853807091712952, 0.014079393818974495]",dynasent_r1
-a budget affair that exposes the generally sad existence of the Bedouins while providing a precious twinkle of insight into their lives .,positive,neutral,False,positive,"[0.0032677643466740847, 0.13762371242046356, 0.8591086268424988]",sst_local
+a budget affair that exposes the generally sad existence of the Bedouins while providing a precious twinkle of insight into their lives .,positive,positive,True,positive,"[0.0032677643466740847, 0.13762371242046356, 0.8591086268424988]",sst_local
 A great idea becomes a not-great movie .,negative,negative,True,negative,"[0.702192485332489, 0.28338950872421265, 0.014418012462556362]",sst_local
 "It's funny, all 6 of us ordered the same AZRW courses minus 2 girls who got the corn soup appetizer: local sausages/pretzel roll/mustard, short ribs, and the flourless chocolate cake.",neutral,neutral,True,neutral,"[0.000344415835570544, 0.9848265647888184, 0.014829056337475777]",dynasent_r1
 "It's cream cheese, roasted jalapenos (not spicy) and onion straws.",neutral,neutral,True,neutral,"[0.0002965467283502221, 0.9770721793174744, 0.022631283849477768]",dynasent_r1
@@ -1466,7 +1466,7 @@ Good luck getting that late of checkout for free at any other high-end Vegas hot
 The hole in the burger looks awesome otherwise it will not look great.,positive,positive,True,positive,"[0.14433492720127106, 0.09288004040718079, 0.7627849578857422]",dynasent_r2
 Waffallonia opened up a few months ago and finally checked it out. it was nice,positive,positive,True,positive,"[1.978882573894225e-05, 0.00010835211287485436, 0.9998718500137329]",dynasent_r2
 The serving staff & the hosts were beyond professional.,positive,positive,True,positive,"[0.00010241323616355658, 9.666349069448188e-05, 0.999800980091095]",dynasent_r1
-"Though a bit of a patchwork in script and production , a glossy , rich green , environment almost makes the picture work .",positive,neutral,False,positive,"[0.024856891483068466, 0.474869042634964, 0.5002740621566772]",sst_local
+"Though a bit of a patchwork in script and production , a glossy , rich green , environment almost makes the picture work .",positive,positive,True,positive,"[0.024856891483068466, 0.474869042634964, 0.5002740621566772]",sst_local
 At night turns into night club.,neutral,neutral,True,neutral,"[0.004143495578318834, 0.9420385956764221, 0.05381786450743675]",dynasent_r1
 "As I stated initially, GREAT idea.",positive,positive,True,positive,"[2.0343026335467584e-05, 0.0006124744541011751, 0.9993671774864197]",dynasent_r1
 "Also, I believe that I saw somewhere on their website that you eat for free on your birthday!",positive,positive,True,positive,"[0.0002753084700088948, 0.03328338637948036, 0.96644127368927]",dynasent_r1
@@ -1490,7 +1490,7 @@ The spot also gave us a front row seat to all the server's bickering.,negative,n
 "I was there for a birthday celebration, which celebrated three people, last Sunday,  March 13, 2016.",neutral,neutral,True,neutral,"[0.00017763848882168531, 0.8940210938453674, 0.10580127686262131]",dynasent_r1
 Patio on fleek!,positive,positive,True,positive,"[0.013536984100937843, 0.42631959915161133, 0.5601434111595154]",dynasent_r1
 The clerk somehow managed to find time to fit us in between filing her nails and calling her boyfriend.,negative,negative,True,neutral,"[0.3437963128089905, 0.35905948281288147, 0.29714423418045044]",dynasent_r2
-They were one of the few places downtown to be open late on a Monday (why do downtowns hate Mondays??,positive,neutral,False,positive,"[0.0015632171416655183, 0.015578937716782093, 0.9828578233718872]",dynasent_r1
+They were one of the few places downtown to be open late on a Monday (why do downtowns hate Mondays??,positive,positive,True,positive,"[0.0015632171416655183, 0.015578937716782093, 0.9828578233718872]",dynasent_r1
 Gotta give this place props where props are due.,positive,positive,True,positive,"[0.0002410938759567216, 0.00023755646543577313, 0.9995213747024536]",dynasent_r1
 He also put words in my mouth and made a scene.,negative,negative,True,negative,"[0.9417409896850586, 0.04967353865504265, 0.008585454896092415]",dynasent_r1
 But I still got hung up on.,negative,negative,True,negative,"[0.7930934429168701, 0.2000134140253067, 0.006893133744597435]",dynasent_r1
@@ -1526,7 +1526,7 @@ Just goes to show that the offices that spend all the money on the billboards ar
 Be prepared to come early on the weekend if you don't want to wait in line.,negative,neutral,False,negative,"[0.880553126335144, 0.1125396117568016, 0.006907198578119278]",dynasent_r1
 She of course kept her attitude the whole time.,negative,negative,True,negative,"[0.9753848314285278, 0.02239365316927433, 0.0022215431090444326]",dynasent_r1
 You have to pay cash and you will most likely not find street parking anywhere near there so look for a lot or try the streets around it.,negative,negative,True,negative,"[0.9020096659660339, 0.09439876675605774, 0.0035914930049329996]",dynasent_r1
-"I had fun while in college, but not too much.",positive,positive,True,positive,"[0.004519693553447723, 0.4911075532436371, 0.504372775554657]",dynasent_r1
+"I had fun while in college, but not too much.",positive,neutral,False,positive,"[0.004519693553447723, 0.4911075532436371, 0.504372775554657]",dynasent_r1
 "I should mention that the staff that mans this museum wears T-shirts proclaiming ""It's awesome!""",neutral,positive,False,positive,"[0.007786948699504137, 0.1715301275253296, 0.820682942867279]",dynasent_r2
 There are a plenty around the Greater Toronto Area.,neutral,neutral,True,neutral,"[0.0005354607128538191, 0.7396250367164612, 0.2598395049571991]",dynasent_r1
 Friday After Next has the same problem that Next Friday did -- it 's called Where 's Chris Tucker When You Need Him ?,negative,negative,True,negative,"[0.9442040324211121, 0.051345691084861755, 0.004450271837413311]",sst_local
@@ -1636,7 +1636,7 @@ SMFH.,negative,neutral,False,neutral,"[0.06365417689085007, 0.8787232041358948, 
 "... with the candy-like taste of it fading faster than 25-cent bubble gum , I realized this is a throwaway movie that wo n't stand the test of time .",negative,negative,True,negative,"[0.9786160588264465, 0.019532425329089165, 0.0018515189876779914]",sst_local
 I hate jogging but u me have a diffrent mindset toward it,negative,negative,True,negative,"[0.7525255084037781, 0.22499316930770874, 0.022481361404061317]",dynasent_r2
 "The guy nods and I'm in, I'm quite happy till this point.",positive,positive,True,positive,"[0.00027641814085654914, 0.014666401781141758, 0.9850571751594543]",dynasent_r1
-A fairly by-the-books blend of action and romance with sprinklings of intentional and unintentional comedy .,positive,neutral,False,positive,"[0.0011677118018269539, 0.4746030569076538, 0.5242292881011963]",sst_local
+A fairly by-the-books blend of action and romance with sprinklings of intentional and unintentional comedy .,positive,positive,True,positive,"[0.0011677118018269539, 0.4746030569076538, 0.5242292881011963]",sst_local
 A remarkable 179-minute meditation on the nature of revolution .,positive,positive,True,positive,"[4.948761124978773e-05, 0.0057845572009682655, 0.9941658973693848]",sst_local
 "Clever , brutal and strangely soulful movie .",positive,positive,True,positive,"[3.0563005566364154e-05, 0.0038688168860971928, 0.996100664138794]",sst_local
 "Sadly, the pumpkin pancakes are not available on the weekends.",negative,negative,True,negative,"[0.9988724589347839, 0.0008186848135665059, 0.00030890744528733194]",dynasent_r1
@@ -1724,7 +1724,7 @@ It 's fairly self-aware in its dumbness .,negative,neutral,False,neutral,"[0.413
 ... understands that a generation defines its music as much as the music defines a generation .,neutral,positive,False,positive,"[0.0006002987502142787, 0.09163770824670792, 0.9077620506286621]",sst_local
 I purchased 3 $297 each Groupons for this merchant for laser hair removal.,neutral,neutral,True,neutral,"[0.00040761963464319706, 0.9848797917366028, 0.014712612144649029]",dynasent_r1
 "In the end, I got her a half order of steak and fries with ketchup which she enjoyed.",positive,positive,True,positive,"[6.839349225629121e-05, 0.0010707095498219132, 0.9988609552383423]",dynasent_r1
-"If there 's nothing fresh about Wannabes , which was written by Mr. DeMeo , who produced and directed the film with Charles A. Addessi , much of the time the movie feels authentic .",neutral,neutral,True,positive,"[0.007026251871138811, 0.35614195466041565, 0.6368317604064941]",sst_local
+"If there 's nothing fresh about Wannabes , which was written by Mr. DeMeo , who produced and directed the film with Charles A. Addessi , much of the time the movie feels authentic .",neutral,positive,False,positive,"[0.007026251871138811, 0.35614195466041565, 0.6368317604064941]",sst_local
 "The two leads are almost good enough to camouflage the dopey plot , but so much naturalistic small talk , delivered in almost muffled exchanges , eventually has a lulling effect .",negative,neutral,False,neutral,"[0.34346333146095276, 0.5894598364830017, 0.06707684695720673]",sst_local
 "I think he was dancing with somebody, but I didn't care.",neutral,neutral,True,neutral,"[0.2985183000564575, 0.6170800924301147, 0.08440162241458893]",dynasent_r1
 "... too slow , too boring , and occasionally annoying .",negative,negative,True,negative,"[0.9986799359321594, 0.0010355408303439617, 0.00028453755658119917]",sst_local
@@ -1791,7 +1791,7 @@ Their Doogh drink and yogurt is so unique.,positive,positive,True,positive,"[0.0
 "Reign of Fire may be little more than another platter of reheated Aliens , but it 's still pretty tasty .",positive,positive,True,positive,"[0.004528450779616833, 0.007432202808558941, 0.9880393147468567]",sst_local
 "A silly , self-indulgent film about a silly , self-indulgent filmmaker .",negative,negative,True,negative,"[0.890759289264679, 0.1015658751130104, 0.007674907799810171]",sst_local
 Ask him about the bath bomb ... :),neutral,neutral,True,neutral,"[0.00041713329846970737, 0.9074639081954956, 0.0921189934015274]",dynasent_r1
-Thank you flamingo for helping me when the cosmopolitan racially profiled me.,positive,negative,False,positive,"[0.002937574405223131, 0.006092708092182875, 0.990969717502594]",dynasent_r1
+Thank you flamingo for helping me when the cosmopolitan racially profiled me.,positive,neutral,False,positive,"[0.002937574405223131, 0.006092708092182875, 0.990969717502594]",dynasent_r1
 Not any cat but an F2 Savannah cat so she is 25% wild.,neutral,neutral,True,neutral,"[0.004425523802638054, 0.9817453026771545, 0.013829183764755726]",dynasent_r1
 About as satisfying and predictable as the fare at your local drive through .,negative,negative,True,negative,"[0.9606016874313354, 0.034557972103357315, 0.004840302746742964]",sst_local
 Recalls quiet freak-outs like L'Avventura and Repulsion .,neutral,neutral,True,neutral,"[0.10560290515422821, 0.7109754085540771, 0.18342168629169464]",sst_local
@@ -1804,7 +1804,7 @@ There are some positives of this Planet Fitness.,positive,positive,True,positive
 That pear sparkling sake got the best of me...,positive,positive,True,positive,"[0.0034176132176071405, 0.05370775982737541, 0.942874550819397]",dynasent_r1
 The restaurant was not apologetic at all .,negative,negative,True,negative,"[0.9986439347267151, 0.0006916081183589995, 0.0006644575041718781]",dynasent_r1
 Make sure you get the cheese board!,positive,positive,True,positive,"[0.00016920203051995486, 0.01213162112981081, 0.9876991510391235]",dynasent_r1
-"The film is just a big , gorgeous , mind-blowing , breath-taking mess .",positive,positive,True,positive,"[0.00018329592421650887, 0.00730380741879344, 0.9925129413604736]",sst_local
+"The film is just a big , gorgeous , mind-blowing , breath-taking mess .",positive,neutral,False,positive,"[0.00018329592421650887, 0.00730380741879344, 0.9925129413604736]",sst_local
 I ended up in a total pizza coma and don't know why.,neutral,positive,False,positive,"[0.01795276254415512, 0.027177825570106506, 0.9548693299293518]",dynasent_r2
 "I think it is an exaggeration, but after many years of searching I believe exaggeration is understatement.",neutral,neutral,True,neutral,"[0.135501429438591, 0.828245997428894, 0.03625260666012764]",dynasent_r1
 Did you know you can get a burnt ends burrito on Thursdays?,neutral,neutral,True,neutral,"[0.00045273752766661346, 0.8086960315704346, 0.19085125625133514]",dynasent_r1
@@ -1833,7 +1833,7 @@ This is our 2nd time eating Raising Canes and this is our first time at this loc
 "Then be sure to top it with like eight pounds of cookies, chocolate, sprinkles and other refined sugar, therefore negating the effect of the smoothie you had earlier.",neutral,negative,False,negative,"[0.9511876702308655, 0.034065768122673035, 0.014746584929525852]",dynasent_r1
 Shitty Shitty Shitty.,negative,negative,True,negative,"[0.9983658194541931, 0.0010158082004636526, 0.0006184429512359202]",dynasent_r1
 His warriors collide in balletic explosion that implies an underlying order throughout the chaos .,neutral,positive,False,positive,"[0.0007694280939176679, 0.056717418134212494, 0.9425132274627686]",sst_local
-Watch out for some of the tree roots that have bubbled up under the asphalt.,negative,negative,True,negative,"[0.9574002623558044, 0.03859449550509453, 0.004005193244665861]",dynasent_r1
+Watch out for some of the tree roots that have bubbled up under the asphalt.,negative,neutral,False,negative,"[0.9574002623558044, 0.03859449550509453, 0.004005193244665861]",dynasent_r1
 "Ultimately , the message of Trouble Every Day seems to be that all sexual desire disrupts life 's stasis .",neutral,neutral,True,neutral,"[0.11546283960342407, 0.8333839774131775, 0.051153164356946945]",sst_local
 "Make sure to bring cash, however, as its cash only!",neutral,neutral,True,neutral,"[0.4063604772090912, 0.5728427767753601, 0.020796770229935646]",dynasent_r1
 The monorail stops in the lobby of the hotel so getting around the city would have been easy.,positive,positive,True,positive,"[0.0001953727623913437, 0.025373317301273346, 0.9744312763214111]",dynasent_r1
@@ -2006,7 +2006,7 @@ It was very nice so we decided to stay again .,positive,positive,True,positive,"
 "Overly stylized with lots of flash black - & - white freeze frames reminiscent of a pseudo-hip luxury car commercial , -LRB- it 's -RRB- at its worst when it 's actually inside the ring .",neutral,negative,False,negative,"[0.965910017490387, 0.03122364543378353, 0.002866290044039488]",sst_local
 The second chapter of the Harry Potter series is even more magical than the first and simply the best family film of the year .,positive,positive,True,positive,"[1.3908025721320882e-05, 0.0002941389393527061, 0.9996919631958008]",sst_local
 Tailored to entertain !,positive,positive,True,positive,"[0.0004159117816016078, 0.014692259021103382, 0.9848918914794922]",sst_local
-"The ""sales"" person virtually disappears once you sign on.",negative,negative,True,neutral,"[0.10037080198526382, 0.8378684520721436, 0.061760805547237396]",dynasent_r1
+"The ""sales"" person virtually disappears once you sign on.",negative,neutral,False,neutral,"[0.10037080198526382, 0.8378684520721436, 0.061760805547237396]",dynasent_r1
 "So in all, the food was filipino food, tasted like filipino food, looked like filipino food, the resort I was staying at did not have filipino food, so I was hungry for filipino food.",neutral,neutral,True,neutral,"[0.0011905587743967772, 0.6991766095161438, 0.29963281750679016]",dynasent_r1
 Right is looking jacked up!,positive,neutral,False,neutral,"[0.09609238058328629, 0.5799524188041687, 0.3239551782608032]",dynasent_r1
 "If we do n't demand a standard of quality for the art that we choose , we deserve the trash that we get .",negative,negative,True,negative,"[0.9753705263137817, 0.01869967207312584, 0.005929870065301657]",sst_local
@@ -2017,7 +2017,7 @@ well worth the time .,positive,positive,True,positive,"[2.9371160053415224e-05, 
 "Nothing was dirty, but the housekeeping seemed lazy. It was really bad.",negative,negative,True,negative,"[0.9988413453102112, 0.0005248142988421023, 0.0006338062230497599]",dynasent_r2
 "The principals in this cast are all fine , but Bishop and Stevenson are standouts .",positive,positive,True,positive,"[8.028845331864432e-05, 0.01361781358718872, 0.9863018989562988]",sst_local
 For you single women like me who know nothing about plumbing they are fair and let you know the charges as they go.,positive,positive,True,positive,"[6.272537575569004e-05, 0.0002805722178891301, 0.9996567964553833]",dynasent_r1
-"The folks two tables down had been seated later than us, and by this point had already enjoyed their apps, drinks and tacos.",negative,neutral,False,positive,"[0.021130289882421494, 0.4836741089820862, 0.4951956272125244]",dynasent_r1
+"The folks two tables down had been seated later than us, and by this point had already enjoyed their apps, drinks and tacos.",negative,negative,True,positive,"[0.021130289882421494, 0.4836741089820862, 0.4951956272125244]",dynasent_r1
 "Lends itself to the narcotizing bland -LRB- sinister , though not nearly so sinister as the biennial Disney girl movie -RRB- machinations of the biennial Disney boy movie .",neutral,negative,False,negative,"[0.7744198441505432, 0.19993934035301208, 0.02564079873263836]",sst_local
 "Opens as promising as any war\/adventure film you 'll ever see and dissolves into a routine courtroom drama , better suited for a movie titled `` Glory : A Soldier 's Story . ''",negative,negative,True,negative,"[0.9309247136116028, 0.06573700904846191, 0.0033382917754352093]",sst_local
 "In the process , they demonstrate that there 's still a lot of life in Hong Kong cinema .",positive,positive,True,positive,"[0.00013944141392130405, 0.027584468945860863, 0.9722761511802673]",sst_local
@@ -2046,7 +2046,7 @@ I have a shellfish allergy...,neutral,neutral,True,neutral,"[0.3103236258029938,
 The reason this picture works better than its predecessors is that Myers is no longer simply spoofing the mini-mod-madness of '60s spy movies .,positive,positive,True,positive,"[0.002407626248896122, 0.022256264463067055, 0.9753361940383911]",sst_local
 Opted for the frites with cheese and pork belly.,neutral,neutral,True,neutral,"[0.00018844142323359847, 0.9805009365081787, 0.01931062713265419]",dynasent_r1
 First a last time I take my car there.,negative,negative,True,negative,"[0.9976468682289124, 0.0006740833632647991, 0.0016790531808510423]",dynasent_r1
-Overall I liked the regular pizza better.,positive,neutral,False,negative,"[0.563571035861969, 0.1736648678779602, 0.2627641260623932]",dynasent_r1
+Overall I liked the regular pizza better.,positive,negative,False,negative,"[0.563571035861969, 0.1736648678779602, 0.2627641260623932]",dynasent_r1
 I went home and actually shave again because they did such an awesome job.,positive,positive,True,positive,"[0.00023478490766137838, 7.581367390230298e-05, 0.9996894598007202]",dynasent_r1
 Was my 1st and last set.,neutral,negative,False,negative,"[0.4983583986759186, 0.4849986433982849, 0.01664292812347412]",dynasent_r1
 I don't usually like eating burgers but this one wassss AMAZZZZZING AND JUICY JUICY JUICY.,positive,positive,True,positive,"[0.0003539389290381223, 0.00011493235797388479, 0.9995311498641968]",dynasent_r1
@@ -2081,7 +2081,7 @@ Jacquot 's Tosca is a treat .,positive,positive,True,positive,"[2.59735479630762
 Lick the bowl good.,positive,positive,True,positive,"[0.002180542331188917, 0.024516437202692032, 0.9733030796051025]",dynasent_r1
 What they're going to do is make somebody play on the machine so people can see what's in there.,neutral,neutral,True,neutral,"[0.0009124508360400796, 0.9910366535186768, 0.008050848729908466]",dynasent_r2
 "Other people who came after us had to wait about an hour, not us.",neutral,positive,False,positive,"[0.005214563105255365, 0.006679999176412821, 0.9881055355072021]",dynasent_r2
-They called me when I resting from surgery and needed my rest.,negative,neutral,False,neutral,"[0.0037139614578336477, 0.9733104109764099, 0.022975632920861244]",dynasent_r1
+They called me when I resting from surgery and needed my rest.,negative,negative,True,neutral,"[0.0037139614578336477, 0.9733104109764099, 0.022975632920861244]",dynasent_r1
 "Well, here's how: 
 
 For starters, when making a cheesesteak sandwich, call me crazy, but I like there to be cheese in it.",positive,neutral,False,neutral,"[0.04323011636734009, 0.9500774145126343, 0.0066924686543643475]",dynasent_r1
@@ -2094,7 +2094,7 @@ Pretty simple - be respectful and everything should be alright.,neutral,neutral,
 "Chalk it up to my adoration for both De Niro and Murphy , but I had a pretty good time with this movie - despite its myriad flaws .",neutral,positive,False,positive,"[6.593719444936141e-05, 0.0002255384169984609, 0.9997084736824036]",sst_local
 I saw some many children running around mad.,negative,negative,True,negative,"[0.8655192852020264, 0.12318479269742966, 0.01129594724625349]",dynasent_r1
 The previous plumber said I needed a new water heater even the one I had was only 3 years old.,neutral,negative,False,negative,"[0.5109049081802368, 0.46436846256256104, 0.024726642295718193]",dynasent_r1
-Haneke challenges us to confront the reality of sexual aberration .,positive,negative,False,positive,"[0.009763200767338276, 0.25929298996925354, 0.7309437990188599]",sst_local
+Haneke challenges us to confront the reality of sexual aberration .,positive,neutral,False,positive,"[0.009763200767338276, 0.25929298996925354, 0.7309437990188599]",sst_local
 Make sure you have even 1:1 male to female ratio or more females,neutral,neutral,True,neutral,"[0.014539177529513836, 0.976996123790741, 0.008464725688099861]",dynasent_r1
 We dined for breakfast at Over Easy today for the first time.,neutral,neutral,True,neutral,"[0.00035446498077362776, 0.977726399898529, 0.021919120103120804]",dynasent_r1
 "Wow okay, can't wait to come back here with your attitude.",negative,negative,True,negative,"[0.98382967710495, 0.005355851259082556, 0.010814408771693707]",dynasent_r1
@@ -2177,7 +2177,7 @@ I watched this show.,neutral,neutral,True,neutral,"[0.0017540105618536472, 0.980
 A 2-3 day job turned into 1-1/2 weeks.,negative,negative,True,negative,"[0.963908314704895, 0.01807337813079357, 0.01801825314760208]",dynasent_r1
 I wish I was one of the people who had a great experience.,negative,negative,True,negative,"[0.9776140451431274, 0.014453606680035591, 0.00793237704783678]",dynasent_r1
 Having a family this was certainly a stressful time for us.,negative,negative,True,negative,"[0.7465265989303589, 0.24005647003650665, 0.013416965492069721]",dynasent_r1
-Was unapologetic and offered the 9 of us to sit at the bar for dinner!,negative,positive,False,positive,"[0.04325976222753525, 0.046586308628320694, 0.910153865814209]",dynasent_r1
+Was unapologetic and offered the 9 of us to sit at the bar for dinner!,negative,negative,True,positive,"[0.04325976222753525, 0.046586308628320694, 0.910153865814209]",dynasent_r1
 The idea is that you can reserve a seat in advance and know where you will sit.,positive,neutral,False,neutral,"[0.0006115017458796501, 0.9397205114364624, 0.05966793745756149]",dynasent_r1
 No napkins or cutlery.,negative,negative,True,negative,"[0.9924613833427429, 0.006529774516820908, 0.0010088178096339107]",dynasent_r1
 Maybe I found the proceedings a little bit too conventional .,negative,negative,True,negative,"[0.9806170463562012, 0.016511227935552597, 0.002871770178899169]",sst_local
@@ -2226,13 +2226,13 @@ Thanks for reading!,positive,neutral,False,neutral,"[0.0011098321992903948, 0.50
 "My goodness , Queen Latifah has a lot to offer and she seemed to have no problem flaunting her natural gifts .",positive,positive,True,positive,"[0.00043150887358933687, 0.0007890923880040646, 0.9987794756889343]",sst_local
 "I had the bean soup for the appetizer, which really wasn't bad.",positive,neutral,False,positive,"[2.589250470919069e-05, 0.00027472901274450123, 0.9996994733810425]",dynasent_r1
 We ordered the pretzels and the Chef's Board as apps.,neutral,neutral,True,neutral,"[0.0001921922230394557, 0.9832587242126465, 0.016549112275242805]",dynasent_r1
-"Agent was friendly enough, told me to get something to eat at the airport she would call when one came in.",positive,neutral,False,positive,"[7.918160554254428e-05, 0.0006518202135339379, 0.9992689490318298]",dynasent_r1
+"Agent was friendly enough, told me to get something to eat at the airport she would call when one came in.",positive,positive,True,positive,"[7.918160554254428e-05, 0.0006518202135339379, 0.9992689490318298]",dynasent_r1
 ... Blade II is more enjoyable than the original .,positive,positive,True,positive,"[0.0009404949960298836, 0.002509624231606722, 0.9965498447418213]",sst_local
 "But only one toilet, haha.",negative,neutral,False,neutral,"[0.08642464131116867, 0.8965887427330017, 0.016986576840281487]",dynasent_r1
 Neither my wife nor I ate there but we gave it a try.,neutral,neutral,True,neutral,"[0.004851275589317083, 0.9885358214378357, 0.006612956058233976]",dynasent_r2
 I cannot believe this place is so helpful.,positive,positive,True,negative,"[0.8714390993118286, 0.02565479837357998, 0.10290614515542984]",dynasent_r2
 "I ordered the Baseball Cut Sirloin which, according to the menu, is only served rare or medium rare(a great sign as far as my reverence detector is concerned.)",positive,positive,True,positive,"[0.0006447848281823099, 0.005507617723196745, 0.993847668170929]",dynasent_r1
-"All Ms. Jovovich , as the sanctified heroine , has to do is look radiant , grimly purposeful and mildly alarmed while forcing open doors , wielding wrenches and fleeing monsters .",neutral,neutral,True,positive,"[0.000507236341945827, 0.07662887126207352, 0.9228638410568237]",sst_local
+"All Ms. Jovovich , as the sanctified heroine , has to do is look radiant , grimly purposeful and mildly alarmed while forcing open doors , wielding wrenches and fleeing monsters .",neutral,negative,False,positive,"[0.000507236341945827, 0.07662887126207352, 0.9228638410568237]",sst_local
 The parking garage was conveniently full.,negative,neutral,False,neutral,"[0.4405934512615204, 0.48249390721321106, 0.07691258937120438]",dynasent_r1
 It 's almost impossible not to be moved by the movie 's depiction of sacrifice and its stirring epilogue in post-Soviet Russia .,positive,positive,True,positive,"[4.556334897642955e-05, 0.00824587419629097, 0.9917085766792297]",sst_local
 "The second time I went was with a large group of people (~12), which given the size of the place, proved to be a bit of a chore.",negative,negative,True,negative,"[0.9861694574356079, 0.010651757940649986, 0.0031787233892828226]",dynasent_r1
@@ -2269,7 +2269,7 @@ Other boba tea shops in Vegas make it too liquidly bland where the pudding break
 "When ordering the smoothie though, I asked if it was an option that many choose and the employee at the register replied with ""I mean I work here, I'm not going to say anything is bad..."" I feel that it's normal to ask what is commonly ordered.",negative,neutral,False,neutral,"[0.4500751793384552, 0.5382196307182312, 0.011705183424055576]",dynasent_r1
 "Out of all of my wedding planning, I did the hassle of flowers at the end because I thought it was going to be fun. ",neutral,neutral,True,neutral,"[0.002049302915111184, 0.981840193271637, 0.016110531985759735]",dynasent_r2
 As I'm still standing there he starts to help someone else.,negative,negative,True,negative,"[0.6517055630683899, 0.3360183835029602, 0.012276064604520798]",dynasent_r1
-We waited about 3 minutes when one of the guys comes out and literally FLOURISHES our 3 bags of food at us.,positive,negative,False,positive,"[0.05973421409726143, 0.41720259189605713, 0.5230632424354553]",dynasent_r1
+We waited about 3 minutes when one of the guys comes out and literally FLOURISHES our 3 bags of food at us.,positive,positive,True,positive,"[0.05973421409726143, 0.41720259189605713, 0.5230632424354553]",dynasent_r1
 She strolls casually by and literally asks how we're doing.,neutral,neutral,True,neutral,"[0.08016244322061539, 0.7273446917533875, 0.19249290227890015]",dynasent_r1
 "She says you should go to the one on McQueen and Pecos, and she is, as usual, right.",positive,positive,True,positive,"[0.0001615904620848596, 0.07803850620985031, 0.9217998385429382]",dynasent_r1
 We were there for 6 hours and paid $24 hours for that.,neutral,neutral,True,neutral,"[0.4619874358177185, 0.514833927154541, 0.023178642615675926]",dynasent_r2
@@ -2474,7 +2474,7 @@ I should have paid him extra for doubling as a therapist.,positive,positive,True
 "These spiders can outrun a motorcycle and wrap a person in a sticky cocoon in seconds , but they fall short of being interesting or entertaining .",negative,negative,True,negative,"[0.9524312615394592, 0.04399728402495384, 0.0035714979749172926]",sst_local
 A wonderful character-based comedy .,positive,positive,True,positive,"[1.386795975122368e-05, 0.0010157517390325665, 0.9989703893661499]",sst_local
 And taste very blend.,negative,negative,True,neutral,"[0.021823890507221222, 0.4991711974143982, 0.4790048897266388]",dynasent_r1
-"Pete was my sales guy, nice enough.",positive,positive,True,positive,"[5.2657829655800015e-05, 0.005238163284957409, 0.9947091341018677]",dynasent_r1
+"Pete was my sales guy, nice enough.",positive,neutral,False,positive,"[5.2657829655800015e-05, 0.005238163284957409, 0.9947091341018677]",dynasent_r1
 "First, it's kind of hard to find.",negative,negative,True,negative,"[0.9959482550621033, 0.002893095603212714, 0.0011586975306272507]",dynasent_r1
 "Expect to be reminded of other , better films , especially Seven , which director William Malone slavishly copies .",negative,negative,True,negative,"[0.9548180103302002, 0.04017765447497368, 0.005004393868148327]",sst_local
 "Tim Allen is great in his role but never hogs the scenes from his fellow cast , as there are plenty of laughs and good lines for everyone in this comedy .",positive,positive,True,positive,"[2.4055099856923334e-05, 0.00044722796883434057, 0.9995287656784058]",sst_local
@@ -2511,12 +2511,12 @@ When I got to urgent care I did not want to wait all night.,negative,negative,Tr
 Presented us with our bill for the total amount.,neutral,neutral,True,neutral,"[0.0010720022255554795, 0.9864288568496704, 0.012499156408011913]",dynasent_r1
 I came across this place on Yelp while looking for a different place to eat yesterday with the wife.,neutral,neutral,True,neutral,"[0.0002560600405558944, 0.9848505258560181, 0.014893393032252789]",dynasent_r1
 No jerk.,negative,negative,True,negative,"[0.8872815370559692, 0.055194806307554245, 0.05752364918589592]",dynasent_r1
-"Regarding Dosas, the less said the better.",negative,negative,True,neutral,"[0.09224706143140793, 0.9019044637680054, 0.005848444066941738]",dynasent_r1
+"Regarding Dosas, the less said the better.",negative,neutral,False,neutral,"[0.09224706143140793, 0.9019044637680054, 0.005848444066941738]",dynasent_r1
 It was fun.,positive,positive,True,positive,"[2.354621574340854e-05, 0.001076258486136794, 0.9989001750946045]",dynasent_r1
 The decided to give the restaurant a try since it was under new management.,neutral,neutral,True,neutral,"[0.0003092271799687296, 0.9090882539749146, 0.09060250967741013]",dynasent_r1
 This review is for the dog park only.,neutral,neutral,True,neutral,"[0.0005327637190930545, 0.9910255074501038, 0.008441649377346039]",dynasent_r1
 I went here because it was conveniently close to home and had a fairly decent experience the first time around.,positive,neutral,False,positive,"[0.00010300012945663184, 0.0026511354371905327, 0.9972459077835083]",dynasent_r1
-The line is out the door every time I go and occassionally there is a 10-20 min wait.,negative,neutral,False,negative,"[0.9646396040916443, 0.031222695484757423, 0.004137731622904539]",dynasent_r1
+The line is out the door every time I go and occassionally there is a 10-20 min wait.,negative,negative,True,negative,"[0.9646396040916443, 0.031222695484757423, 0.004137731622904539]",dynasent_r1
 I know the strip can be pricey but come on!,negative,negative,True,negative,"[0.9973747730255127, 0.0008899933309294283, 0.0017352431314066052]",dynasent_r1
 "But I was admittedly impressed with my scalding hot fresh cakes, consdering that this place is always empty, and they always seem to have a tonne ready made.",positive,positive,True,positive,"[0.0547955259680748, 0.006704205181449652, 0.9385003447532654]",dynasent_r1
 "Just one more collection of penis , breast and flatulence gags in search of a story .",negative,negative,True,negative,"[0.9523776173591614, 0.04522338882088661, 0.002398906508460641]",sst_local
@@ -2550,7 +2550,7 @@ Those with an interest in new or singular sorts of film experiences will find Wh
 Flies everywhere inside.,negative,negative,True,negative,"[0.9974715709686279, 0.0014241966418921947, 0.001104342401959002]",dynasent_r1
 Good polish selection and front desk is the most positive point of this place.,positive,positive,True,positive,"[0.000848221592605114, 0.00017416098853573203, 0.9989776611328125]",dynasent_r1
 It was really nice how the server made that clear so when I got my usual bill and it was double I wouldn't be surprised.,positive,positive,True,positive,"[0.002515132538974285, 0.0008367974078282714, 0.9966481328010559]",dynasent_r1
-Fans of the animated wildlife adventure show will be in warthog heaven ; others need not necessarily apply .,positive,positive,True,positive,"[0.00847772229462862, 0.15386055409908295, 0.8376616835594177]",sst_local
+Fans of the animated wildlife adventure show will be in warthog heaven ; others need not necessarily apply .,positive,neutral,False,positive,"[0.00847772229462862, 0.15386055409908295, 0.8376616835594177]",sst_local
 This is an excellent place to go if you want to see how much stress you can put on your relationship.,negative,negative,True,negative,"[0.9244832992553711, 0.015940189361572266, 0.05957643687725067]",dynasent_r1
 Hits one out of the park for the ` they do n't make 'em like that anymore ' department .,neutral,positive,False,positive,"[0.004282988142222166, 0.005239923018962145, 0.9904770851135254]",sst_local
 "We arrived slightly early, but were seated quickly outside.",positive,positive,True,positive,"[7.342288881773129e-05, 0.012794120237231255, 0.9871324300765991]",dynasent_r1
@@ -2718,7 +2718,7 @@ Bigger bowls please.,negative,neutral,False,neutral,"[0.2663489580154419, 0.5472
 "It 's predictable , but it jumps through the expected hoops with style and even some depth .",positive,positive,True,positive,"[0.0003068815276492387, 0.035947296768426895, 0.9637458920478821]",sst_local
 Oh yea employees there park in the prime parking in front of the store.,negative,neutral,False,neutral,"[0.01596510410308838, 0.8227956891059875, 0.16123922169208527]",dynasent_r1
 An enjoyably half-wit remake of the venerable Italian comedy Big Deal on Madonna Street .,positive,positive,True,positive,"[0.037853289395570755, 0.27259427309036255, 0.6895524263381958]",sst_local
-I'm sure I'll play here again as it's one of my favorite local courses but I hope they take better care of it soon.,positive,positive,True,positive,"[0.0932907909154892, 0.023590536788105965, 0.8831186294555664]",dynasent_r1
+I'm sure I'll play here again as it's one of my favorite local courses but I hope they take better care of it soon.,positive,neutral,False,positive,"[0.0932907909154892, 0.023590536788105965, 0.8831186294555664]",dynasent_r1
 "Anyway , for one reason or another , Crush turns into a dire drama partway through .",neutral,negative,False,negative,"[0.9757005572319031, 0.022270433604717255, 0.002028979128226638]",sst_local
 Lots of waitresses and waiters standing around.,negative,negative,True,negative,"[0.5628933906555176, 0.41369929909706116, 0.023407280445098877]",dynasent_r1
 It was wrong in all the wonderful ways.,positive,positive,True,positive,"[0.005077038891613483, 0.006728248670697212, 0.9881947040557861]",dynasent_r2
@@ -2835,7 +2835,7 @@ Man was I ever proved wrong.,neutral,neutral,True,neutral,"[0.006111577618867159
 I went to some random spot and they messed up my hair.,negative,negative,True,negative,"[0.9892662763595581, 0.007264893036335707, 0.0034687784500420094]",dynasent_r1
 "For lack of a better way to put it, SOOOOOOO GOOOOD!",positive,positive,True,positive,"[0.00010033533180831, 0.00013383103942032903, 0.9997658133506775]",dynasent_r1
 Pizza plus iced tea $23 plus tax.,neutral,neutral,True,neutral,"[0.00046835519606247544, 0.9864333868026733, 0.013098213821649551]",dynasent_r1
-"Introduce yourself to your guests -- hell there are only about 2 of them, so it shouldn't tax you too much.",negative,negative,True,neutral,"[0.14065322279930115, 0.8268091678619385, 0.032537635415792465]",dynasent_r1
+"Introduce yourself to your guests -- hell there are only about 2 of them, so it shouldn't tax you too much.",negative,neutral,False,neutral,"[0.14065322279930115, 0.8268091678619385, 0.032537635415792465]",dynasent_r1
 The customer was just nodding.,neutral,neutral,True,neutral,"[0.0028545986860990524, 0.9796223640441895, 0.01752309687435627]",dynasent_r1
 I had our ford fusion get a recall taken care here.,neutral,neutral,True,neutral,"[0.00040352693758904934, 0.9517703652381897, 0.04782607778906822]",dynasent_r1
 I told him the kind of hair i wanted for my kid.,neutral,neutral,True,neutral,"[0.00030323295504786074, 0.983535647392273, 0.016161147505044937]",dynasent_r1
@@ -2965,7 +2965,7 @@ I guess I have to go to Trop for wings!,positive,neutral,False,neutral,"[0.00083
 Eat here if every other restaurant in area has already closed.,negative,negative,True,positive,"[0.02720366045832634, 0.024077419191598892, 0.9487189650535583]",dynasent_r1
 "The staff was fairly friendly on the phone, pizza came in the delivery estimate time.",positive,positive,True,positive,"[7.145389827201143e-05, 0.00010670558549463749, 0.9998218417167664]",dynasent_r1
 "This cuddly sequel to the 1999 hit is a little more visually polished , a little funnier , and a little more madcap .",positive,positive,True,positive,"[0.00014978574472479522, 0.00663799187168479, 0.9932122230529785]",sst_local
-I would recommend getting a set of training sessions.,neutral,neutral,True,neutral,"[0.006920767016708851, 0.8579766750335693, 0.1351025104522705]",dynasent_r1
+I would recommend getting a set of training sessions.,neutral,positive,False,neutral,"[0.006920767016708851, 0.8579766750335693, 0.1351025104522705]",dynasent_r1
 Makmalbaf follows a resolutely realistic path in this uncompromising insight into the harsh existence of the Kurdish refugees of Iran 's borderlands .,positive,positive,True,positive,"[0.0010678692487999797, 0.10625772923231125, 0.892674446105957]",sst_local
 The burgers taste gamey.,positive,negative,False,negative,"[0.990903913974762, 0.006985882297158241, 0.002110140398144722]",dynasent_r1
 The bartenders really need to work with their Hensley Sales rep to make sure the bar is stocked for a weekend.,negative,negative,True,negative,"[0.9970412850379944, 0.0011096575763076544, 0.001849059946835041]",dynasent_r1
@@ -3064,12 +3064,12 @@ If they sold their tortillas by the bulk I'd buy them.,positive,positive,True,po
 Moderately involving despite bargain-basement photography and hackneyed romance .,negative,neutral,False,positive,"[0.042150162160396576, 0.3414972126483917, 0.6163525581359863]",sst_local
 "The WWII drama is well plotted , visually striking and filled with enjoyably complex characters who are never what they first appear .",positive,positive,True,positive,"[1.030031398840947e-05, 0.0010751604568213224, 0.9989145994186401]",sst_local
 I then proceeded to ask her why she was being so nasty and somehow her voice changed to a sweet apologetic angelic voice and a smile then appeared with an oh I'm sorry I didn't know I was coming across that way.,negative,negative,True,negative,"[0.866519033908844, 0.053122881799936295, 0.08035802096128464]",dynasent_r1
-The only thing I have an issue with is the spice level isn't always the same.,negative,negative,True,negative,"[0.9983477592468262, 0.000520500645507127, 0.001131699187681079]",dynasent_r1
+The only thing I have an issue with is the spice level isn't always the same.,negative,neutral,False,negative,"[0.9983477592468262, 0.000520500645507127, 0.001131699187681079]",dynasent_r1
 "We weren't that hungry, but did split up and tried a bite of the burger, fries and pretzel with cheese fondue.",neutral,neutral,True,neutral,"[0.00021130942332092673, 0.9756560921669006, 0.024132627993822098]",dynasent_r1
 I had a party planned for 500 people.,neutral,neutral,True,neutral,"[0.0005544077139347792, 0.9823659062385559, 0.017079703509807587]",dynasent_r1
 "We had a terrible business trip and were so angry when we arrived, it was a great return to normal to once again take the Showtime Tours shuttle.",positive,positive,True,positive,"[0.02127251774072647, 0.009913883171975613, 0.9688135981559753]",dynasent_r2
 "These are lives worth watching , paths worth following .",positive,positive,True,positive,"[6.851702346466482e-05, 0.01596790738403797, 0.9839635491371155]",sst_local
-First time I paid attention to My Guy not going to make that mistake again.,negative,neutral,False,neutral,"[0.08337131887674332, 0.7328152656555176, 0.18381337821483612]",dynasent_r1
+First time I paid attention to My Guy not going to make that mistake again.,negative,negative,True,neutral,"[0.08337131887674332, 0.7328152656555176, 0.18381337821483612]",dynasent_r1
 The two leads chomp considerably more scenery with their acting than fire-breathing monsters barbecue with their breath ...,negative,negative,True,negative,"[0.8386481404304504, 0.13107061386108398, 0.030281227082014084]",sst_local
 I had raved about this place and posted it on two different local FB pages saying how great it was.,positive,positive,True,positive,"[0.0002930241171270609, 0.011803017929196358, 0.9879040122032166]",dynasent_r1
 "Tried a new place. Came here during the week, no wait at all.",positive,positive,True,positive,"[0.0005111983045935631, 0.03428192436695099, 0.9652068614959717]",dynasent_r2
@@ -3156,7 +3156,7 @@ It never fails to engage us .,positive,positive,True,positive,"[5.65601185371633
 Usually go to Tina's across the street but I definitely wanted to try out this spot!,neutral,neutral,True,neutral,"[0.00018936705600935966, 0.7894852757453918, 0.21032533049583435]",dynasent_r2
 The visuals alone make Metropolis worth seeing .,positive,positive,True,positive,"[7.670837658224627e-05, 0.002187208505347371, 0.9977360963821411]",sst_local
 It was smeared with nutella and marshmallows that had a nice brown color on top.,positive,positive,True,positive,"[0.004640862811356783, 0.07202454656362534, 0.923334538936615]",dynasent_r1
-"An earnest racial-issues picture that might have gotten respectful critical praise in a different era -- say , the '60s .",neutral,positive,False,positive,"[0.017025548964738846, 0.32290053367614746, 0.6600738763809204]",sst_local
+"An earnest racial-issues picture that might have gotten respectful critical praise in a different era -- say , the '60s .",neutral,neutral,True,positive,"[0.017025548964738846, 0.32290053367614746, 0.6600738763809204]",sst_local
 The pool looked like a resort style and the weight room was nice and updated.,positive,positive,True,positive,"[4.5690900151384994e-05, 6.60766672808677e-05, 0.9998883008956909]",dynasent_r1
 Perhaps no picture ever made has more literally showed that the road to hell is paved with good intentions .,positive,negative,False,positive,"[0.018470387905836105, 0.03524200990796089, 0.9462876319885254]",sst_local
 I decided to spend a little more money and go to a Benefit Brow Bar.,neutral,neutral,True,neutral,"[0.00024069614300969988, 0.9730200171470642, 0.026739275082945824]",dynasent_r1
@@ -3920,7 +3920,7 @@ So I would literally stay anywhere else in las Vegas but here.,negative,negative
 Advised Showtime Tours at 230pm we are ready to leave airport and be transported to Flamingo Hotel.,neutral,neutral,True,neutral,"[0.0002417243376839906, 0.9817422032356262, 0.018016135320067406]",dynasent_r1
 "Well before it 's over , Beijing Bicycle begins spinning its wheels .",neutral,negative,False,negative,"[0.5056864619255066, 0.4553193151950836, 0.03899422660470009]",sst_local
 -Resort fees.,neutral,neutral,True,neutral,"[0.008518828079104424, 0.9854340553283691, 0.006047090515494347]",dynasent_r1
-I would give it five stars ... if the stars go to one hundred.,negative,positive,False,positive,"[0.06778627634048462, 0.020379740744829178, 0.9118339419364929]",dynasent_r2
+I would give it five stars ... if the stars go to one hundred.,negative,negative,True,positive,"[0.06778627634048462, 0.020379740744829178, 0.9118339419364929]",dynasent_r2
 When I walked in I honestly couldn't decide what I wanted cuz again I'm not about bagels at all.,negative,neutral,False,neutral,"[0.0022579375654459, 0.9894272685050964, 0.008314757607877254]",dynasent_r1
 "I opened my sandwich at work to see a Classic bun, lettuce, tomato, and mayo.",neutral,neutral,True,neutral,"[0.0010890013072639704, 0.9801714420318604, 0.01873960718512535]",dynasent_r1
 The only element of suspense is whether the movie will change titles or distributors again before the closing credits roll .,negative,negative,True,negative,"[0.8891144394874573, 0.10421312600374222, 0.006672393996268511]",sst_local
@@ -3957,7 +3957,7 @@ I was highly recommended to a great realtor that honestly did a fantastic job fo
 My bff and I went on a Tuesday night at 730pm.,neutral,neutral,True,neutral,"[0.0001679526176303625, 0.968424916267395, 0.03140709176659584]",dynasent_r1
 "Wasabi is slight fare indeed , with the entire project having the feel of something tossed off quickly -LRB- like one of Hubert 's punches -RRB- , but it should go down smoothly enough with popcorn .",positive,neutral,False,neutral,"[0.37368106842041016, 0.44609445333480835, 0.18022452294826508]",sst_local
 "When the plot kicks in , the film loses credibility .",negative,negative,True,negative,"[0.8528854846954346, 0.13888853788375854, 0.008225971832871437]",sst_local
-"As an actor , The Rock is aptly named .",negative,positive,False,positive,"[0.000244813971221447, 0.02212979644536972, 0.97762531042099]",sst_local
+"As an actor , The Rock is aptly named .",negative,neutral,False,positive,"[0.000244813971221447, 0.02212979644536972, 0.97762531042099]",sst_local
 The best way to hope for any chance of enjoying this film is by lowering your expectations .,negative,negative,True,negative,"[0.9295046925544739, 0.060711152851581573, 0.009784096851944923]",sst_local
 Do the sound of sporadic fire alarms at 5 a.m. and the lively discussions of your neighbors through paper-thin walls delight you?,negative,negative,True,negative,"[0.9847767353057861, 0.011531172320246696, 0.0036920392885804176]",dynasent_r1
 Brought my 90 y.o.,neutral,neutral,True,neutral,"[0.005260071717202663, 0.9860115051269531, 0.008728411048650742]",dynasent_r1
@@ -3984,7 +3984,7 @@ I was so Mad!,negative,negative,True,negative,"[0.9931803941726685, 0.0050394996
 If you are looking for a great wine selection or cheese plates them this is not your place.,negative,negative,True,negative,"[0.998563826084137, 0.0005273885326460004, 0.0009088619262911379]",dynasent_r1
 "Up your game,  staff at this location.",negative,negative,True,negative,"[0.9973422884941101, 0.0013602727558463812, 0.0012974905548617244]",dynasent_r1
 Even the oldest unveiled Dill Pickle...take that one for a test drive!,neutral,positive,False,positive,"[0.16864006221294403, 0.29283422231674194, 0.5385257601737976]",dynasent_r2
-"She was awesome, personally oversaw the treason from beginning to end.",positive,negative,False,positive,"[0.037484925240278244, 0.024721486493945122, 0.9377936124801636]",dynasent_r1
+"She was awesome, personally oversaw the treason from beginning to end.",positive,positive,True,positive,"[0.037484925240278244, 0.024721486493945122, 0.9377936124801636]",dynasent_r1
 I had ordered seared Foie gras and Coquille St. Jacques.,neutral,neutral,True,neutral,"[0.00020150012278463691, 0.9809277653694153, 0.018870661035180092]",dynasent_r1
 This is pretty dicey material .,negative,negative,True,negative,"[0.779496967792511, 0.20941826701164246, 0.011084708385169506]",sst_local
 She also sold him fries without asking me.,negative,negative,True,negative,"[0.9939733147621155, 0.001815625699236989, 0.004211096558719873]",dynasent_r1
@@ -4275,7 +4275,7 @@ Will we be back?,neutral,neutral,True,neutral,"[0.001349462429061532, 0.82655620
 "Having said that, some people question these AYCE Sushi joints for the same thing, and I have seen some things that were not good.",negative,negative,True,negative,"[0.8841204047203064, 0.10767771303653717, 0.008201885968446732]",dynasent_r1
 "If you live around Rainbow blvd, Take the drive to Spring Mountain Rd for REAL Church's chicken!",positive,positive,True,positive,"[0.0004278340202290565, 0.001678262371569872, 0.9978938698768616]",dynasent_r1
 "Bright seems alternately amused and disgusted with this material , and he ca n't help throwing in a few of his own touches .",neutral,negative,False,positive,"[0.0035888918209820986, 0.4286630153656006, 0.5677480697631836]",sst_local
-The carrots could have been a bit more slender.,negative,negative,True,negative,"[0.9969502091407776, 0.0008782800869084895, 0.0021715075708925724]",dynasent_r1
+The carrots could have been a bit more slender.,negative,neutral,False,negative,"[0.9969502091407776, 0.0008782800869084895, 0.0021715075708925724]",dynasent_r1
 Frozen meat patties are disgusting except for this brand.,positive,positive,True,positive,"[0.003777924692258239, 0.0006663052481599152, 0.9955558180809021]",dynasent_r2
 No more .,negative,neutral,False,neutral,"[0.16339713335037231, 0.8220242857933044, 0.014578601345419884]",sst_local
 "Order two coffees at the drive thru, drive away and the coffee is COLD!",negative,negative,True,negative,"[0.9982051849365234, 0.0005671528051607311, 0.0012276299530640244]",dynasent_r1
@@ -4403,7 +4403,7 @@ Just make sure you don't try to score Latino points by attempting to order in Sp
 Cuts right through the B.S. giving a big middle-fingered `` shut up '' to those who talk up what is nothing more than two guys beating the hell outta one another .,neutral,positive,False,positive,"[0.07955504208803177, 0.08384432643651962, 0.836600661277771]",sst_local
 He did a good job pulling my leg for months after I had sent him thousands of dollars.,negative,negative,True,negative,"[0.9689016342163086, 0.00829154159873724, 0.022806799039244652]",dynasent_r2
 When I initially visited the Stripper 101 webpage I was super excited to take the class.,positive,positive,True,positive,"[0.00022995770268607885, 0.1751095950603485, 0.8246604800224304]",dynasent_r1
-This is called getto Vons for a reason.,negative,negative,True,neutral,"[0.013286028988659382, 0.7357520461082458, 0.25096186995506287]",dynasent_r1
+This is called getto Vons for a reason.,negative,neutral,False,neutral,"[0.013286028988659382, 0.7357520461082458, 0.25096186995506287]",dynasent_r1
 The man wore a smile as he locked her in the trunk.,neutral,neutral,True,neutral,"[0.00842559989541769, 0.836397111415863, 0.1551773101091385]",dynasent_r2
 I don't know how they wouldn't have known.,negative,neutral,False,neutral,"[0.06742165237665176, 0.9199343323707581, 0.012644032016396523]",dynasent_r1
 "And let's not mention if I didn't fill them in, how scary I looked.",neutral,negative,False,negative,"[0.9084452390670776, 0.08705426752567291, 0.004500511102378368]",dynasent_r1
@@ -4506,7 +4506,7 @@ She brought back three items.,neutral,neutral,True,neutral,"[0.00066321005579084
 I ate the entire bowl.,negative,neutral,False,neutral,"[0.0009948601946234703, 0.7624181509017944, 0.23658694326877594]",dynasent_r1
 A refreshing Korean film about five female high school friends who face an uphill battle when they try to take their relationships into deeper waters .,positive,positive,True,positive,"[0.0005451352335512638, 0.0033486494794487953, 0.9961062073707581]",sst_local
 "Even the imaginative gore ca n't hide the musty scent of Todd Farmer 's screenplay , which is a simple retread of the 1979 Alien , with a plucky heroine battling a monster loose in a spaceship .",negative,negative,True,negative,"[0.9276204109191895, 0.06818301230669022, 0.004196558613330126]",sst_local
-It took 19 predecessors to get THIS ?,negative,neutral,False,neutral,"[0.3587614893913269, 0.5464715957641602, 0.09476686269044876]",sst_local
+It took 19 predecessors to get THIS ?,negative,negative,True,neutral,"[0.3587614893913269, 0.5464715957641602, 0.09476686269044876]",sst_local
 We would have ordered more if we could eat more.,positive,positive,True,positive,"[0.006481362506747246, 0.00358187360689044, 0.9899368286132812]",dynasent_r1
 "Heck, it's been featured on the food network!",positive,positive,True,positive,"[0.000274241145234555, 0.12361615151166916, 0.8761095404624939]",dynasent_r1
 Morrissette 's script and direction show a fair amount of intelligence and wit -- but it does n't signify a whole lot either .,neutral,neutral,True,neutral,"[0.07826558500528336, 0.7412359118461609, 0.18049852550029755]",sst_local
@@ -4559,7 +4559,7 @@ Anyone who can count to five -LRB- the film 's target market ? -RRB-,negative,ne
 We decided on the bread pudding.,neutral,neutral,True,neutral,"[0.00021030279458500445, 0.9750970602035522, 0.024692628532648087]",dynasent_r1
 https://www.yelp.com/biz/vegas-discount-nutrition-superstore-las-vegas-8?hrid=QQhKNmf3VF_6r_qAfE8jxg&utm_campaign=www_review_share_popup&utm_medium=copy_link&utm_source=(direct),neutral,neutral,True,neutral,"[0.002469839993864298, 0.9834586381912231, 0.014071510173380375]",dynasent_r1
 For all its serious sense of purpose ... -LRB- it -RRB- finds a way to lay bare the tragedies of its setting with a good deal of warmth and humor .,positive,positive,True,positive,"[6.958541052881628e-05, 0.002878254745155573, 0.9970521926879883]",sst_local
-Don't even think of coming to this place if your stomach isn't empty so you can eat and eat.,positive,positive,True,negative,"[0.9465272426605225, 0.01053109485656023, 0.04294169321656227]",dynasent_r2
+Don't even think of coming to this place if your stomach isn't empty so you can eat and eat.,positive,negative,False,negative,"[0.9465272426605225, 0.01053109485656023, 0.04294169321656227]",dynasent_r2
 They really try to go that extra mile at the Elara...,positive,positive,True,positive,"[2.8705162549158558e-05, 0.00035507683060131967, 0.9996161460876465]",dynasent_r1
 I'll clean my table just make food better.,negative,positive,False,positive,"[0.1772392839193344, 0.4058612585067749, 0.4168994724750519]",dynasent_r1
 Least favourite was sparerib dish; it was too dry.,negative,negative,True,negative,"[0.9991913437843323, 0.0004458016192074865, 0.0003627861733548343]",dynasent_r1
@@ -4618,7 +4618,7 @@ The wait staff is the definition of customer service (Amanda was my server).,pos
 "I replied, ""I was a local!""",neutral,neutral,True,neutral,"[0.0012697570491582155, 0.9860885739326477, 0.012641683220863342]",dynasent_r1
 It seemed like she had a magic button on the glass or something.,positive,neutral,False,neutral,"[0.015627942979335785, 0.5763810276985168, 0.40799105167388916]",dynasent_r1
 "I was surprised a place like this had cafeteria style service featuring trays with first-come, first-served seating. ",positive,neutral,False,neutral,"[0.2882034480571747, 0.6924679279327393, 0.019328603520989418]",dynasent_r2
-"(To it's credit, the meat was tender.)",positive,neutral,False,positive,"[0.00016410468379035592, 0.00014790486602578312, 0.9996880292892456]",dynasent_r1
+"(To it's credit, the meat was tender.)",positive,positive,True,positive,"[0.00016410468379035592, 0.00014790486602578312, 0.9996880292892456]",dynasent_r1
 I love this services.,positive,positive,True,positive,"[4.972491296939552e-05, 0.0001985002018045634, 0.9997517466545105]",dynasent_r2
 "This is the woman who is accused of being too ""stoned"" to cook pizza.",negative,negative,True,negative,"[0.7825888991355896, 0.20801015198230743, 0.009400935843586922]",dynasent_r1
 A psychologically rich and suspenseful moral thriller with a stellar performance by Al Pacino .,positive,positive,True,positive,"[1.5130688552744687e-05, 0.0010296377586200833, 0.998955249786377]",sst_local
@@ -4630,7 +4630,7 @@ A psychologically rich and suspenseful moral thriller with a stellar performance
 I WILL NEVER HAVE MY CAR WASHED OR DETAILED HERE AGAIN.,negative,negative,True,negative,"[0.9953302145004272, 0.0010095653124153614, 0.003660195739939809]",dynasent_r1
 "Droll caper-comedy remake of `` Big Deal on Madonna Street '' that 's a sly , amusing , laugh-filled little gem in which the ultimate `` Bellini '' begins to look like a `` real Kaputschnik . ''",positive,positive,True,positive,"[0.001574224908836186, 0.04095517471432686, 0.9574706554412842]",sst_local
 I did have to park in the back of the parking lot as there weren't any spaces left.,negative,negative,True,negative,"[0.770130455493927, 0.2237291932106018, 0.006140377838164568]",dynasent_r1
-Bennett 's dramatization of her personal descent into post-breakup perdition has a morbid appeal that 's tough to shake .,neutral,negative,False,positive,"[0.0032743550837039948, 0.20105846226215363, 0.7956672310829163]",sst_local
+Bennett 's dramatization of her personal descent into post-breakup perdition has a morbid appeal that 's tough to shake .,neutral,positive,False,positive,"[0.0032743550837039948, 0.20105846226215363, 0.7956672310829163]",sst_local
 I personally give the big black guy that delivered to us tonite 5 out of 5 stars.,positive,positive,True,positive,"[0.06464873254299164, 0.01031212043017149, 0.9250392317771912]",dynasent_r1
 Needless to say I was infuriated!,negative,negative,True,negative,"[0.9984595775604248, 0.0008594496175646782, 0.0006809690967202187]",dynasent_r1
 Kaufman creates an eerie sense of not only being there at the time of these events but the very night Matthew was killed .,positive,positive,True,positive,"[0.004032807424664497, 0.05610983446240425, 0.9398574233055115]",sst_local
@@ -4717,7 +4717,7 @@ The disarming cornball atmosphere has a way of infecting the entire crowd as the
 Ridiculous .,negative,negative,True,negative,"[0.9613255262374878, 0.032702960073947906, 0.005971470847725868]",sst_local
 "I ordered a blended root beer float and got my boyfriend a strawberry, watermelon slush.",neutral,neutral,True,neutral,"[0.00015106177306734025, 0.9793902635574341, 0.0204586423933506]",dynasent_r1
 I was so looking forward to this great opportunity and at such an elegant chapel since I was recently engages and eager to get married.,positive,positive,True,positive,"[0.00014289846876636147, 0.015495647676289082, 0.9843614101409912]",dynasent_r1
-"Rather quickly , the film falls into a soothing formula of brotherly conflict and reconciliation .",positive,neutral,False,positive,"[0.0004620720574166626, 0.06323213875293732, 0.936305820941925]",sst_local
+"Rather quickly , the film falls into a soothing formula of brotherly conflict and reconciliation .",positive,positive,True,positive,"[0.0004620720574166626, 0.06323213875293732, 0.936305820941925]",sst_local
 #2 How can we help them?,neutral,neutral,True,neutral,"[0.0013068907428532839, 0.9836770296096802, 0.015016085468232632]",dynasent_r1
 And they are so proud of their service for some reason.,negative,negative,True,negative,"[0.640296459197998, 0.15670640766620636, 0.2029971182346344]",dynasent_r1
 I don't feel overly full and like I have ingested a ton of grease so that is why I am giving 4 stars. We loved it.,positive,positive,True,positive,"[0.002799022477120161, 0.00024129815574269742, 0.9969596862792969]",dynasent_r2
@@ -4725,7 +4725,7 @@ I don't feel overly full and like I have ingested a ton of grease so that is why
 "Our waitress cooked our beef perfectly but she said we could cook it if we want, but we didn't.",positive,positive,True,positive,"[0.0004494285094551742, 0.0004770396335516125, 0.9990735054016113]",dynasent_r1
 "Mr. Parker has brilliantly updated his source and grasped its essence , composing a sorrowful and hilarious tone poem about alienated labor , or an absurdist workplace sitcom .",positive,positive,True,positive,"[7.40336618036963e-05, 0.0014607852790504694, 0.9984651803970337]",sst_local
 The movie was a delightful endeavor in terms of seeing how fast it could bore one to sleep.,negative,negative,True,negative,"[0.9490181803703308, 0.04165448248386383, 0.00932739395648241]",dynasent_r2
-"We ate at Gilda's the previous night for much, much more, that was good, but not near the level of Smashed Pig.",positive,positive,True,positive,"[0.003738607279956341, 0.0018375167855992913, 0.9944238066673279]",dynasent_r1
+"We ate at Gilda's the previous night for much, much more, that was good, but not near the level of Smashed Pig.",positive,neutral,False,positive,"[0.003738607279956341, 0.0018375167855992913, 0.9944238066673279]",dynasent_r1
 This place is a little far for me to come.,negative,neutral,False,negative,"[0.7289891839027405, 0.2659986913204193, 0.005012170411646366]",dynasent_r1
 "Christians sensitive to a reductionist view of their Lord as a luv-spreading Dr. Feelgood or omnipotent slacker will feel vastly more affronted than secularists , who might even praise God for delivering such an instant camp classic .",positive,negative,False,negative,"[0.8589972257614136, 0.10914299637079239, 0.03185975179076195]",sst_local
 We are staying at the hotel and figured we would give it a try for breakfast.,neutral,neutral,True,neutral,"[0.0001816773583414033, 0.967282235622406, 0.03253607451915741]",dynasent_r1
@@ -4793,7 +4793,7 @@ I've been to quite a few boba shops (shops?,neutral,neutral,True,neutral,"[0.000
 I confirmed that the drink was a cold brew with soy and the barista said yes.,neutral,neutral,True,neutral,"[0.0004287481715437025, 0.9439759254455566, 0.055595315992832184]",dynasent_r1
 "Nothing like what we expected, but even more!!",positive,positive,True,positive,"[0.001000463729724288, 0.01687215454876423, 0.9821274876594543]",dynasent_r1
 "The movie 's ripe , enrapturing beauty will tempt those willing to probe its inscrutable mysteries .",positive,positive,True,positive,"[0.00042169709922745824, 0.05709701403975487, 0.9424813389778137]",sst_local
-Middle finger bro!,negative,neutral,False,neutral,"[0.11522138118743896, 0.7793025970458984, 0.10547596216201782]",dynasent_r1
+Middle finger bro!,negative,negative,True,neutral,"[0.11522138118743896, 0.7793025970458984, 0.10547596216201782]",dynasent_r1
 "Verbinski substitutes atmosphere for action , tedium for thrills .",negative,negative,True,negative,"[0.8481764197349548, 0.14360757172107697, 0.008215994574129581]",sst_local
 A smart company will use that opportunity to impress me NOT turn me away.,negative,negative,True,negative,"[0.6132588386535645, 0.34981799125671387, 0.036923181265592575]",dynasent_r1
 "Le Caviar-a large bowl, coated on the bottom about 1/4"" deep with shellfish gelatin, dotted uniformly with balls of cauliflower tipped with maybe jalapeno jelly?",neutral,neutral,True,neutral,"[0.0018082757014781237, 0.9712045192718506, 0.02698727510869503]",dynasent_r1
@@ -4840,7 +4840,7 @@ I decided to go there on a Friday night at 11:00 pm.,neutral,neutral,True,neutra
 "Places a slightly believable love triangle in a difficult-to-swallow setting , and then disappointingly moves the story into the realm of an improbable thriller .",negative,negative,True,negative,"[0.7652513384819031, 0.2233283668756485, 0.011420325376093388]",sst_local
 It is nature against progress .,neutral,neutral,True,neutral,"[0.33185523748397827, 0.6480517387390137, 0.020093021914362907]",sst_local
 We had dinner at Bouchon on a Tuesday night and we were able to make a reservation at 7:30 p.m.,neutral,neutral,True,neutral,"[0.00035812141140922904, 0.5961267352104187, 0.40351513028144836]",dynasent_r2
-"I will give it a try again, just to get my asian food fix nearby.",neutral,neutral,True,positive,"[0.001191052608191967, 0.012095235288143158, 0.986713707447052]",dynasent_r1
+"I will give it a try again, just to get my asian food fix nearby.",neutral,positive,False,positive,"[0.001191052608191967, 0.012095235288143158, 0.986713707447052]",dynasent_r1
 "Lets be clear, this is a 5 min walk from my office and I come to get my BANGS TRIMMED.",neutral,neutral,True,neutral,"[0.00024316294002346694, 0.9837414026260376, 0.016015388071537018]",dynasent_r1
 I figured Yum Yum would be the best pick of the two because it wasn't fast food.,positive,neutral,False,neutral,"[0.002966218860819936, 0.9309433698654175, 0.066090427339077]",dynasent_r1
 I bought a warranty from Homelife to cover major repairs.,neutral,neutral,True,neutral,"[0.0003698160871863365, 0.9802456498146057, 0.01938454434275627]",dynasent_r1
@@ -4913,7 +4913,7 @@ Scrumptious!!,positive,positive,True,positive,"[4.730267755803652e-05, 0.0005831
 "What could have become just another cautionary fable is allowed to play out as a clever , charming tale -- as pleasantly in its own way as its self-dramatizing characters .",positive,positive,True,positive,"[0.000503309303894639, 0.02221600152552128, 0.9772806763648987]",sst_local
 The salads were the best part of the meal.,positive,positive,True,positive,"[0.0019061899511143565, 0.0003174847806803882, 0.9977763295173645]",dynasent_r1
 "The movie has a soft , percolating magic , a deadpan suspense .",positive,positive,True,positive,"[0.0011848061112686992, 0.08334022760391235, 0.9154748916625977]",sst_local
-"William Shatner , as a pompous professor , is the sole bright spot ...",neutral,neutral,True,positive,"[0.04063120111823082, 0.2424185574054718, 0.7169501781463623]",sst_local
+"William Shatner , as a pompous professor , is the sole bright spot ...",neutral,positive,False,positive,"[0.04063120111823082, 0.2424185574054718, 0.7169501781463623]",sst_local
 Only issue is higher rates for any cleaning after a suspended (by us) appointment due to our being away for vacation.,negative,negative,True,negative,"[0.9965466856956482, 0.002060724887996912, 0.0013924911618232727]",dynasent_r1
 I know where I am making my next appointment!,positive,positive,True,positive,"[0.0001258309348486364, 0.0008955054800026119, 0.9989786148071289]",dynasent_r1
 If you come with a larger party of 3 or 4 I would suggest getting two small combos rather than a large.,neutral,neutral,True,neutral,"[0.0023576775565743446, 0.9843548536300659, 0.013287492096424103]",dynasent_r1
@@ -5112,7 +5112,7 @@ I am a vegetarian and there are enough options available.,positive,positive,True
 "Seeing nothing amiss, she steps back, crosses her arms and watches the rest of our transaction practically breathing down our necks.",negative,negative,True,negative,"[0.9947016835212708, 0.001935467473231256, 0.0033628875389695168]",dynasent_r1
 Sushi for the connoisseurs of the macabre .,negative,neutral,False,neutral,"[0.3635430335998535, 0.42270177602767944, 0.21375517547130585]",sst_local
 Never ever will I leave my items to be returned behind the counter while I shop.,negative,negative,True,negative,"[0.8554453253746033, 0.12921135127544403, 0.015343325212597847]",dynasent_r1
-"Maybe it 's just because this past year has seen the release of some of the worst film comedies in decades ... But honestly , Analyze That really is n't all that bad .",neutral,positive,False,positive,"[0.006160326302051544, 0.006627198774367571, 0.9872124791145325]",sst_local
+"Maybe it 's just because this past year has seen the release of some of the worst film comedies in decades ... But honestly , Analyze That really is n't all that bad .",neutral,neutral,True,positive,"[0.006160326302051544, 0.006627198774367571, 0.9872124791145325]",sst_local
 I arrived fairly early and I think she ran out of bread right after I ordered.,negative,negative,True,negative,"[0.983394980430603, 0.01294500008225441, 0.003660044865682721]",dynasent_r1
 "If I lived on the Strip, this bar would be my regular spot.",positive,positive,True,positive,"[2.1238984118099324e-05, 0.00011803099187090993, 0.9998607635498047]",dynasent_r1
 Too much chocolate inside!,negative,negative,True,negative,"[0.9633034467697144, 0.023624567314982414, 0.013072026893496513]",dynasent_r1
@@ -5122,7 +5122,7 @@ This is one for the ages .,positive,positive,True,positive,"[0.00087400682969018
 When I go to a bar - I want to sit at the bar and drink some beers!,neutral,neutral,True,neutral,"[0.04208211600780487, 0.932185709476471, 0.025732101872563362]",dynasent_r1
 Promptly went to my I pad and enabled find my phone.,neutral,neutral,True,neutral,"[0.0033992151729762554, 0.9843838214874268, 0.012216955423355103]",dynasent_r1
 The other location told me they didn't have them on file.,negative,negative,True,negative,"[0.5976154804229736, 0.3959524631500244, 0.0064320978708565235]",dynasent_r1
-Also the Vietnamese coffee with no sugar is could be mad concentrated and might keep u laced up all night.,neutral,negative,False,negative,"[0.8941580653190613, 0.04927309602499008, 0.056568924337625504]",dynasent_r2
+Also the Vietnamese coffee with no sugar is could be mad concentrated and might keep u laced up all night.,neutral,neutral,True,negative,"[0.8941580653190613, 0.04927309602499008, 0.056568924337625504]",dynasent_r2
 It seems like nothing has done to my car even the vacuuming.,negative,negative,True,negative,"[0.6036604046821594, 0.2874055802822113, 0.10893402993679047]",dynasent_r1
 "It 's this memory-as-identity obviation that gives Secret Life its intermittent unease , reaffirming that long-held illusions are indeed reality , and that erasing them recasts the self .",neutral,neutral,True,neutral,"[0.011527174152433872, 0.6008756756782532, 0.3875972032546997]",sst_local
 I highly recommend their services to anyone if you love emptying your wallet.,negative,negative,True,negative,"[0.990207850933075, 0.001762683386914432, 0.00802947673946619]",dynasent_r2
@@ -5292,7 +5292,7 @@ Is this progress ?,negative,neutral,False,neutral,"[0.32346025109291077, 0.65722
 In-N-Out Burger is a huge letdown.,negative,negative,True,negative,"[0.9987665414810181, 0.0008006241405382752, 0.0004329622897785157]",dynasent_r2
 Especially that redhead,neutral,neutral,True,neutral,"[0.004620153922587633, 0.9844483137130737, 0.010931530967354774]",dynasent_r1
 The film is really not so much bad as bland .,negative,negative,True,negative,"[0.9555732607841492, 0.040345508605241776, 0.004081192892044783]",sst_local
-"The wonderful store manager there got on the phone with the warranty people and come to find out our after market warranty can only be taken care of at a Hyundai dealer... after discussing with the warranty manager about Henderson Hyundai's refusal unless we pay and their awful customer service, the he gave the ok for us to be covered at Tire works.",positive,negative,False,positive,"[0.00012282920943107456, 0.0010768243810161948, 0.9988002777099609]",dynasent_r1
+"The wonderful store manager there got on the phone with the warranty people and come to find out our after market warranty can only be taken care of at a Hyundai dealer... after discussing with the warranty manager about Henderson Hyundai's refusal unless we pay and their awful customer service, the he gave the ok for us to be covered at Tire works.",positive,neutral,False,positive,"[0.00012282920943107456, 0.0010768243810161948, 0.9988002777099609]",dynasent_r1
 "Engrossing and affecting , if ultimately not quite satisfying .",neutral,positive,False,positive,"[0.002200570423156023, 0.24870336055755615, 0.7490960359573364]",sst_local
 The only thing in Pauline and Paulette that you have n't seen before is a scene featuring a football field-sized Oriental rug crafted out of millions of vibrant flowers .,negative,neutral,False,neutral,"[0.008848811499774456, 0.8838412761688232, 0.10730990022420883]",sst_local
 "If you think that Jennifer Lopez has shown poor judgment in planning to marry Ben Affleck , wait till you see Maid in Manhattan .",negative,negative,True,negative,"[0.6345925331115723, 0.31820616126060486, 0.047201357781887054]",sst_local
@@ -5313,9 +5313,9 @@ The shuttles only go to the Whynn Hotel Resort and to the Caesar's Palace Forum 
 Called and asked about prices.,neutral,neutral,True,neutral,"[0.0012341216206550598, 0.9890214800834656, 0.009744422510266304]",dynasent_r1
 We recently moved to this part of town and there are just too many local joints to waste time or money on a bad one.,negative,neutral,False,neutral,"[0.33787837624549866, 0.4966486394405365, 0.16547304391860962]",dynasent_r1
 "Led by Griffin 's smartly nuanced performance and enthusiasm , the cast has a lot of fun with the material .",positive,positive,True,positive,"[1.9041734049096704e-05, 0.004204506985843182, 0.9957764744758606]",sst_local
-It wo n't rock any boats but is solid meat-and-potatoes filmmaking .,neutral,positive,False,positive,"[0.000857571663800627, 0.03783487528562546, 0.9613075256347656]",sst_local
+It wo n't rock any boats but is solid meat-and-potatoes filmmaking .,neutral,neutral,True,positive,"[0.000857571663800627, 0.03783487528562546, 0.9613075256347656]",sst_local
 They direct us to the country and they called the venue.,neutral,neutral,True,neutral,"[0.0002572660450823605, 0.9746111631393433, 0.025131598114967346]",dynasent_r2
-Can be a little pricey depending on what you order,negative,neutral,False,negative,"[0.9974688291549683, 0.001848964486271143, 0.0006821936694905162]",dynasent_r1
+Can be a little pricey depending on what you order,negative,negative,True,negative,"[0.9974688291549683, 0.001848964486271143, 0.0006821936694905162]",dynasent_r1
 A carefully structured scream of consciousness that is tortured and unsettling -- but unquestionably alive .,positive,positive,True,positive,"[0.0007568242726847529, 0.10031840950250626, 0.898924708366394]",sst_local
 I will start off by saying the optometrists was great.,positive,positive,True,positive,"[2.755706555035431e-05, 0.00010236983507638797, 0.9998700618743896]",dynasent_r1
 "Of course they hide behind blame toward the home warranty, but come on!",negative,negative,True,negative,"[0.993121325969696, 0.003233172930777073, 0.003645433811470866]",dynasent_r1
@@ -5579,7 +5579,7 @@ Brings out two more.,neutral,neutral,True,neutral,"[0.004941748920828104, 0.9675
 I ran off to the airport without desert.,neutral,neutral,True,neutral,"[0.3614684045314789, 0.6249929666519165, 0.013538667932152748]",dynasent_r1
 never buy,negative,negative,True,negative,"[0.684174656867981, 0.3038959205150604, 0.011929337866604328]",dynasent_r2
 I hate those overpriced prix fixe bullshit menus with their $100pp multi-course fiesta that always turns into poor quality and sloppy.,negative,negative,True,negative,"[0.9938722848892212, 0.003483149688690901, 0.002644600812345743]",dynasent_r1
-At first we were a little concerned about the price.,negative,neutral,False,negative,"[0.9495536684989929, 0.047115400433540344, 0.0033309380523860455]",dynasent_r1
+At first we were a little concerned about the price.,negative,negative,True,negative,"[0.9495536684989929, 0.047115400433540344, 0.0033309380523860455]",dynasent_r1
 It 's a bittersweet and lyrical mix of elements .,positive,positive,True,positive,"[0.0002920430270023644, 0.042220063507556915, 0.9574878215789795]",sst_local
 Prior to coming to The Joint our co-pay was $40 per visit.,neutral,neutral,True,neutral,"[0.012944851070642471, 0.927649974822998, 0.05940517410635948]",dynasent_r1
 But is be lying if I said anything I tasted from Rocco's was excellent.,negative,negative,True,negative,"[0.9794460535049438, 0.010948791168630123, 0.009605059400200844]",dynasent_r1
@@ -5638,7 +5638,7 @@ A well-made and often lovely depiction of the mysteries of friendship .,positive
 "I kept thinking over and over again , ' I should be enjoying this . '",negative,negative,True,negative,"[0.9561728835105896, 0.04053633660078049, 0.0032906942069530487]",sst_local
 I have eaten at Mesa Grill before and loved it.,positive,positive,True,positive,"[0.0001243826118297875, 8.705029904376715e-05, 0.9997885823249817]",dynasent_r1
 "In the second half of the film , Frei 's control loosens in direct proportion to the amount of screen time he gives Nachtwey for self-analysis .",negative,negative,True,negative,"[0.6083252429962158, 0.376015841960907, 0.01565898023545742]",sst_local
-There was plenty of open tables,positive,positive,True,positive,"[0.00036022294079884887, 0.001694397651590407, 0.9979453682899475]",dynasent_r1
+There was plenty of open tables,positive,neutral,False,positive,"[0.00036022294079884887, 0.001694397651590407, 0.9979453682899475]",dynasent_r1
 I was really starting to miss it.,positive,neutral,False,neutral,"[0.004708672408014536, 0.8025327920913696, 0.19275857508182526]",dynasent_r1
 They were great - on time (early even!,positive,positive,True,positive,"[1.9775050532189198e-05, 0.00012557597074192017, 0.999854564666748]",dynasent_r1
 "A provocative movie about loss , anger , greed , jealousy , sickness and love .",positive,positive,True,positive,"[0.00013309756468515843, 0.02061893232166767, 0.9792479276657104]",sst_local
@@ -5689,7 +5689,7 @@ RACIST!!,negative,negative,True,negative,"[0.9937886595726013, 0.002550503471866
 She brought another shot of the mix for me when I asked.,neutral,positive,False,positive,"[0.0019755230750888586, 0.07448972761631012, 0.9235346913337708]",dynasent_r2
 "My hope is in writing this review other see it, and do t get scared or bullied into treatments they don't need!",negative,negative,True,negative,"[0.7213623523712158, 0.19352522492408752, 0.08511243760585785]",dynasent_r1
 "So, this time while visiting AZ again we decided to eat inside.",neutral,neutral,True,neutral,"[0.00030379267991520464, 0.9786531925201416, 0.021042965352535248]",dynasent_r1
-"Wow, one person could totally handle all the work!",neutral,positive,False,positive,"[0.1565231829881668, 0.3678598701953888, 0.475616991519928]",dynasent_r2
+"Wow, one person could totally handle all the work!",neutral,neutral,True,positive,"[0.1565231829881668, 0.3678598701953888, 0.475616991519928]",dynasent_r2
 "ever heard of a smile, ladies?",negative,neutral,False,neutral,"[0.3259841799736023, 0.6641436815261841, 0.009872174821794033]",dynasent_r1
 A trite psychological thriller designed to keep the audience guessing and guessing -- which is not to be confused with suspecting -- until it comes time to wrap things up and send the viewers home .,neutral,negative,False,negative,"[0.8890907168388367, 0.10639491677284241, 0.0045143417082726955]",sst_local
 "He simply said to come back tomorrow night and he would ""take care of us.""",neutral,neutral,True,neutral,"[0.01785651035606861, 0.9484108090400696, 0.03373275324702263]",dynasent_r1
@@ -6052,7 +6052,7 @@ What a delightful little tea/dessert spot.,positive,positive,True,positive,"[2.3
 Dealership.,neutral,neutral,True,neutral,"[0.004863993264734745, 0.9743070006370544, 0.020829036831855774]",dynasent_r1
 A minor picture with a major identity crisis -- it 's sort of true and it 's sort of bogus and it 's ho-hum all the way through .,negative,negative,True,negative,"[0.9277752637863159, 0.0679931789636612, 0.0042315078899264336]",sst_local
 Dawdles and drags when it should pop ; it does n't even have the virtue of enough mindless violence to break up the tedium of all its generational bonding .,negative,negative,True,negative,"[0.9514578580856323, 0.046534616500139236, 0.0020076187793165445]",sst_local
-And if The Hours wins ` Best Picture ' I just might .,positive,positive,True,positive,"[0.008383224718272686, 0.314953476190567, 0.6766632795333862]",sst_local
+And if The Hours wins ` Best Picture ' I just might .,positive,neutral,False,positive,"[0.008383224718272686, 0.314953476190567, 0.6766632795333862]",sst_local
 "If you're looking for fine dining, this isn't your place.",negative,negative,True,negative,"[0.9977858066558838, 0.0011602361919358373, 0.0010539466748014092]",dynasent_r1
 ... In this incarnation its fizz is infectious .,positive,positive,True,positive,"[0.0001315056870225817, 0.008585099130868912, 0.9912834167480469]",sst_local
 "It may be an easy swipe to take , but this Barbershop just does n't make the cut .",negative,negative,True,negative,"[0.995218813419342, 0.0037306256126612425, 0.0010504996171221137]",sst_local
@@ -6228,7 +6228,7 @@ Keep your eyes focused on the customer and don't roll them when I ask for help.,
 "Luckily, it was pretty cheap.",positive,neutral,False,positive,"[0.00011220989108551294, 0.00047407447709701955, 0.9994137287139893]",dynasent_r1
 Resourceful and ingenious entertainment .,positive,positive,True,positive,"[2.20610381802544e-05, 0.000844207766931504, 0.9991337656974792]",sst_local
 Called Pete last week to inquire about having a toilet and water line replaced which was damaged by a tenant in my Las Vegas rental property.,neutral,neutral,True,neutral,"[0.0005179766449145973, 0.9902611374855042, 0.009220930747687817]",dynasent_r1
-A very average science fiction film .,negative,negative,True,negative,"[0.8888538479804993, 0.10571922361850739, 0.005426944699138403]",sst_local
+A very average science fiction film .,negative,neutral,False,negative,"[0.8888538479804993, 0.10571922361850739, 0.005426944699138403]",sst_local
 "Driving by, it didn't look like this place was open.",neutral,negative,False,negative,"[0.9498331546783447, 0.04824361205101013, 0.0019233127823099494]",dynasent_r1
 "Not only does the movie fail to make us part of its reality , it fails the most basic relevancy test as well .",negative,negative,True,negative,"[0.990240216255188, 0.00883965753018856, 0.0009201577049680054]",sst_local
 How can you get a babysitter for 1.5-2 hours.,neutral,neutral,True,neutral,"[0.0008148462511599064, 0.9862598776817322, 0.01292518712580204]",dynasent_r1
@@ -6355,7 +6355,7 @@ So relentlessly wholesome it made me want to swipe something .,neutral,negative,
 "Food is kinda like Lola Rosa in the McGill ghetto, if you've been there.",neutral,neutral,True,neutral,"[0.0016126011032611132, 0.978029191493988, 0.020358238369226456]",dynasent_r1
 The people all said everything my friends and I wanted to hear to just get us to keep traveling with them and shut us up!,negative,negative,True,negative,"[0.3908490538597107, 0.3273886442184448, 0.2817623019218445]",dynasent_r1
 Eight Crazy Nights is a showcase for Sandler 's many talents .,positive,positive,True,positive,"[0.0002978490956593305, 0.020862409844994545, 0.9788396954536438]",sst_local
-Japan 's premier stylist of sex and blood hits audiences with what may be his most demented film to date .,positive,positive,True,positive,"[0.0006692232564091682, 0.06492888927459717, 0.9344018697738647]",sst_local
+Japan 's premier stylist of sex and blood hits audiences with what may be his most demented film to date .,positive,negative,False,positive,"[0.0006692232564091682, 0.06492888927459717, 0.9344018697738647]",sst_local
 "This is a particularly toxic little bonbon , palatable to only a chosen and very jaundiced few .",negative,negative,True,negative,"[0.974705159664154, 0.018358809873461723, 0.006936096120625734]",sst_local
 If you want a chill afternoon with cool people then I'd recommend bringing your suit and hanging out at Spanish Fly.,positive,positive,True,positive,"[4.8713063733885065e-05, 0.00037442988832481205, 0.9995768666267395]",dynasent_r1
 "Though Howard demonstrates a great eye as a director , this Southern Gothic drama is sadly a tough sit , with an undeveloped narrative and enough flashbacks and heavy-handed metaphors to choke a horse -- or at least slow him down to a canter .",negative,negative,True,negative,"[0.9385776519775391, 0.056406110525131226, 0.00501627940684557]",sst_local
@@ -6411,7 +6411,7 @@ A TV episode inflated past its natural length .,negative,negative,True,negative,
 "With generic sets and B-grade special effects , Jason is about as convincing on the sci-fi front as TV 's defunct Cleopatra 2525 .",negative,negative,True,negative,"[0.9760112762451172, 0.022037448361516, 0.0019513152074068785]",sst_local
 Put it in a history book. Sounds like a fun read.,positive,positive,True,positive,"[0.03880365565419197, 0.36733224987983704, 0.5938640832901001]",dynasent_r2
 "Schmaltzy and unfunny , Adam Sandler 's cartoon about Hanukkah is numbingly bad , Little Nicky bad , 10 Worst List bad .",negative,negative,True,negative,"[0.994345486164093, 0.005005114246159792, 0.000649282883387059]",sst_local
-"A real story about real people living their lives concerned about the future of an elderly , mentally handicapped family member .",positive,neutral,False,positive,"[0.00023312328266911209, 0.06400559097528458, 0.9357613325119019]",sst_local
+"A real story about real people living their lives concerned about the future of an elderly , mentally handicapped family member .",positive,positive,True,positive,"[0.00023312328266911209, 0.06400559097528458, 0.9357613325119019]",sst_local
 "Viewed on its own terms , Treasure Planet is better-than-average family entertainment , but true fans of the Stevenson 's novel will likely prefer Disney 's more faithful 1950 live-action swashbuckling classic .",neutral,neutral,True,neutral,"[0.017671866342425346, 0.6947378516197205, 0.28759023547172546]",sst_local
 Perfect hole in the wall!,positive,positive,True,positive,"[0.00021072728850413114, 0.00079205515794456, 0.9989972710609436]",dynasent_r1
 "When the pizza came out I asked for aomenparmesean to sprinkle on the top and he pulled out his container and said ""say when"".",neutral,negative,False,negative,"[0.7050400972366333, 0.2823486626148224, 0.012611218728125095]",dynasent_r1
@@ -6439,7 +6439,7 @@ The last time I went to Kinkade's I had just moved to Phoenix and needed my A/C 
 "Witty , touching and well paced .",positive,positive,True,positive,"[1.886299651232548e-05, 0.0020942254923284054, 0.9978868365287781]",sst_local
 But where oh where were we to find the cute for our ailments?!,neutral,neutral,True,neutral,"[0.05939789488911629, 0.5851373672485352, 0.35546472668647766]",dynasent_r1
 "For a good chunk of its running time , Trapped is an effective and claustrophobic thriller .",positive,positive,True,positive,"[0.0002374327596044168, 0.024413414299488068, 0.9753492474555969]",sst_local
-Anne needs to get some reading spectacles.,negative,neutral,False,negative,"[0.5145425796508789, 0.46841081976890564, 0.017046550288796425]",dynasent_r1
+Anne needs to get some reading spectacles.,negative,negative,True,negative,"[0.5145425796508789, 0.46841081976890564, 0.017046550288796425]",dynasent_r1
 Ranks among Willams ' best screen work .,positive,positive,True,positive,"[9.777936793398112e-05, 0.014357773587107658, 0.9855445027351379]",sst_local
 (Bottomless mimosas!),positive,positive,True,positive,"[0.00147991010453552, 0.29914090037345886, 0.6993791460990906]",dynasent_r1
 She offered to connect me with the store manager.,neutral,neutral,True,neutral,"[0.00020218687132000923, 0.7301651239395142, 0.2696326971054077]",dynasent_r1
@@ -6476,7 +6476,7 @@ professional.",positive,positive,True,positive,"[1.829541906772647e-05, 0.000295
 I wonder what the reaction of Israelis will be to this supposedly evenhanded presentation .,neutral,neutral,True,neutral,"[0.02954208478331566, 0.9618204832077026, 0.008637355640530586]",sst_local
 "Still , I thought it could have been more .",negative,negative,True,negative,"[0.9888424873352051, 0.007222550921142101, 0.003934949636459351]",sst_local
 My experience began with a phone call requesting very obscurely whether or not they served decaf coffee.,neutral,neutral,True,neutral,"[0.003148109884932637, 0.9902591705322266, 0.006592767778784037]",dynasent_r1
-"Friend called a week in advance to reserve for a party of 20, called twice during week including sat, was told all good.",neutral,positive,False,positive,"[0.002102203667163849, 0.38947030901908875, 0.6084274649620056]",dynasent_r1
+"Friend called a week in advance to reserve for a party of 20, called twice during week including sat, was told all good.",neutral,neutral,True,positive,"[0.002102203667163849, 0.38947030901908875, 0.6084274649620056]",dynasent_r1
 I used to go to this location of Global Pet because we had had such great experiences with the staff.,positive,positive,True,positive,"[0.0002716543385758996, 0.005007842089980841, 0.994720458984375]",dynasent_r1
 Occasionally amateurishly made but a winsome cast and nice dialogue keeps it going .,neutral,positive,False,positive,"[0.009745661169290543, 0.35710570216178894, 0.6331486105918884]",sst_local
 "She lists ingredients , but never mixes and stirs .",negative,negative,True,negative,"[0.8986935019493103, 0.09729303419589996, 0.0040134829469025135]",sst_local
@@ -6517,7 +6517,7 @@ She kept the phone between her shoulder and ear.,neutral,neutral,True,neutral,"[
 It has been my experience at other restaurants that waiters do their best to ignore serving women because they expect a lousy gratuity.,negative,negative,True,negative,"[0.5551084280014038, 0.43208181858062744, 0.012809725478291512]",dynasent_r1
 "While the store does look huge on the outside, it doesn't really feel that spacious inside. It was disappointing.",negative,negative,True,negative,"[0.9989808201789856, 0.0004468939150683582, 0.0005722129135392606]",dynasent_r2
 We did go to Dickey's (7th street and Greenway) and had some decent bar-be-cue.,positive,positive,True,positive,"[0.0001547436841065064, 0.00028739270055666566, 0.9995577931404114]",dynasent_r1
-"The gentleman staffing the bar seemed a bit gruff, but a good caffeine fix will help me forgive even the orneriest grump.",negative,positive,False,negative,"[0.7852382659912109, 0.14993701875209808, 0.06482476741075516]",dynasent_r1
+"The gentleman staffing the bar seemed a bit gruff, but a good caffeine fix will help me forgive even the orneriest grump.",negative,neutral,False,negative,"[0.7852382659912109, 0.14993701875209808, 0.06482476741075516]",dynasent_r1
 Follow this link for a coupon: http://www.hobbylobby.com/weekly/coupon.cfm,neutral,neutral,True,neutral,"[0.0005609657964669168, 0.9725134372711182, 0.026925673708319664]",dynasent_r1
 De Niro may enjoy the same free ride from critics afforded to Clint Eastwood in the lazy Bloodwork .,negative,negative,True,negative,"[0.8027960658073425, 0.17919887602329254, 0.018005039542913437]",sst_local
 "Well done, jerks!",negative,negative,True,negative,"[0.9936191439628601, 0.0018368924502283335, 0.0045439074747264385]",dynasent_r1

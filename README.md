@@ -8,15 +8,23 @@ The research investigated collaborative approaches between bidirectional transfo
 
 - Augmenting GPT-4o-mini prompts with ELECTRA predictions significantly improved performance over either model alone
 - However, when GPT models were fine-tuned, including predictions decreased performance
-- Including probabilities or similar examples enhanced performance for GPT-4o on challenging datasets  
 - Fine-tuned GPT-4o-mini achieved nearly equivalent performance to GPT-4o at 76% lower cost
 - The best approach depends on project constraints (budget, privacy concerns, available compute resources)
+
+## Updates
+
+### March 30, 2025:
+- Added round 2 experiment results in [results_round2](results_round2), [electra_finetune](electra_finetune), and [gpt_finetune_experiments_round2.ipynb](gpt_finetune_experiments_round2.ipynb)
+- Corrected round one E7-G4O-ELFT data in [results](results) (was E14 now E19 in latest numbering), [gpt_finetune_experiments.ipynb](gpt_finetune_experiments.ipynb) and [statistics.ipynb](statistics.ipynb)
+- Updated [research_paper.pdf](research_paper.pdf), which addresses some reviewer feedback and includes 2 rounds of experiments
+- Updated [requirements.txt](requirements.txt)
 
 ## Resources
 
 ### Research
 - [ELECTRA and GPT-4o: Cost-Effective Partners for Sentiment Analysis](research_paper.pdf) - Research paper (PDF)
 - [arXiv preprint](http://arxiv.org/abs/2501.00062) - published Dec 29, 2024 in cs.CL, cross-posted to cs.AI (arXiv:2501.00062)
+- Accepted into NAACL 2025 [4th Workshop on Knowledge-Augmentation for Language Models and NLP Methods](https://knowledge-nlp.github.io/naacl2025/)
 
 ### Models 
 - [ELECTRA Base Classifier for Sentiment Analysis](https://huggingface.co/jbeno/electra-base-classifier-sentiment) - Fine-tuned ELECTRA base discriminator (Hugging Face)

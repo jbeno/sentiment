@@ -6,26 +6,22 @@ nltk>=3.7
 pytest>=7.1
 jupyter>=1.0.0
 pandas>=1.5
-# uncomment the following line to install pytorch and torchvision
-torch>=2.2.0; sys_platform != "linux" and sys_platform != "win32"
-torch>=2.2.0+${DEVICE}; sys_platform == "linux" or sys_platform == "win32"
+torch==2.1.2
 torchvision==0.16.2
 torchaudio==2.1.2
 transformers>=4.38.0
 datasets==2.14.6
 spacy==3.7.2
 dspy-ai==2.3.1
-# dependencies for dspy-ai
+onnx==1.17.0
 openai<=0.28.1
-python-dotenv
-wget
-
-# Additional required packages from imports
+python-dotenv>=1.0.1
+wget>=3.2
 tqdm>=4.66.0
 wandb>=0.18.0
 seaborn>=0.13.0
 tiktoken>=0.7.0
-phoenix-otel>=0.4.0  # For phoenix.otel
+arize-phoenix-otel>=0.4.1
 openinference-instrumentation>=0.1.16
 openinference-instrumentation-dspy>=0.1.12
 electra-classifier>=0.1.0

@@ -1,0 +1,150 @@
+{
+  "experiment_name": "E25-G4OMFT-EBFT-FT5",
+  "start_time": "2025-03-28 00:46:52",
+  "notes": "Experiment 25: Evaluate deep model collaboration through fine-tuning GPT-4o-mini and Electra Base fine-tuned model, fine-tuned on 5 epochs",
+  "instance": "electra_base_gpt_sentiment",
+  "dataset_shape": [
+    6530,
+    4
+  ],
+  "examples_length": 6530,
+  "results_shape": [
+    6530,
+    7
+  ],
+  "save_directory": "results_round2_take2",
+  "temperature": 0.1,
+  "random_seed": 123,
+  "merged_local": {
+    "negative": {
+      "precision": 0.8920634920634921,
+      "recall": 0.8363095238095238,
+      "f1-score": 0.8632872503840245,
+      "support": 2352.0
+    },
+    "neutral": {
+      "precision": 0.7200392927308448,
+      "recall": 0.8015308911973756,
+      "f1-score": 0.7586028460543338,
+      "support": 1829.0
+    },
+    "positive": {
+      "precision": 0.8934032328527741,
+      "recall": 0.870583226905066,
+      "f1-score": 0.881845623113411,
+      "support": 2349.0
+    },
+    "accuracy": 0.8388973966309341,
+    "macro avg": {
+      "precision": 0.8351686725490369,
+      "recall": 0.8361412139706551,
+      "f1-score": 0.834578573183923,
+      "support": 6530.0
+    },
+    "weighted avg": {
+      "precision": 0.8443628474286701,
+      "recall": 0.8388973966309341,
+      "f1-score": 0.8406418969418077,
+      "support": 6530.0
+    }
+  },
+  "dynasent_r1": {
+    "negative": {
+      "precision": 0.9428294573643411,
+      "recall": 0.8108333333333333,
+      "f1-score": 0.8718637992831542,
+      "support": 1200.0
+    },
+    "neutral": {
+      "precision": 0.7591587516960652,
+      "recall": 0.9325,
+      "f1-score": 0.8369483919222139,
+      "support": 1200.0
+    },
+    "positive": {
+      "precision": 0.9140767824497258,
+      "recall": 0.8333333333333334,
+      "f1-score": 0.8718395815170009,
+      "support": 1200.0
+    },
+    "accuracy": 0.8588888888888889,
+    "macro avg": {
+      "precision": 0.8720216638367108,
+      "recall": 0.8588888888888889,
+      "f1-score": 0.8602172575741229,
+      "support": 3600.0
+    },
+    "weighted avg": {
+      "precision": 0.8720216638367106,
+      "recall": 0.8588888888888889,
+      "f1-score": 0.8602172575741229,
+      "support": 3600.0
+    }
+  },
+  "dynasent_r2": {
+    "negative": {
+      "precision": 0.8125,
+      "recall": 0.8666666666666667,
+      "f1-score": 0.8387096774193549,
+      "support": 240.0
+    },
+    "neutral": {
+      "precision": 0.8019323671497585,
+      "recall": 0.6916666666666667,
+      "f1-score": 0.7427293064876958,
+      "support": 240.0
+    },
+    "positive": {
+      "precision": 0.8132295719844358,
+      "recall": 0.8708333333333333,
+      "f1-score": 0.8410462776659959,
+      "support": 240.0
+    },
+    "accuracy": 0.8097222222222222,
+    "macro avg": {
+      "precision": 0.8092206463780647,
+      "recall": 0.8097222222222222,
+      "f1-score": 0.8074950871910156,
+      "support": 720.0
+    },
+    "weighted avg": {
+      "precision": 0.8092206463780646,
+      "recall": 0.8097222222222222,
+      "f1-score": 0.8074950871910155,
+      "support": 720.0
+    }
+  },
+  "sst_local": {
+    "negative": {
+      "precision": 0.8571428571428571,
+      "recall": 0.8618421052631579,
+      "f1-score": 0.8594860579551667,
+      "support": 912.0
+    },
+    "neutral": {
+      "precision": 0.5098591549295775,
+      "recall": 0.4652956298200514,
+      "f1-score": 0.48655913978494625,
+      "support": 389.0
+    },
+    "positive": {
+      "precision": 0.8912579957356077,
+      "recall": 0.9196919691969196,
+      "f1-score": 0.9052517596101787,
+      "support": 909.0
+    },
+    "accuracy": 0.8158371040723982,
+    "macro avg": {
+      "precision": 0.752753335936014,
+      "recall": 0.748943234760043,
+      "f1-score": 0.7504323191167638,
+      "support": 2210.0
+    },
+    "weighted avg": {
+      "precision": 0.8100466131699361,
+      "recall": 0.8158371040723982,
+      "f1-score": 0.8126681627679224,
+      "support": 2210.0
+    }
+  }
+}
