@@ -13,6 +13,11 @@ The research investigated collaborative approaches between bidirectional transfo
 
 ## Updates
 
+### May 3, 2025:
+- Paper published in Proceedings of NAACL 2025 Workshop on Knowledge-Augmented Methods for NLP (pages 18-36)
+- Updated [arXiv listing](https://arxiv.org/abs/2501.00062) to v2 paper that addresses reviewer feedback and includes 2 rounds of experiments; added conference publication information
+- Added formal citation and ACL Anthology link (https://aclanthology.org/2025.knowledgenlp-1.2/)
+
 ### March 30, 2025:
 - Added round 2 experiment results in [results_round2](results_round2), [electra_finetune](electra_finetune), and [gpt_finetune_experiments_round2.ipynb](gpt_finetune_experiments_round2.ipynb)
 - Corrected round one E7-G4O-ELFT data in [results](results) (was E14 now E19 in latest numbering), [gpt_finetune_experiments.ipynb](gpt_finetune_experiments.ipynb) and [statistics.ipynb](statistics.ipynb)
@@ -24,7 +29,7 @@ The research investigated collaborative approaches between bidirectional transfo
 ### Research
 - [ELECTRA and GPT-4o: Cost-Effective Partners for Sentiment Analysis](research_paper.pdf) - Research paper (PDF)
 - [arXiv preprint](http://arxiv.org/abs/2501.00062) - published Dec 29, 2024 in cs.CL, cross-posted to cs.AI (arXiv:2501.00062)
-- Accepted into NAACL 2025 [4th Workshop on Knowledge-Augmentation for Language Models and NLP Methods](https://knowledge-nlp.github.io/naacl2025/)
+- Published in [Proceedings of the 4th International Workshop on Knowledge-Augmented Methods for Natural Language Processing](https://aclanthology.org/2025.knowledgenlp-1.2/), pages 18-36, NAACL 2025
 
 ### Models 
 - [ELECTRA Base Classifier for Sentiment Analysis](https://huggingface.co/jbeno/electra-base-classifier-sentiment) - Fine-tuned ELECTRA base discriminator (Hugging Face)
@@ -344,15 +349,24 @@ Code was created in VSCode with auto-complete assistance from GitHub CoPilot wit
 If you use this material in your research, please cite:
 
 ```bibtex
-@article{beno-2024-electragpt,
-      title={ELECTRA and GPT-4o: Cost-Effective Partners for Sentiment Analysis}, 
-      author={James P. Beno},
-      journal={arXiv preprint arXiv:2501.00062},
-      year={2024},
-      eprint={2501.00062},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2501.00062}, 
+@inproceedings{beno-2025-electra,
+    title = "{ELECTRA} and {GPT}-4o: Cost-Effective Partners for Sentiment Analysis",
+    author = "Beno, James P.",
+    editor = "Shi, Weijia  and
+      Yu, Wenhao  and
+      Asai, Akari  and
+      Jiang, Meng  and
+      Durrett, Greg  and
+      Hajishirzi, Hannaneh  and
+      Zettlemoyer, Luke",
+    booktitle = "Proceedings of the 4th International Workshop on Knowledge-Augmented Methods for Natural Language Processing",
+    month = may,
+    year = "2025",
+    address = "Albuquerque, New Mexico, USA",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2025.knowledgenlp-1.2/",
+    pages = "18--36",
+    ISBN = "979-8-89176-229-9"
 }
 ```
 
